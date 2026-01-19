@@ -7,21 +7,20 @@ public class BinanceApiException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     private final int code;
-    private final String message;
+    private final String apiMessage;
 
-    public BinanceApiException(int code, String message) {
-        super("Binance API error: " + code + " - " + message);
+    public BinanceApiException(int code, String apiMessage) {
+        super("Binance API error: " + code + " - " + apiMessage);
         this.code = code;
-        this.message = message;
+        this.apiMessage = apiMessage;
     }
 
     public int getCode() {
         return code;
     }
 
-    @Override
-    public String getMessage() {
-        return message;
+    public String getApiMessage() {
+        return apiMessage;
     }
 
     public boolean isRateLimited() {
