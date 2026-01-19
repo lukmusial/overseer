@@ -7,28 +7,23 @@ A modular high-frequency trading client in Java supporting:
 
 ## Java Setup (Required: Java 21)
 
-This project requires Java 21. Before running any commands:
+This project requires Java 21. The Java home is configured in `gradle.properties`:
+- **Intel Mac**: `/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
+- **Apple Silicon**: `/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
 
+All `./gradlew` commands will automatically use the configured Java version.
+
+### Installing Java 21 (if not present)
 ```bash
-# Check for Java 21 installation
-/usr/libexec/java_home -V 2>&1 | grep -E "21|openjdk@21"
+# Homebrew (recommended)
+brew install openjdk@21
 
-# If using brew-installed Java 21:
-export JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
-# Or on Apple Silicon:
-export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
-
-# Add to shell profile (~/.zshrc or ~/.bashrc) for persistence:
-echo 'export JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home' >> ~/.zshrc
-
-# Verify Java version
-java -version  # Should show: openjdk version "21.x.x"
+# Verify installation
+/usr/libexec/java_home -V 2>&1 | grep 21
 ```
 
-**For Claude Code:** Always prepend commands with JAVA_HOME if not set in shell:
-```bash
-export JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home && ./gradlew test
-```
+### Switching between Intel/Apple Silicon
+Edit `gradle.properties` and update `org.gradle.java.home` to match your architecture.
 
 ## Development Workflow (NON-NEGOTIABLE)
 
@@ -44,7 +39,7 @@ Never skip tests or commits. This ensures:
 - Regressions are caught immediately
 
 ```bash
-# Standard workflow (ensure JAVA_HOME is set first)
+# Standard workflow
 ./gradlew test && git add -A && git commit -m "Description of change"
 ```
 
