@@ -1,0 +1,48 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+*.swp
+*.swo
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (for React UI)
+hft-ui/node_modules/
+hft-ui/dist/
+hft-ui/.env.local
+
+# Runtime
+*.pid
+*.seed
+
+# Test outputs
+test-output/
+target/
+
+# Chronicle data
+*.cq4
+*.cq4t
