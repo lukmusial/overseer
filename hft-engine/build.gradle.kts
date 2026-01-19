@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":hft-core"))
     implementation(project(":hft-exchange-api"))
     implementation(project(":hft-risk"))
+    implementation(project(":hft-persistence"))
 
     // LMAX Disruptor for lock-free inter-thread messaging
     implementation("com.lmax:disruptor:$disruptorVersion")
