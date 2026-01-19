@@ -31,17 +31,36 @@ Edit `gradle.properties` and update `org.gradle.java.home` to match your archite
 
 1. **Implement the change**
 2. **Run tests** - `./gradlew test` must pass
-3. **Commit to git** - atomic commits with meaningful messages
+3. **Update documentation** - if the change affects architecture, update `docs/ARCHITECTURE.md`
+4. **Commit to git** - atomic commits with meaningful messages
 
-Never skip tests or commits. This ensures:
+Never skip tests, documentation updates, or commits. This ensures:
 - Code is always in a working state
 - Changes are tracked and reversible
 - Regressions are caught immediately
+- Documentation stays in sync with code
 
 ```bash
 # Standard workflow
 ./gradlew test && git add -A && git commit -m "Description of change"
 ```
+
+### Documentation Requirements
+
+**Update `docs/ARCHITECTURE.md` when:**
+- Adding or removing modules
+- Changing component interactions or data flow
+- Adding new trading algorithms or strategies
+- Modifying risk rules or circuit breaker behavior
+- Changing persistence mechanisms
+- Altering the event processing pipeline
+- Adding new sequence flows (e.g., new order types)
+
+**Documentation uses Mermaid diagrams** - ensure diagrams are updated to reflect changes:
+- Architecture diagrams for structural changes
+- Sequence diagrams for flow changes
+- Class diagrams for new interfaces/implementations
+- State diagrams for state machine changes
 
 ## Quick Start
 
@@ -66,6 +85,8 @@ Never skip tests or commits. This ensures:
 
 ```
 hft-client/
+├── docs/               # Architecture documentation with diagrams
+│   └── ARCHITECTURE.md # Component diagrams, sequence diagrams, algorithm visuals
 ├── hft-core/           # Domain models, interfaces (zero dependencies)
 ├── hft-algo/           # Trading algorithms (VWAP, TWAP, Momentum, Mean Reversion)
 ├── hft-exchange-api/   # Exchange port interfaces
