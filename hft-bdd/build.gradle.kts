@@ -1,8 +1,13 @@
-// hft-bdd: Cucumber BDD tests
+// hft-bdd: Cucumber BDD tests and JMH benchmarks
 
 val cucumberVersion: String by project
+val jmhVersion: String by project
 
 dependencies {
+    // JMH Benchmarks
+    testImplementation("org.openjdk.jmh:jmh-core:$jmhVersion")
+    testAnnotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:$jmhVersion")
+
     testImplementation(project(":hft-core"))
     testImplementation(project(":hft-algo"))
     testImplementation(project(":hft-engine"))
