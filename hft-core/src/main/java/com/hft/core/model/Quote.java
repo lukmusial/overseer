@@ -10,7 +10,8 @@ public class Quote implements Poolable {
     private long askPrice;      // Price in minor units
     private long bidSize;       // Size in base units
     private long askSize;       // Size in base units
-    private long timestamp;     // Epoch nanos
+    private long timestamp;     // Epoch nanos from exchange
+    private long receivedAt;    // Local receive time (nanos)
     private long sequenceNumber;
 
     // Price scale factor (e.g., 100 for 2 decimal places)
@@ -36,6 +37,7 @@ public class Quote implements Poolable {
         bidSize = 0;
         askSize = 0;
         timestamp = 0;
+        receivedAt = 0;
         sequenceNumber = 0;
     }
 
@@ -46,6 +48,7 @@ public class Quote implements Poolable {
         this.bidSize = other.bidSize;
         this.askSize = other.askSize;
         this.timestamp = other.timestamp;
+        this.receivedAt = other.receivedAt;
         this.sequenceNumber = other.sequenceNumber;
         this.priceScale = other.priceScale;
     }
@@ -97,6 +100,14 @@ public class Quote implements Poolable {
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public long getReceivedAt() {
+        return receivedAt;
+    }
+
+    public void setReceivedAt(long receivedAt) {
+        this.receivedAt = receivedAt;
     }
 
     public long getSequenceNumber() {
