@@ -5,6 +5,31 @@ A modular high-frequency trading client in Java supporting:
 - **Stocks**: Alpaca (REST/WebSocket API, paper trading)
 - **Crypto**: Binance (REST/WebSocket API, testnet)
 
+## Java Setup (Required: Java 21)
+
+This project requires Java 21. Before running any commands:
+
+```bash
+# Check for Java 21 installation
+/usr/libexec/java_home -V 2>&1 | grep -E "21|openjdk@21"
+
+# If using brew-installed Java 21:
+export JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+# Or on Apple Silicon:
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+
+# Add to shell profile (~/.zshrc or ~/.bashrc) for persistence:
+echo 'export JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home' >> ~/.zshrc
+
+# Verify Java version
+java -version  # Should show: openjdk version "21.x.x"
+```
+
+**For Claude Code:** Always prepend commands with JAVA_HOME if not set in shell:
+```bash
+export JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home && ./gradlew test
+```
+
 ## Development Workflow (NON-NEGOTIABLE)
 
 **Every functional change MUST follow this workflow:**
@@ -19,7 +44,7 @@ Never skip tests or commits. This ensures:
 - Regressions are caught immediately
 
 ```bash
-# Standard workflow
+# Standard workflow (ensure JAVA_HOME is set first)
 ./gradlew test && git add -A && git commit -m "Description of change"
 ```
 

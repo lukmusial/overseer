@@ -45,6 +45,9 @@ public class Order implements Poolable {
     private String strategyId;
     private String algorithmId;
 
+    // Rejection info
+    private String rejectReason;
+
     // Performance metrics
     private long submitLatencyNanos;
     private long ackLatencyNanos;
@@ -78,6 +81,7 @@ public class Order implements Poolable {
         lastUpdatedAt = 0;
         strategyId = null;
         algorithmId = null;
+        rejectReason = null;
         submitLatencyNanos = 0;
         ackLatencyNanos = 0;
         fillLatencyNanos = 0;
@@ -106,6 +110,7 @@ public class Order implements Poolable {
         this.lastUpdatedAt = other.lastUpdatedAt;
         this.strategyId = other.strategyId;
         this.algorithmId = other.algorithmId;
+        this.rejectReason = other.rejectReason;
         this.submitLatencyNanos = other.submitLatencyNanos;
         this.ackLatencyNanos = other.ackLatencyNanos;
         this.fillLatencyNanos = other.fillLatencyNanos;
@@ -343,6 +348,35 @@ public class Order implements Poolable {
     public void setQuantity(long quantity) {
         this.quantity = quantity;
         this.remainingQuantity = quantity;
+    }
+
+    public void setClientOrderId(long clientOrderId) {
+        this.clientOrderId = clientOrderId;
+    }
+
+    public void setFilledQuantity(long filledQuantity) {
+        this.filledQuantity = filledQuantity;
+        this.remainingQuantity = quantity - filledQuantity;
+    }
+
+    public void setAverageFilledPrice(long averageFilledPrice) {
+        this.averageFilledPrice = averageFilledPrice;
+    }
+
+    public void setSubmittedAt(long submittedAt) {
+        this.submittedAt = submittedAt;
+    }
+
+    public void setAcceptedAt(long acceptedAt) {
+        this.acceptedAt = acceptedAt;
+    }
+
+    public void setRejectReason(String rejectReason) {
+        this.rejectReason = rejectReason;
+    }
+
+    public String getRejectReason() {
+        return rejectReason;
     }
 
     public double getPriceAsDouble() {
