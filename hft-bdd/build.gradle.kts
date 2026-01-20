@@ -11,6 +11,8 @@ dependencies {
     testImplementation(project(":hft-core"))
     testImplementation(project(":hft-algo"))
     testImplementation(project(":hft-engine"))
+    testImplementation(project(":hft-risk"))
+    testImplementation(project(":hft-persistence"))
     testImplementation(project(":hft-exchange-api"))
     testImplementation(project(":hft-exchange-alpaca"))
     testImplementation(project(":hft-exchange-binance"))

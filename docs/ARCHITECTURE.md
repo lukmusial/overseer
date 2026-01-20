@@ -11,6 +11,7 @@ This document provides visual documentation of the HFT trading system architectu
 5. [Trading Algorithms](#trading-algorithms)
 6. [Risk Management](#risk-management)
 7. [Persistence Layer](#persistence-layer)
+8. [Testing Strategy](#testing-strategy)
 
 ---
 
@@ -1083,6 +1084,97 @@ graph LR
         end
     end
 ```
+
+---
+
+## Testing Strategy
+
+The system uses a comprehensive testing approach with BDD (Behavior-Driven Development) for end-to-end orchestration validation.
+
+### Test Categories
+
+```mermaid
+graph TB
+    subgraph "Test Pyramid"
+        E2E[E2E Orchestration Tests<br/>Cucumber BDD]
+        INT[Integration Tests<br/>Component Interaction]
+        UNIT[Unit Tests<br/>JUnit 5]
+        PERF[Performance Tests<br/>JMH Benchmarks]
+    end
+
+    E2E --> INT
+    INT --> UNIT
+    PERF -.-> UNIT
+```
+
+### End-to-End Orchestration Scenarios
+
+The BDD tests in `hft-bdd` module validate complete system flows:
+
+#### Signal to Order Flow
+```mermaid
+sequenceDiagram
+    participant Market
+    participant Strategy
+    participant Engine
+    participant Risk
+    participant Persistence
+
+    Market->>Strategy: Price Update (Quote)
+    Strategy->>Strategy: Calculate Signal
+    Strategy->>Engine: Generate Order
+    Engine->>Risk: Pre-Trade Check
+    Risk-->>Engine: Approved/Rejected
+    Engine->>Persistence: Log Event
+```
+
+#### Risk Rejection Scenarios
+Tests verify that orders are properly rejected when:
+- Order size exceeds maximum (`MaxOrderSizeRule`)
+- Position size would exceed maximum (`MaxPositionSizeRule`)
+- Daily notional limit exceeded (`MaxDailyNotionalRule`)
+- Daily loss limit breached (`MaxDailyLossRule`)
+- Net/Gross exposure limits exceeded
+
+#### Position and P&L Tracking
+```mermaid
+sequenceDiagram
+    participant Order
+    participant Engine
+    participant Position
+    participant PnL
+
+    Order->>Engine: Order Filled
+    Engine->>Position: Update Position
+    Position->>Position: Calculate Avg Entry
+    Position->>PnL: Calculate Unrealized
+    Engine->>Engine: Price Update
+    PnL->>PnL: Recalculate P&L
+```
+
+### Running Tests
+
+```bash
+# Run all BDD tests
+./gradlew :hft-bdd:test
+
+# Run E2E orchestration tests only
+./gradlew :hft-bdd:test --tests '*EndToEnd*'
+
+# Run performance benchmarks
+./gradlew :hft-bdd:test --tests '*Performance*'
+```
+
+### Key Test Scenarios
+
+| Scenario Group | Description |
+|----------------|-------------|
+| Signal → Order | Market signals flow through strategies to generate orders |
+| Risk Rejection | Orders blocked by various risk limits |
+| Circuit Breaker | Trading halted after repeated rejections |
+| Fill → P&L | Order fills update positions and calculate P&L |
+| Persistence | All events recorded in audit log and trade journal |
+| Engine State | State snapshots and daily resets |
 
 ---
 
