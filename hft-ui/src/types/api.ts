@@ -50,14 +50,38 @@ export interface Position {
   isFlat: boolean;
 }
 
+export type AlgorithmState = 'CREATED' | 'RUNNING' | 'PAUSED' | 'STOPPED' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
+
+export interface StrategyStats {
+  startTimeNanos: number;
+  endTimeNanos: number;
+  totalOrders: number;
+  filledOrders: number;
+  cancelledOrders: number;
+  rejectedOrders: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  maxDrawdown: number;
+}
+
 export interface Strategy {
   id: string;
   name: string;
-  type: StrategyType;
-  symbol: string;
+  type: string;
+  state: AlgorithmState;
+  symbols: string[];
+  parameters: Record<string, unknown>;
+  progress: number;
+  stats: StrategyStats | null;
+}
+
+export interface ExchangeStatus {
   exchange: string;
-  enabled: boolean;
-  parameters: Record<string, string>;
+  name: string;
+  connected: boolean;
+  authenticated: boolean;
+  lastHeartbeat: number | null;
+  errorMessage: string | null;
 }
 
 export interface CreateOrderRequest {
@@ -73,11 +97,10 @@ export interface CreateOrderRequest {
 }
 
 export interface CreateStrategyRequest {
-  name: string;
-  type: StrategyType;
-  symbol: string;
+  type: string;
+  symbols: string[];
   exchange: string;
-  parameters: Record<string, string>;
+  parameters: Record<string, unknown>;
 }
 
 export interface Notification {

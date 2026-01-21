@@ -6,6 +6,7 @@ import type {
   Strategy,
   CreateOrderRequest,
   CreateStrategyRequest,
+  ExchangeStatus,
 } from '../types/api';
 
 const API_BASE = '/api';
@@ -77,16 +78,24 @@ export function useApi() {
     });
   }, []);
 
-  const enableStrategy = useCallback(async (id: string): Promise<void> => {
-    await fetch(`${API_BASE}/strategies/${id}/enable`, { method: 'POST' });
+  const startStrategy = useCallback(async (id: string): Promise<void> => {
+    await fetch(`${API_BASE}/strategies/${id}/start`, { method: 'POST' });
   }, []);
 
-  const disableStrategy = useCallback(async (id: string): Promise<void> => {
-    await fetch(`${API_BASE}/strategies/${id}/disable`, { method: 'POST' });
+  const stopStrategy = useCallback(async (id: string): Promise<void> => {
+    await fetch(`${API_BASE}/strategies/${id}/stop`, { method: 'POST' });
+  }, []);
+
+  const getStrategy = useCallback(async (id: string): Promise<Strategy> => {
+    return fetchJson<Strategy>(`${API_BASE}/strategies/${id}`);
   }, []);
 
   const removeStrategy = useCallback(async (id: string): Promise<void> => {
     await fetch(`${API_BASE}/strategies/${id}`, { method: 'DELETE' });
+  }, []);
+
+  const getExchangeStatus = useCallback(async (): Promise<ExchangeStatus[]> => {
+    return fetchJson<ExchangeStatus[]>(`${API_BASE}/exchanges/status`);
   }, []);
 
   return {
@@ -99,9 +108,11 @@ export function useApi() {
     cancelOrder,
     getPositions,
     getStrategies,
+    getStrategy,
     createStrategy,
-    enableStrategy,
-    disableStrategy,
+    startStrategy,
+    stopStrategy,
     removeStrategy,
+    getExchangeStatus,
   };
 }

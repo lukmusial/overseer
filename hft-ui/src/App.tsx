@@ -4,14 +4,17 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { EngineStatus } from './components/EngineStatus';
 import { StrategyList } from './components/StrategyList';
 import { StrategyForm } from './components/StrategyForm';
+import { StrategyInspector } from './components/StrategyInspector';
 import { OrderList } from './components/OrderList';
 import { PositionList } from './components/PositionList';
+import { ExchangeStatusPanel } from './components/ExchangeStatusPanel';
 import type {
   EngineStatus as EngineStatusType,
   Order,
   Position,
   Strategy,
   CreateStrategyRequest,
+  ExchangeStatus as ExchangeStatusType,
 } from './types/api';
 import './App.css';
 
@@ -20,7 +23,9 @@ export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+  const [exchanges, setExchanges] = useState<ExchangeStatusType[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
+  const [inspectedStrategy, setInspectedStrategy] = useState<Strategy | null>(null);
 
   const api = useApi();
   const { connected, subscribe } = useWebSocket({
@@ -45,9 +50,30 @@ export default function App() {
       } catch (error) {
         console.error('Failed to load data:', error);
       }
+
+      // Load exchange status separately (may not exist yet)
+      try {
+        const exchangeStatus = await api.getExchangeStatus();
+        setExchanges(exchangeStatus);
+      } catch (error) {
+        console.log('Exchange status endpoint not available');
+      }
     };
     loadData();
   }, []);
+
+  // Poll exchange status every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const exchangeStatus = await api.getExchangeStatus();
+        setExchanges(exchangeStatus);
+      } catch {
+        // Silently ignore - endpoint may not exist
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [api]);
 
   // WebSocket subscriptions
   useEffect(() => {
@@ -77,11 +103,23 @@ export default function App() {
         return [position, ...prev];
       });
     });
+    const unsubStrategies = subscribe<Strategy>('/topic/strategies', (strategy) => {
+      setStrategies((prev) => {
+        const idx = prev.findIndex((s) => s.id === strategy.id);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = strategy;
+          return updated;
+        }
+        return [...prev, strategy];
+      });
+    });
 
     return () => {
       unsubStatus();
       unsubOrders();
       unsubPositions();
+      unsubStrategies();
     };
   }, [connected, subscribe]);
 
@@ -112,25 +150,25 @@ export default function App() {
     }
   }, [api]);
 
-  const handleEnableStrategy = useCallback(async (id: string) => {
+  const handleStartStrategy = useCallback(async (id: string) => {
     try {
-      await api.enableStrategy(id);
+      await api.startStrategy(id);
       setStrategies((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, enabled: true } : s))
+        prev.map((s) => (s.id === id ? { ...s, state: 'RUNNING' } : s))
       );
     } catch (error) {
-      console.error('Failed to enable strategy:', error);
+      console.error('Failed to start strategy:', error);
     }
   }, [api]);
 
-  const handleDisableStrategy = useCallback(async (id: string) => {
+  const handleStopStrategy = useCallback(async (id: string) => {
     try {
-      await api.disableStrategy(id);
+      await api.stopStrategy(id);
       setStrategies((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, enabled: false } : s))
+        prev.map((s) => (s.id === id ? { ...s, state: 'STOPPED' } : s))
       );
     } catch (error) {
-      console.error('Failed to disable strategy:', error);
+      console.error('Failed to stop strategy:', error);
     }
   }, [api]);
 
@@ -142,6 +180,10 @@ export default function App() {
       console.error('Failed to remove strategy:', error);
     }
   }, [api]);
+
+  const handleInspectStrategy = useCallback((strategy: Strategy) => {
+    setInspectedStrategy(strategy);
+  }, []);
 
   // Order operations
   const handleCancelOrder = useCallback(async (orderId: number) => {
@@ -157,7 +199,7 @@ export default function App() {
       <header>
         <h1>HFT Trading Dashboard</h1>
         <div className={`connection-status ${wsConnected ? 'connected' : 'disconnected'}`}>
-          {wsConnected ? 'Connected' : 'Disconnected'}
+          {wsConnected ? 'WebSocket Connected' : 'WebSocket Disconnected'}
         </div>
       </header>
       <main>
@@ -168,20 +210,29 @@ export default function App() {
               onStart={handleStartEngine}
               onStop={handleStopEngine}
             />
+            <ExchangeStatusPanel exchanges={exchanges} />
             <StrategyForm onSubmit={handleCreateStrategy} />
           </div>
           <div className="col-right">
             <StrategyList
               strategies={strategies}
-              onEnable={handleEnableStrategy}
-              onDisable={handleDisableStrategy}
+              onStart={handleStartStrategy}
+              onStop={handleStopStrategy}
               onRemove={handleRemoveStrategy}
+              onInspect={handleInspectStrategy}
             />
             <PositionList positions={positions} />
             <OrderList orders={orders} onCancel={handleCancelOrder} />
           </div>
         </div>
       </main>
+
+      {inspectedStrategy && (
+        <StrategyInspector
+          strategy={inspectedStrategy}
+          onClose={() => setInspectedStrategy(null)}
+        />
+      )}
     </div>
   );
 }

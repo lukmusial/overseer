@@ -1,26 +1,39 @@
 import { useState } from 'react';
-import type { StrategyType, CreateStrategyRequest } from '../types/api';
+import type { CreateStrategyRequest } from '../types/api';
 
 interface Props {
   onSubmit: (strategy: CreateStrategyRequest) => void;
 }
 
-const STRATEGY_TYPES: StrategyType[] = ['VWAP', 'TWAP', 'MOMENTUM', 'MEAN_REVERSION'];
+type StrategyType = 'momentum' | 'meanreversion';
+
+const STRATEGY_TYPES: { value: StrategyType; label: string }[] = [
+  { value: 'momentum', label: 'Momentum' },
+  { value: 'meanreversion', label: 'Mean Reversion' },
+];
+
 const EXCHANGES = ['ALPACA', 'BINANCE'];
 
-const DEFAULT_PARAMS: Record<StrategyType, Record<string, string>> = {
-  VWAP: { targetQuantity: '1000', durationMinutes: '30', participationRate: '0.1' },
-  TWAP: { targetQuantity: '1000', durationMinutes: '30', sliceCount: '10' },
-  MOMENTUM: { lookbackPeriod: '20', momentumThreshold: '0.02', positionSize: '100' },
-  MEAN_REVERSION: { lookbackPeriod: '20', stdDevThreshold: '2.0', positionSize: '100' },
+const DEFAULT_PARAMS: Record<StrategyType, Record<string, unknown>> = {
+  momentum: {
+    shortPeriod: 10,
+    longPeriod: 30,
+    signalThreshold: 0.02,
+    maxPositionSize: 1000,
+  },
+  meanreversion: {
+    lookbackPeriod: 20,
+    entryZScore: 2.0,
+    exitZScore: 0.5,
+    maxPositionSize: 1000,
+  },
 };
 
 export function StrategyForm({ onSubmit }: Props) {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<StrategyType>('VWAP');
+  const [type, setType] = useState<StrategyType>('momentum');
   const [symbol, setSymbol] = useState('');
   const [exchange, setExchange] = useState('ALPACA');
-  const [parameters, setParameters] = useState<Record<string, string>>(DEFAULT_PARAMS.VWAP);
+  const [parameters, setParameters] = useState<Record<string, unknown>>(DEFAULT_PARAMS.momentum);
 
   const handleTypeChange = (newType: StrategyType) => {
     setType(newType);
@@ -28,13 +41,21 @@ export function StrategyForm({ onSubmit }: Props) {
   };
 
   const handleParamChange = (key: string, value: string) => {
-    setParameters((prev) => ({ ...prev, [key]: value }));
+    const numValue = parseFloat(value);
+    setParameters((prev) => ({
+      ...prev,
+      [key]: isNaN(numValue) ? value : numValue,
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ name, type, symbol, exchange, parameters });
-    setName('');
+    onSubmit({
+      type,
+      symbols: [symbol],
+      exchange,
+      parameters,
+    });
     setSymbol('');
   };
 
@@ -43,20 +64,10 @@ export function StrategyForm({ onSubmit }: Props) {
       <h2>Create Strategy</h2>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label>Name:</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            placeholder="My VWAP Strategy"
-          />
-        </div>
-        <div className="form-group">
           <label>Type:</label>
           <select value={type} onChange={(e) => handleTypeChange(e.target.value as StrategyType)}>
             {STRATEGY_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
         </div>
@@ -84,7 +95,7 @@ export function StrategyForm({ onSubmit }: Props) {
             <label>{key}:</label>
             <input
               type="text"
-              value={value}
+              value={String(value)}
               onChange={(e) => handleParamChange(key, e.target.value)}
             />
           </div>
