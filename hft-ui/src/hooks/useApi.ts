@@ -7,6 +7,7 @@ import type {
   CreateOrderRequest,
   CreateStrategyRequest,
   ExchangeStatus,
+  TradingSymbol,
 } from '../types/api';
 
 const API_BASE = '/api';
@@ -98,6 +99,10 @@ export function useApi() {
     return fetchJson<ExchangeStatus[]>(`${API_BASE}/exchanges/status`);
   }, []);
 
+  const getSymbols = useCallback(async (exchange: string): Promise<TradingSymbol[]> => {
+    return fetchJson<TradingSymbol[]>(`${API_BASE}/exchanges/${exchange}/symbols`);
+  }, []);
+
   return {
     getEngineStatus,
     startEngine,
@@ -114,5 +119,6 @@ export function useApi() {
     stopStrategy,
     removeStrategy,
     getExchangeStatus,
+    getSymbols,
   };
 }

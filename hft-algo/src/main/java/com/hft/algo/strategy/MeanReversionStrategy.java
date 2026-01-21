@@ -45,7 +45,11 @@ public class MeanReversionStrategy extends AbstractTradingStrategy {
     private long maxPositionSize;
 
     public MeanReversionStrategy(Set<Symbol> symbols, StrategyParameters parameters) {
-        super(symbols, parameters);
+        this(symbols, parameters, null);
+    }
+
+    public MeanReversionStrategy(Set<Symbol> symbols, StrategyParameters parameters, String customName) {
+        super(symbols, parameters, customName);
         loadParameters();
 
         // Initialize price histories

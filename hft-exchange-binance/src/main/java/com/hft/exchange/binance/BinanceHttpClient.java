@@ -3,6 +3,7 @@ package com.hft.exchange.binance;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hft.exchange.binance.dto.BinanceExchangeInfo;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -224,6 +225,14 @@ public class BinanceHttpClient {
         } catch (Exception e) {
             return new BinanceApiException(-1, body);
         }
+    }
+
+    /**
+     * Fetches exchange information including all available trading symbols.
+     * This is a public endpoint that does not require authentication.
+     */
+    public CompletableFuture<BinanceExchangeInfo> getExchangeInfo() {
+        return publicGet("/api/v3/exchangeInfo", BinanceExchangeInfo.class);
     }
 
     public void close() {

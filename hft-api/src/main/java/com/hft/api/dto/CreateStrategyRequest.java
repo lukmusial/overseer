@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 public record CreateStrategyRequest(
+        String name,
         @NotBlank String type,
         @NotEmpty List<String> symbols,
         @NotBlank String exchange,

@@ -45,7 +45,11 @@ public class MomentumStrategy extends AbstractTradingStrategy {
     private double longMultiplier;
 
     public MomentumStrategy(Set<Symbol> symbols, StrategyParameters parameters) {
-        super(symbols, parameters);
+        this(symbols, parameters, null);
+    }
+
+    public MomentumStrategy(Set<Symbol> symbols, StrategyParameters parameters, String customName) {
+        super(symbols, parameters, customName);
         loadParameters();
     }
 

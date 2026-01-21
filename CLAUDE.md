@@ -30,9 +30,10 @@ Edit `gradle.properties` and update `org.gradle.java.home` to match your archite
 **Every functional change MUST follow this workflow:**
 
 1. **Implement the change**
-2. **Run tests** - `./gradlew test` must pass
-3. **Update documentation** - if the change affects architecture, update `docs/ARCHITECTURE.md`
-4. **Commit to git** - atomic commits with meaningful messages
+2. **Write tests** - NEW FUNCTIONALITY MUST HAVE TESTS (see Testing Requirements below)
+3. **Run tests** - `./gradlew test` and `npm test` (for UI changes) must pass
+4. **Update documentation** - if the change affects architecture, update `docs/ARCHITECTURE.md`
+5. **Commit to git** - atomic commits with meaningful messages
 
 Never skip tests, documentation updates, or commits. This ensures:
 - Code is always in a working state
@@ -41,9 +42,81 @@ Never skip tests, documentation updates, or commits. This ensures:
 - Documentation stays in sync with code
 
 ```bash
-# Standard workflow
+# Standard workflow for backend changes
 ./gradlew test && git add -A && git commit -m "Description of change"
+
+# Standard workflow for frontend changes
+cd hft-ui && npm test && cd .. && git add -A && git commit -m "Description of change"
+
+# Full stack changes
+./gradlew test && cd hft-ui && npm test && cd .. && git add -A && git commit -m "Description of change"
 ```
+
+### Testing Requirements (MANDATORY)
+
+**All new functionality MUST include corresponding tests.** This is non-negotiable.
+
+#### Backend (Java) Testing
+
+For new/modified code, add tests to the appropriate module's `src/test/java` directory:
+
+| Module | Test Location | Test Type |
+|--------|--------------|-----------|
+| `hft-core` | `hft-core/src/test/java/com/hft/core/` | Unit tests for domain models |
+| `hft-algo` | `hft-algo/src/test/java/com/hft/algo/` | Unit tests for algorithms |
+| `hft-api` | `hft-api/src/test/java/com/hft/api/` | Controller tests (MockMvc), Service tests |
+| `hft-exchange-*` | `hft-exchange-*/src/test/java/` | Integration tests for exchange adapters |
+| `hft-bdd` | `hft-bdd/src/test/resources/features/` | End-to-end BDD scenarios |
+
+**Backend test patterns:**
+- Controllers: Use `@WebMvcTest` with `MockMvc` for REST endpoint testing
+- Services: Use `@ExtendWith(MockitoExtension.class)` for unit tests
+- Integration: Use `@SpringBootTest` for full context tests
+
+```bash
+# Run all backend tests
+./gradlew test
+
+# Run specific module tests
+./gradlew :hft-api:test
+./gradlew :hft-algo:test
+```
+
+#### Frontend (React/TypeScript) Testing
+
+The UI uses Vitest + React Testing Library. Tests are located alongside components:
+
+| Type | Location | Pattern |
+|------|----------|---------|
+| Hook tests | `src/hooks/*.test.ts` | Test custom hooks in isolation |
+| Component tests | `src/components/*.test.tsx` | Test component behavior and rendering |
+
+**Frontend test patterns:**
+- Use `vi.mock()` to mock dependencies (hooks, API calls)
+- Use `render()`, `screen`, `fireEvent`, `waitFor` from testing-library
+- Test user interactions, not implementation details
+
+```bash
+# Run frontend tests
+cd hft-ui && npm test
+
+# Run with coverage
+cd hft-ui && npm run test:coverage
+
+# Watch mode for development
+cd hft-ui && npm run test:watch
+```
+
+#### What MUST Be Tested
+
+| Change Type | Required Tests |
+|-------------|----------------|
+| New REST endpoint | Controller test with MockMvc |
+| New service method | Service unit test |
+| New React component | Component render + interaction tests |
+| New custom hook | Hook unit test |
+| New algorithm | Unit tests + BDD scenario |
+| Bug fix | Regression test proving fix |
 
 ### Documentation Requirements
 
@@ -98,7 +171,7 @@ hft-client/
 ├── hft-api/            # Spring Boot REST/WebSocket API
 ├── hft-app/            # Main application assembly
 ├── hft-bdd/            # Cucumber BDD tests & JMH benchmarks
-└── hft-ui/             # React frontend (future)
+└── hft-ui/             # React frontend (Vitest + React Testing Library)
 ```
 
 ## Architecture (Hexagonal/Ports & Adapters)
@@ -154,10 +227,19 @@ try {
 
 ## Testing
 
-### Unit Tests
+### Backend Unit Tests
 Located in `src/test/java` of each module. Run with:
 ```bash
 ./gradlew :hft-core:test
+./gradlew :hft-api:test
+./gradlew test  # All modules
+```
+
+### Frontend Unit Tests (Vitest)
+Located in `hft-ui/src/**/*.test.{ts,tsx}`. Run with:
+```bash
+cd hft-ui && npm test
+cd hft-ui && npm run test:coverage
 ```
 
 ### BDD Tests (Cucumber)
@@ -220,11 +302,18 @@ Key benchmarks:
 - Chronicle Wire 2.25.0 (zero-GC serialization)
 - OkHttp 4.12.0 (HTTP/WebSocket)
 
-### Testing
+### Testing (Backend)
 - JUnit 5.10.2
 - Mockito 5.10.0
 - Cucumber 7.15.0
 - JMH 1.37
+- Spring Boot Test (MockMvc)
+
+### Testing (Frontend)
+- Vitest 4.x
+- React Testing Library
+- @testing-library/jest-dom
+- @testing-library/user-event
 
 ## Common Tasks
 

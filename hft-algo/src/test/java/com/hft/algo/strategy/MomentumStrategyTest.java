@@ -61,6 +61,22 @@ class MomentumStrategyTest {
     }
 
     @Test
+    void getDisplayName_WithCustomName_ShouldReturnCustomName() {
+        MomentumStrategy customStrategy = new MomentumStrategy(
+                Set.of(testSymbol),
+                new com.hft.algo.base.StrategyParameters(),
+                "My Custom Momentum"
+        );
+        customStrategy.initialize(context);
+        assertEquals("My Custom Momentum", customStrategy.getDisplayName());
+    }
+
+    @Test
+    void getDisplayName_WithoutCustomName_ShouldReturnTypeName() {
+        assertEquals("Momentum", strategy.getDisplayName());
+    }
+
+    @Test
     void onQuote_ShouldInitializeEma() {
         strategy.start();
 

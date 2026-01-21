@@ -48,7 +48,7 @@ class StrategyControllerTest {
     @Test
     void createStrategy_createsNewStrategy() throws Exception {
         CreateStrategyRequest request = new CreateStrategyRequest(
-                "momentum", List.of("AAPL"), "ALPACA",
+                "My Strategy", "momentum", List.of("AAPL"), "ALPACA",
                 Map.of("shortPeriod", 10, "longPeriod", 30)
         );
         StrategyDto created = createStrategyDto("new-strat", AlgorithmState.INITIALIZED);
@@ -64,7 +64,7 @@ class StrategyControllerTest {
     @Test
     void createStrategy_validatesRequest() throws Exception {
         CreateStrategyRequest invalidRequest = new CreateStrategyRequest(
-                "", List.of(), "ALPACA", Map.of()
+                null, "", List.of(), "ALPACA", Map.of()
         );
 
         mockMvc.perform(post("/api/strategies")

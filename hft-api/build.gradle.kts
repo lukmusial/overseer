@@ -10,6 +10,8 @@ dependencies {
     implementation(project(":hft-algo"))
     implementation(project(":hft-engine"))
     implementation(project(":hft-exchange-api"))
+    implementation(project(":hft-exchange-alpaca"))
+    implementation(project(":hft-exchange-binance"))
     implementation(project(":hft-risk"))
 
     // Spring Boot

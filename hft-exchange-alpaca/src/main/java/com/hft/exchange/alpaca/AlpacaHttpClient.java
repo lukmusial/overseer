@@ -8,7 +8,10 @@ import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.hft.exchange.alpaca.dto.AlpacaAsset;
+
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -205,6 +208,78 @@ public class AlpacaHttpClient {
         });
 
         return future;
+    }
+
+    /**
+     * Fetches all available assets from Alpaca.
+     * @param assetClass Filter by asset class: "us_equity", "crypto", or null for all
+     * @param status Filter by status: "active", "inactive", or null for all
+     */
+    public CompletableFuture<List<AlpacaAsset>> getAssets(String assetClass, String status) {
+        StringBuilder path = new StringBuilder("/v2/assets");
+        boolean hasParam = false;
+
+        if (status != null && !status.isBlank()) {
+            path.append("?status=").append(status);
+            hasParam = true;
+        }
+
+        if (assetClass != null && !assetClass.isBlank()) {
+            path.append(hasParam ? "&" : "?").append("asset_class=").append(assetClass);
+        }
+
+        String url = config.getTradingUrl() + path;
+        Request request = new Request.Builder()
+                .url(url)
+                .headers(buildHeaders())
+                .get()
+                .build();
+
+        CompletableFuture<List<AlpacaAsset>> future = new CompletableFuture<>();
+
+        httpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                log.error("Request failed: {} {}", request.method(), request.url(), e);
+                future.completeExceptionally(e);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) {
+                try (response) {
+                    String body = response.body() != null ? response.body().string() : null;
+
+                    if (response.isSuccessful() && body != null) {
+                        List<AlpacaAsset> assets = objectMapper.readValue(body,
+                                objectMapper.getTypeFactory().constructCollectionType(List.class, AlpacaAsset.class));
+                        future.complete(assets);
+                    } else {
+                        log.error("API error: {} {} - {} {}",
+                                request.method(), request.url(), response.code(), body);
+                        future.completeExceptionally(new AlpacaApiException(response.code(), body));
+                    }
+                } catch (Exception e) {
+                    log.error("Error parsing response", e);
+                    future.completeExceptionally(e);
+                }
+            }
+        });
+
+        return future;
+    }
+
+    /**
+     * Fetches active tradable equity assets from Alpaca.
+     */
+    public CompletableFuture<List<AlpacaAsset>> getActiveEquities() {
+        return getAssets("us_equity", "active");
+    }
+
+    /**
+     * Fetches active tradable crypto assets from Alpaca.
+     */
+    public CompletableFuture<List<AlpacaAsset>> getActiveCrypto() {
+        return getAssets("crypto", "active");
     }
 
     public void close() {

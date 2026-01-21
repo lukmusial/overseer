@@ -1,10 +1,13 @@
 package com.hft.api.service;
 
+import com.hft.algo.base.AbstractTradingStrategy;
 import com.hft.algo.base.AlgorithmState;
 import com.hft.algo.base.StrategyParameters;
 import com.hft.algo.base.TradingStrategy;
 import com.hft.algo.strategy.MeanReversionStrategy;
 import com.hft.algo.strategy.MomentumStrategy;
+import com.hft.algo.strategy.TwapStrategy;
+import com.hft.algo.strategy.VwapStrategy;
 import com.hft.api.dto.*;
 import com.hft.core.model.*;
 import com.hft.engine.TradingEngine;
@@ -128,10 +131,13 @@ public class TradingService {
             request.parameters().forEach(params::set);
         }
 
+        String customName = request.name();
         TradingStrategy strategy;
         switch (request.type().toLowerCase()) {
-            case "momentum" -> strategy = new MomentumStrategy(symbols, params);
-            case "meanreversion", "mean_reversion" -> strategy = new MeanReversionStrategy(symbols, params);
+            case "momentum" -> strategy = new MomentumStrategy(symbols, params, customName);
+            case "meanreversion", "mean_reversion" -> strategy = new MeanReversionStrategy(symbols, params, customName);
+            case "vwap" -> strategy = new VwapStrategy(symbols, params, customName);
+            case "twap" -> strategy = new TwapStrategy(symbols, params, customName);
             default -> throw new IllegalArgumentException("Unknown strategy type: " + request.type());
         }
 
@@ -190,10 +196,16 @@ public class TradingService {
                 strategy.getMaxDrawdown()
         );
 
+        // Get display name (custom name if set, otherwise type name)
+        String displayName = strategy.getName();
+        if (strategy instanceof AbstractTradingStrategy abstractStrategy) {
+            displayName = abstractStrategy.getDisplayName();
+        }
+
         return new StrategyDto(
                 strategy.getId(),
-                strategy.getName(),
-                strategy.getName(),
+                displayName,
+                strategy.getName(),  // type is always the algorithm type
                 strategy.getState(),
                 symbolList,
                 strategy.getParameters().toMap(),

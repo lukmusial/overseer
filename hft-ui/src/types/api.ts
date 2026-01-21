@@ -84,6 +84,18 @@ export interface ExchangeStatus {
   errorMessage: string | null;
 }
 
+export interface TradingSymbol {
+  symbol: string;
+  name: string;
+  exchange: string;
+  assetClass: string;
+  baseAsset: string;
+  quoteAsset: string;
+  tradable: boolean;
+  marginable: boolean;
+  shortable: boolean;
+}
+
 export interface CreateOrderRequest {
   symbol: string;
   exchange: string;
@@ -97,6 +109,7 @@ export interface CreateOrderRequest {
 }
 
 export interface CreateStrategyRequest {
+  name?: string;
   type: string;
   symbols: string[];
   exchange: string;

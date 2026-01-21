@@ -514,3 +514,41 @@ th {
 .detail-item.error .value {
   color: #fca5a5;
 }
+
+/* Form enhancements */
+.type-description {
+  display: block;
+  color: #64748b;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Symbol selector */
+.symbol-filter {
+  margin-bottom: 0.5rem;
+}
+
+.symbol-select {
+  height: auto;
+  min-height: 120px;
+}
+
+.symbol-select option {
+  padding: 0.5rem;
+}
+
+.symbol-select option:checked {
+  background: #0284c7;
+}
+
+.selected-symbol {
+  display: block;
+  color: #6ee7b7;
+  margin-top: 0.5rem;
+}
+
+.loading-indicator {
+  color: #94a3b8;
+  font-style: italic;
+  padding: 0.5rem 0;
+}

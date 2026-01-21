@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public abstract class AbstractTradingStrategy implements TradingStrategy {
 
     protected final String id;
+    protected final String customName;
     protected final Set<Symbol> symbols;
     protected StrategyParameters parameters;
     protected AlgorithmContext context;
@@ -42,7 +43,12 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
     protected volatile long startTimeNanos;
 
     protected AbstractTradingStrategy(Set<Symbol> symbols, StrategyParameters parameters) {
+        this(symbols, parameters, null);
+    }
+
+    protected AbstractTradingStrategy(Set<Symbol> symbols, StrategyParameters parameters, String customName) {
         this.id = UUID.randomUUID().toString().substring(0, 8);
+        this.customName = customName;
         this.symbols = new HashSet<>(symbols);
         this.parameters = parameters != null ? parameters : new StrategyParameters();
 
@@ -57,6 +63,13 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
     @Override
     public String getId() {
         return id;
+    }
+
+    /**
+     * Gets the display name (custom name if set, otherwise the type name).
+     */
+    public String getDisplayName() {
+        return customName != null && !customName.isBlank() ? customName : getName();
     }
 
     @Override
