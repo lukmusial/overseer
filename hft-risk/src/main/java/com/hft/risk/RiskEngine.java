@@ -189,6 +189,15 @@ public class RiskEngine {
         return circuitBreaker.getState();
     }
 
+    /**
+     * Checks circuit breaker state, potentially triggering HALF_OPEN transition after cooldown.
+     * Returns the state after the check.
+     */
+    public CircuitBreaker.State checkCircuitBreakerState() {
+        circuitBreaker.checkAllowed(); // This may transition from OPEN to HALF_OPEN
+        return circuitBreaker.getState();
+    }
+
     public long getOrdersSubmittedToday() {
         return ordersSubmittedToday.get();
     }

@@ -175,19 +175,20 @@ class PositionManagerTest {
     }
 
     @Test
-    void getNetExposure_ShouldSumAbsoluteMarketValues() {
+    void getNetExposure_ShouldCalculateLongMinusShort() {
         Symbol symbol2 = new Symbol("GOOGL", Exchange.ALPACA);
 
-        // Long position
+        // Long AAPL: 100 shares @ $150 = $15,000 market value = 15000 cents
         positionManager.applyTrade(createTrade(testSymbol, OrderSide.BUY, 100, 15000L));
         positionManager.updateMarketValue(testSymbol, 15000L);
 
-        // Short position
+        // Short GOOGL: 10 shares @ $2000 = $20,000 market value = 20000 cents
         positionManager.applyTrade(createTrade(symbol2, OrderSide.SELL, 10, 200000L));
         positionManager.updateMarketValue(symbol2, 200000L);
 
+        // Net exposure = long - short = 15000 - 20000 = -5000 (net short)
         long netExposure = positionManager.getNetExposure();
-        assertTrue(netExposure > 0);
+        assertEquals(-5000L, netExposure);
     }
 
     @Test

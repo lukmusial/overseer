@@ -153,10 +153,10 @@ Feature: End-to-End Trading System Orchestration
     When I buy 10 units at 50000
     And I buy 10 more units at 51000
     Then my position should be 20 units
-    And my average entry price should be 50500
+    And the average entry price should be 50500.00
     When I sell 5 units at 52000
     Then my position should be 15 units
-    And my realized P&L should be 7500
+    And the position realized P&L should be 7500.00
     And the position manager should track all trades
 
   # ============================================================================

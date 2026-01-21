@@ -128,14 +128,21 @@ public class PositionManager {
     }
 
     /**
-     * Gets net exposure (sum of absolute position values).
+     * Gets net exposure (long exposure minus short exposure).
      */
     public long getNetExposure() {
-        long exposure = 0;
+        long longExposure = 0;
+        long shortExposure = 0;
+
         for (Position position : positions.values()) {
-            exposure += Math.abs(position.getMarketValue());
+            if (position.isLong()) {
+                longExposure += position.getMarketValue();
+            } else if (position.isShort()) {
+                shortExposure += position.getMarketValue();
+            }
         }
-        return exposure;
+
+        return longExposure - shortExposure;
     }
 
     /**
