@@ -12,10 +12,15 @@ import com.hft.api.dto.*;
 import com.hft.core.model.*;
 import com.hft.engine.TradingEngine;
 import com.hft.engine.service.PositionManager;
+import com.hft.persistence.PersistenceManager;
+import com.hft.persistence.StrategyRepository;
+import com.hft.persistence.StrategyRepository.StrategyDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -25,10 +30,89 @@ public class TradingService {
     private static final Logger log = LoggerFactory.getLogger(TradingService.class);
 
     private final TradingEngine tradingEngine;
+    private final TradingEngineAlgorithmContext algorithmContext;
+    private final PersistenceManager persistenceManager;
     private final Map<String, TradingStrategy> activeStrategies = new ConcurrentHashMap<>();
 
     public TradingService() {
+        this(PersistenceManager.chronicle());
+    }
+
+    /**
+     * Constructor for testing - allows injecting a custom persistence manager.
+     */
+    public TradingService(PersistenceManager persistenceManager) {
         this.tradingEngine = new TradingEngine();
+        this.algorithmContext = new TradingEngineAlgorithmContext(tradingEngine);
+        this.persistenceManager = persistenceManager;
+    }
+
+    @PostConstruct
+    public void init() {
+        loadPersistedStrategies();
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        persistenceManager.close();
+    }
+
+    private void loadPersistedStrategies() {
+        List<StrategyDefinition> definitions = persistenceManager.getStrategyRepository().findAll();
+        log.info("Loading {} persisted strategies", definitions.size());
+
+        for (StrategyDefinition def : definitions) {
+            try {
+                TradingStrategy strategy = createStrategyFromDefinition(def);
+                strategy.initialize(algorithmContext);
+                activeStrategies.put(strategy.getId(), strategy);
+                log.info("Restored strategy: {} ({})", strategy.getId(), strategy.getName());
+            } catch (Exception e) {
+                log.error("Failed to restore strategy {}: {}", def.id(), e.getMessage());
+            }
+        }
+    }
+
+    private TradingStrategy createStrategyFromDefinition(StrategyDefinition def) {
+        Set<Symbol> symbols = def.symbols().stream()
+                .map(s -> new Symbol(s, Exchange.valueOf(def.exchange())))
+                .collect(Collectors.toSet());
+
+        StrategyParameters params = new StrategyParameters();
+        if (def.parameters() != null) {
+            def.parameters().forEach(params::set);
+        }
+
+        return switch (def.type().toLowerCase()) {
+            case "momentum" -> new MomentumStrategy(symbols, params, def.name());
+            case "meanreversion", "mean_reversion" -> new MeanReversionStrategy(symbols, params, def.name());
+            case "vwap" -> new VwapStrategy(symbols, params, def.name());
+            case "twap" -> new TwapStrategy(symbols, params, def.name());
+            default -> throw new IllegalArgumentException("Unknown strategy type: " + def.type());
+        };
+    }
+
+    private void persistStrategy(TradingStrategy strategy) {
+        List<String> symbols = strategy.getSymbols().stream()
+                .map(Symbol::getTicker)
+                .collect(Collectors.toList());
+
+        String exchange = strategy.getSymbols().stream()
+                .findFirst()
+                .map(s -> s.getExchange().name())
+                .orElse("ALPACA");
+
+        StrategyDefinition def = new StrategyDefinition(
+                strategy.getId(),
+                strategy instanceof AbstractTradingStrategy abs ? abs.getCustomName() : strategy.getName(),
+                strategy.getName(),  // type
+                symbols,
+                exchange,
+                strategy.getParameters().toMap(),
+                strategy.getState().name()
+        );
+
+        persistenceManager.getStrategyRepository().save(def);
     }
 
     // Engine operations
@@ -44,7 +128,10 @@ public class TradingService {
     }
 
     public EngineStatusDto getEngineStatus() {
-        return EngineStatusDto.from(tradingEngine.getSnapshot());
+        int runningStrategies = (int) activeStrategies.values().stream()
+                .filter(s -> s.getState() == AlgorithmState.RUNNING)
+                .count();
+        return EngineStatusDto.from(tradingEngine.getSnapshot(), runningStrategies);
     }
 
     public void resetDailyCounters() {
@@ -141,7 +228,13 @@ public class TradingService {
             default -> throw new IllegalArgumentException("Unknown strategy type: " + request.type());
         }
 
+        // Initialize strategy with context before storing
+        strategy.initialize(algorithmContext);
         activeStrategies.put(strategy.getId(), strategy);
+
+        // Persist strategy definition
+        persistStrategy(strategy);
+
         log.info("Created strategy: {} ({})", strategy.getId(), strategy.getName());
 
         return toStrategyDto(strategy);
@@ -181,6 +274,10 @@ public class TradingService {
         if (strategy != null && strategy.getState() == AlgorithmState.RUNNING) {
             strategy.cancel();
         }
+
+        // Remove from persistence
+        persistenceManager.getStrategyRepository().delete(id);
+
         log.info("Deleted strategy: {}", id);
     }
 

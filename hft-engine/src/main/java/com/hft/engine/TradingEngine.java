@@ -52,6 +52,7 @@ public class TradingEngine {
     private final MetricsHandler metricsHandler;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private volatile long startTimeMillis = 0;
 
     // Event translators for zero-allocation publishing
     private static final EventTranslatorOneArg<TradingEvent, Order> NEW_ORDER_TRANSLATOR =
@@ -116,6 +117,7 @@ public class TradingEngine {
      */
     public void start() {
         if (running.compareAndSet(false, true)) {
+            startTimeMillis = System.currentTimeMillis();
             disruptor.start();
             riskManager.enableTrading();
             log.info("TradingEngine started");
@@ -127,6 +129,7 @@ public class TradingEngine {
      */
     public void stop() {
         if (running.compareAndSet(true, false)) {
+            startTimeMillis = 0;
             riskManager.disableTradingWithReason("Engine shutdown");
             disruptor.shutdown();
             log.info("TradingEngine stopped");
@@ -270,8 +273,12 @@ public class TradingEngine {
      * Gets a snapshot of current engine state.
      */
     public EngineSnapshot getSnapshot() {
+        long start = startTimeMillis;
+        long uptime = start > 0 ? System.currentTimeMillis() - start : 0;
         return new EngineSnapshot(
                 running.get(),
+                start,
+                uptime,
                 ringBuffer.getCursor(),
                 ringBuffer.remainingCapacity(),
                 orderManager.getOrderCount(),
@@ -288,6 +295,8 @@ public class TradingEngine {
      */
     public record EngineSnapshot(
             boolean running,
+            long startTimeMillis,
+            long uptimeMillis,
             long eventsPublished,
             long ringBufferCapacity,
             int totalOrders,

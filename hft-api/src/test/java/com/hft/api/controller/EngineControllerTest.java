@@ -30,19 +30,37 @@ class EngineControllerTest {
                 100, 90, 80, 5, 5, 0.8, 0.05, 10.0, 5000, 1000000
         );
         EngineStatusDto status = new EngineStatusDto(
-                true, true, null,
-                1000, 4096,
-                100, 10,
-                positions, metrics
+                true,                    // running
+                System.currentTimeMillis(), // startTime
+                5000L,                   // uptimeMillis
+                true,                    // tradingEnabled
+                null,                    // tradingDisabledReason
+                1000,                    // eventsPublished
+                4096,                    // ringBufferCapacity
+                100,                     // totalOrders
+                10,                      // activeOrders
+                90,                      // totalOrdersProcessed
+                80,                      // totalTradesExecuted
+                5,                       // activeStrategies
+                3,                       // openPositions
+                10,                      // pendingOrders
+                positions,
+                metrics
         );
         when(tradingService.getEngineStatus()).thenReturn(status);
 
         mockMvc.perform(get("/api/engine/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.running").value(true))
+                .andExpect(jsonPath("$.uptimeMillis").value(5000))
                 .andExpect(jsonPath("$.tradingEnabled").value(true))
                 .andExpect(jsonPath("$.totalOrders").value(100))
-                .andExpect(jsonPath("$.activeOrders").value(10));
+                .andExpect(jsonPath("$.activeOrders").value(10))
+                .andExpect(jsonPath("$.totalOrdersProcessed").value(90))
+                .andExpect(jsonPath("$.totalTradesExecuted").value(80))
+                .andExpect(jsonPath("$.activeStrategies").value(5))
+                .andExpect(jsonPath("$.openPositions").value(3))
+                .andExpect(jsonPath("$.pendingOrders").value(10));
     }
 
     @Test

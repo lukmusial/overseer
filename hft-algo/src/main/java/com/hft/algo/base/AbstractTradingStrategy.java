@@ -72,6 +72,13 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         return customName != null && !customName.isBlank() ? customName : getName();
     }
 
+    /**
+     * Gets the custom name if set, or null.
+     */
+    public String getCustomName() {
+        return customName;
+    }
+
     @Override
     public AlgorithmState getState() {
         return state.get();

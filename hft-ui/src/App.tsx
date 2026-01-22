@@ -8,6 +8,7 @@ import { StrategyInspector } from './components/StrategyInspector';
 import { OrderList } from './components/OrderList';
 import { PositionList } from './components/PositionList';
 import { ExchangeStatusPanel } from './components/ExchangeStatusPanel';
+import { ChartPanel } from './components/ChartPanel';
 import type {
   EngineStatus as EngineStatusType,
   Order,
@@ -214,6 +215,7 @@ export default function App() {
             <StrategyForm onSubmit={handleCreateStrategy} />
           </div>
           <div className="col-right">
+            <ChartPanel exchanges={exchanges} strategies={strategies} />
             <StrategyList
               strategies={strategies}
               onStart={handleStartStrategy}

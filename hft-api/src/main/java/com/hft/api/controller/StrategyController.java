@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/strategies")
-@CrossOrigin(origins = "*")
 public class StrategyController {
 
     private final TradingService tradingService;

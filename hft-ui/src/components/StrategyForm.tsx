@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CreateStrategyRequest, TradingSymbol } from '../types/api';
 import { useApi } from '../hooks/useApi';
 
@@ -47,19 +47,25 @@ export function StrategyForm({ onSubmit }: Props) {
   const { getSymbols } = useApi();
   const [name, setName] = useState('');
   const [type, setType] = useState<StrategyType>('momentum');
-  const [symbol, setSymbol] = useState('');
+  const [selectedSymbol, setSelectedSymbol] = useState<TradingSymbol | null>(null);
   const [exchange, setExchange] = useState('ALPACA');
   const [parameters, setParameters] = useState<Record<string, unknown>>(DEFAULT_PARAMS.momentum);
   const [symbols, setSymbols] = useState<TradingSymbol[]>([]);
   const [loadingSymbols, setLoadingSymbols] = useState(false);
-  const [symbolFilter, setSymbolFilter] = useState('');
+  const [symbolInput, setSymbolInput] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [symbolError, setSymbolError] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Fetch symbols when exchange changes
   useEffect(() => {
     let cancelled = false;
     setLoadingSymbols(true);
-    setSymbol('');
-    setSymbolFilter('');
+    setSelectedSymbol(null);
+    setSymbolInput('');
+    setSymbolError('');
 
     getSymbols(exchange)
       .then((data) => {
@@ -71,6 +77,7 @@ export function StrategyForm({ onSubmit }: Props) {
         console.error('Failed to fetch symbols:', err);
         if (!cancelled) {
           setSymbols([]);
+          setSymbolError('Failed to load symbols');
         }
       })
       .finally(() => {
@@ -83,6 +90,17 @@ export function StrategyForm({ onSubmit }: Props) {
       cancelled = true;
     };
   }, [exchange, getSymbols]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleTypeChange = (newType: StrategyType) => {
     setType(newType);
@@ -97,28 +115,102 @@ export function StrategyForm({ onSubmit }: Props) {
     }));
   };
 
+  // Filter symbols based on input
+  const filteredSymbols = symbols.filter(
+    (s) =>
+      s.symbol.toLowerCase().includes(symbolInput.toLowerCase()) ||
+      s.name.toLowerCase().includes(symbolInput.toLowerCase())
+  );
+
+  const handleSymbolInputChange = (value: string) => {
+    setSymbolInput(value);
+    setShowDropdown(true);
+    setHighlightedIndex(-1);
+    setSymbolError('');
+
+    // Check if input exactly matches a symbol
+    const exactMatch = symbols.find(
+      (s) => s.symbol.toLowerCase() === value.toLowerCase()
+    );
+    if (exactMatch) {
+      setSelectedSymbol(exactMatch);
+    } else {
+      setSelectedSymbol(null);
+    }
+  };
+
+  const handleSymbolSelect = (sym: TradingSymbol) => {
+    setSelectedSymbol(sym);
+    setSymbolInput(sym.symbol);
+    setShowDropdown(false);
+    setSymbolError('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showDropdown || filteredSymbols.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedIndex((prev) =>
+          prev < filteredSymbols.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < filteredSymbols.length) {
+          handleSymbolSelect(filteredSymbols[highlightedIndex]);
+        }
+        break;
+      case 'Escape':
+        setShowDropdown(false);
+        break;
+    }
+  };
+
+  const validateSymbol = (): boolean => {
+    if (!symbolInput.trim()) {
+      setSymbolError('Please select a symbol');
+      return false;
+    }
+
+    const validSymbol = symbols.find(
+      (s) => s.symbol.toLowerCase() === symbolInput.toLowerCase()
+    );
+
+    if (!validSymbol) {
+      setSymbolError(`"${symbolInput}" is not available. Please select from the list.`);
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateSymbol()) {
+      inputRef.current?.focus();
+      return;
+    }
+
     onSubmit({
       name: name || undefined,
       type,
-      symbols: [symbol],
+      symbols: [selectedSymbol!.symbol],
       exchange,
       parameters,
     });
     setName('');
-    setSymbol('');
-    setSymbolFilter('');
+    setSelectedSymbol(null);
+    setSymbolInput('');
   };
 
   const selectedType = STRATEGY_TYPES.find(t => t.value === type);
-
-  // Filter symbols based on user input
-  const filteredSymbols = symbols.filter(
-    (s) =>
-      s.symbol.toLowerCase().includes(symbolFilter.toLowerCase()) ||
-      s.name.toLowerCase().includes(symbolFilter.toLowerCase())
-  );
 
   return (
     <div className="card">
@@ -154,36 +246,57 @@ export function StrategyForm({ onSubmit }: Props) {
           <label>Symbol:</label>
           {loadingSymbols ? (
             <div className="loading-indicator">Loading symbols...</div>
+          ) : symbols.length === 0 ? (
+            <div className="error-message">No symbols available for {exchange}</div>
           ) : (
-            <>
+            <div className="symbol-autocomplete" ref={dropdownRef}>
               <input
+                ref={inputRef}
                 type="text"
-                value={symbolFilter}
-                onChange={(e) => setSymbolFilter(e.target.value)}
-                placeholder="Search symbols..."
-                className="symbol-filter"
+                value={symbolInput}
+                onChange={(e) => handleSymbolInputChange(e.target.value)}
+                onFocus={() => setShowDropdown(true)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type to search symbols..."
+                className={`symbol-input ${symbolError ? 'input-error' : ''} ${selectedSymbol ? 'input-valid' : ''}`}
+                autoComplete="off"
               />
-              <select
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-                required
-                size={5}
-                className="symbol-select"
-              >
-                <option value="">-- Select a symbol --</option>
-                {filteredSymbols.slice(0, 50).map((s) => (
-                  <option key={s.symbol} value={s.symbol}>
-                    {s.symbol} - {s.name}
-                  </option>
-                ))}
-                {filteredSymbols.length > 50 && (
-                  <option disabled>... {filteredSymbols.length - 50} more (filter to narrow)</option>
-                )}
-              </select>
-              {symbol && (
-                <small className="selected-symbol">Selected: {symbol}</small>
+              {symbolError && (
+                <div className="error-message">{symbolError}</div>
               )}
-            </>
+              {selectedSymbol && !symbolError && (
+                <div className="selected-symbol-info">
+                  {selectedSymbol.symbol} - {selectedSymbol.name}
+                </div>
+              )}
+              {!selectedSymbol && symbolInput && !symbolError && (
+                <div className="symbol-hint">
+                  {filteredSymbols.length > 0
+                    ? `${filteredSymbols.length} matching symbol${filteredSymbols.length !== 1 ? 's' : ''} - select from dropdown`
+                    : 'No matching symbols found'}
+                </div>
+              )}
+              {showDropdown && filteredSymbols.length > 0 && (
+                <ul className="symbol-dropdown">
+                  {filteredSymbols.slice(0, 10).map((sym, index) => (
+                    <li
+                      key={sym.symbol}
+                      className={`symbol-option ${index === highlightedIndex ? 'highlighted' : ''} ${selectedSymbol?.symbol === sym.symbol ? 'selected' : ''}`}
+                      onClick={() => handleSymbolSelect(sym)}
+                      onMouseEnter={() => setHighlightedIndex(index)}
+                    >
+                      <span className="symbol-ticker">{sym.symbol}</span>
+                      <span className="symbol-name">{sym.name}</span>
+                    </li>
+                  ))}
+                  {filteredSymbols.length > 10 && (
+                    <li className="symbol-option more-items">
+                      ... and {filteredSymbols.length - 10} more
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
           )}
         </div>
         <h3>Parameters</h3>
@@ -197,7 +310,13 @@ export function StrategyForm({ onSubmit }: Props) {
             />
           </div>
         ))}
-        <button type="submit" className="btn-primary">Create Strategy</button>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={loadingSymbols || symbols.length === 0}
+        >
+          Create Strategy
+        </button>
       </form>
     </div>
   );

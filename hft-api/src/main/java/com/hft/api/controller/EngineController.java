@@ -9,7 +9,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/engine")
-@CrossOrigin(origins = "*")
 public class EngineController {
 
     private final TradingService tradingService;

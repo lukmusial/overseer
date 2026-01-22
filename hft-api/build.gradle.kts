@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":hft-exchange-alpaca"))
     implementation(project(":hft-exchange-binance"))
     implementation(project(":hft-risk"))
+    implementation(project(":hft-persistence"))
 
     // Spring Boot
     implementation("org.springframework.boot:spring-boot-starter-web")

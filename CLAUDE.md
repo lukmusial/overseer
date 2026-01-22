@@ -32,24 +32,44 @@ Edit `gradle.properties` and update `org.gradle.java.home` to match your archite
 1. **Implement the change**
 2. **Write tests** - NEW FUNCTIONALITY MUST HAVE TESTS (see Testing Requirements below)
 3. **Run tests** - `./gradlew test` and `npm test` (for UI changes) must pass
-4. **Update documentation** - if the change affects architecture, update `docs/ARCHITECTURE.md`
-5. **Commit to git** - atomic commits with meaningful messages
+4. **Verify application startup** - `./gradlew :hft-app:bootRun` must start successfully
+5. **Update documentation** - if the change affects architecture, update `docs/ARCHITECTURE.md`
+6. **Commit to git** - atomic commits with meaningful messages
 
-Never skip tests, documentation updates, or commits. This ensures:
+Never skip tests, application startup verification, documentation updates, or commits. This ensures:
 - Code is always in a working state
+- Application can actually start and run (not just compile)
 - Changes are tracked and reversible
 - Regressions are caught immediately
 - Documentation stays in sync with code
 
 ```bash
 # Standard workflow for backend changes
-./gradlew test && git add -A && git commit -m "Description of change"
+./gradlew test && ./gradlew :hft-app:bootRun &
+sleep 15 && curl -s http://localhost:8080/api/engine/status && pkill -f HftApplication
+git add -A && git commit -m "Description of change"
 
 # Standard workflow for frontend changes
 cd hft-ui && npm test && cd .. && git add -A && git commit -m "Description of change"
 
-# Full stack changes
-./gradlew test && cd hft-ui && npm test && cd .. && git add -A && git commit -m "Description of change"
+# Full stack changes (verify both backend and frontend)
+./gradlew test && cd hft-ui && npm test && cd ..
+./gradlew :hft-app:bootRun &
+sleep 15 && curl -s http://localhost:8080/api/engine/status && pkill -f HftApplication
+git add -A && git commit -m "Description of change"
+```
+
+### Quick Application Startup Check
+
+To verify the application starts correctly:
+```bash
+# Start the application
+./gradlew :hft-app:bootRun
+
+# In another terminal, verify it responds
+curl http://localhost:8080/api/engine/status
+
+# Stop with Ctrl+C
 ```
 
 ### Testing Requirements (MANDATORY)
@@ -138,7 +158,7 @@ cd hft-ui && npm run test:watch
 ## Quick Start
 
 ```bash
-# Build the project
+# Build the project (includes frontend build automatically)
 ./gradlew build
 
 # Run tests
@@ -150,8 +170,34 @@ cd hft-ui && npm run test:watch
 # Run JMH benchmarks
 ./gradlew :hft-bdd:jmh
 
-# Start the application
+# Start the application (builds frontend automatically)
 ./gradlew :hft-app:bootRun
+
+# Skip frontend build for faster backend-only iteration
+./gradlew :hft-app:bootRun -PskipFrontend
+```
+
+### Frontend Build Automation
+
+The frontend (hft-ui) is automatically built and bundled when running:
+- `./gradlew build`
+- `./gradlew :hft-app:bootRun`
+- `./gradlew :hft-app:bootJar`
+
+This is handled by Gradle tasks:
+- `npmInstall` - Installs npm dependencies
+- `buildFrontend` - Runs `npm run build` (TypeScript compile + Vite bundle)
+- `copyFrontend` - Copies dist to `hft-app/src/main/resources/static`
+
+To skip frontend build for faster backend-only development:
+```bash
+./gradlew :hft-app:bootRun -PskipFrontend
+```
+
+For frontend-only development with hot reload:
+```bash
+cd hft-ui && npm run dev
+# Runs at http://localhost:3000 with proxy to backend at :8080
 ```
 
 ## Project Structure

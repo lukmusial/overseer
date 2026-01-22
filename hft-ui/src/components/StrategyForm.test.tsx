@@ -87,22 +87,29 @@ describe('StrategyForm', () => {
   it('loads symbols when exchange is selected', async () => {
     render(<StrategyForm onSubmit={mockOnSubmit} />);
 
-    // Wait for ALPACA symbols to load (default exchange)
+    // Wait for symbols to load
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
     });
 
-    expect(screen.getByText(/GOOGL - Alphabet Inc./i)).toBeInTheDocument();
-    expect(screen.getByText(/MSFT - Microsoft Corporation/i)).toBeInTheDocument();
+    // Focus on symbol input to show dropdown
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.click(symbolInput);
+
+    // Should show symbols in dropdown
+    await waitFor(() => {
+      expect(screen.getByText('AAPL')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
     expect(mockGetSymbols).toHaveBeenCalledWith('ALPACA');
   });
 
   it('loads different symbols when exchange changes', async () => {
     render(<StrategyForm onSubmit={mockOnSubmit} />);
 
-    // Wait for initial ALPACA symbols
+    // Wait for initial load
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
     });
 
     // Change to BINANCE using the exchange dropdown
@@ -111,15 +118,20 @@ describe('StrategyForm', () => {
       fireEvent.change(exchangeSelect, { target: { value: 'BINANCE' } });
     });
 
-    // Wait for BINANCE symbols
+    // Wait for BINANCE symbols to load
     await waitFor(() => {
-      expect(screen.getByText(/BTCUSDT - BTC\/USDT/i)).toBeInTheDocument();
+      expect(mockGetSymbols).toHaveBeenCalledWith('BINANCE');
     });
 
-    expect(screen.getByText(/ETHUSDT - ETH\/USDT/i)).toBeInTheDocument();
-    // ALPACA symbols should be gone
-    expect(screen.queryByText(/AAPL - Apple Inc./i)).not.toBeInTheDocument();
-    expect(mockGetSymbols).toHaveBeenCalledWith('BINANCE');
+    // Click on symbol input to show dropdown
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.click(symbolInput);
+
+    // Should show BINANCE symbols
+    await waitFor(() => {
+      expect(screen.getByText('BTCUSDT')).toBeInTheDocument();
+    });
+    expect(screen.getByText('BTC/USDT')).toBeInTheDocument();
   });
 
   it('filters symbols based on search input', async () => {
@@ -127,16 +139,19 @@ describe('StrategyForm', () => {
 
     // Wait for symbols to load
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
     });
 
-    // Type in the filter
-    const filterInput = screen.getByPlaceholderText('Search symbols...');
-    await userEvent.type(filterInput, 'GOOG');
+    // Type in the symbol input to filter
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.type(symbolInput, 'GOOG');
 
-    // Should show GOOGL but not AAPL
-    expect(screen.getByText(/GOOGL - Alphabet Inc./i)).toBeInTheDocument();
-    expect(screen.queryByText(/AAPL - Apple Inc./i)).not.toBeInTheDocument();
+    // Should show only GOOGL in dropdown
+    await waitFor(() => {
+      expect(screen.getByText('GOOGL')).toBeInTheDocument();
+    });
+    // AAPL should not be visible
+    expect(screen.queryByText('AAPL')).not.toBeInTheDocument();
   });
 
   it('shows strategy type description', async () => {
@@ -172,24 +187,27 @@ describe('StrategyForm', () => {
 
     // Wait for symbols to load
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
     });
 
-    // Fill in name using placeholder
+    // Fill in name
     const nameInput = screen.getByPlaceholderText('My Strategy');
     await userEvent.type(nameInput, 'My Test Strategy');
 
-    // Select a symbol from the listbox
-    const symbolSelect = screen.getByRole('listbox');
-    await act(async () => {
-      fireEvent.change(symbolSelect, { target: { value: 'AAPL' } });
+    // Type in symbol input and select from dropdown
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.type(symbolInput, 'AAPL');
+
+    // Click on AAPL option in dropdown
+    await waitFor(() => {
+      expect(screen.getByText('AAPL')).toBeInTheDocument();
     });
+    const aaplOption = screen.getByText('AAPL').closest('li');
+    await userEvent.click(aaplOption!);
 
     // Submit
     const submitButton = screen.getByRole('button', { name: /Create Strategy/i });
-    await act(async () => {
-      fireEvent.click(submitButton);
-    });
+    await userEvent.click(submitButton);
 
     expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({
       name: 'My Test Strategy',
@@ -208,20 +226,22 @@ describe('StrategyForm', () => {
 
     // Wait for symbols to load
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
     });
 
-    // Select a symbol (don't fill name)
-    const symbolSelect = screen.getByRole('listbox');
-    await act(async () => {
-      fireEvent.change(symbolSelect, { target: { value: 'AAPL' } });
+    // Type and select symbol
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.type(symbolInput, 'AAPL');
+
+    await waitFor(() => {
+      expect(screen.getByText('AAPL')).toBeInTheDocument();
     });
+    const aaplOption = screen.getByText('AAPL').closest('li');
+    await userEvent.click(aaplOption!);
 
     // Submit
     const submitButton = screen.getByRole('button', { name: /Create Strategy/i });
-    await act(async () => {
-      fireEvent.click(submitButton);
-    });
+    await userEvent.click(submitButton);
 
     expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({
       name: undefined,
@@ -229,22 +249,26 @@ describe('StrategyForm', () => {
     }));
   });
 
-  it('shows selected symbol indicator', async () => {
+  it('shows selected symbol confirmation', async () => {
     render(<StrategyForm onSubmit={mockOnSubmit} />);
 
     // Wait for symbols to load
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
     });
 
-    // Select a symbol
-    const symbolSelect = screen.getByRole('listbox');
-    await act(async () => {
-      fireEvent.change(symbolSelect, { target: { value: 'AAPL' } });
-    });
+    // Type and select symbol
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.type(symbolInput, 'AAPL');
 
-    // Should show selected indicator
-    expect(screen.getByText(/Selected: AAPL/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('AAPL')).toBeInTheDocument();
+    });
+    const aaplOption = screen.getByText('AAPL').closest('li');
+    await userEvent.click(aaplOption!);
+
+    // Should show confirmation with symbol name
+    expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
   });
 
   it('handles symbol fetch error gracefully', async () => {
@@ -257,7 +281,82 @@ describe('StrategyForm', () => {
       expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
     });
 
-    // Should show empty select option
-    expect(screen.getByText(/-- Select a symbol --/i)).toBeInTheDocument();
+    // Should show error message
+    expect(screen.getByText(/No symbols available/i)).toBeInTheDocument();
+  });
+
+  it('prevents submission with invalid symbol', async () => {
+    render(<StrategyForm onSubmit={mockOnSubmit} />);
+
+    // Wait for symbols to load
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
+    });
+
+    // Type an invalid symbol (not selecting from dropdown)
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.type(symbolInput, 'INVALID');
+
+    // Close dropdown by clicking elsewhere
+    await userEvent.click(document.body);
+
+    // Submit
+    const submitButton = screen.getByRole('button', { name: /Create Strategy/i });
+    await userEvent.click(submitButton);
+
+    // Should show error and not call onSubmit
+    await waitFor(() => {
+      expect(screen.getByText(/is not available/i)).toBeInTheDocument();
+    });
+    expect(mockOnSubmit).not.toHaveBeenCalled();
+  });
+
+  it('prevents submission with empty symbol', async () => {
+    render(<StrategyForm onSubmit={mockOnSubmit} />);
+
+    // Wait for symbols to load
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
+    });
+
+    // Submit without selecting a symbol
+    const submitButton = screen.getByRole('button', { name: /Create Strategy/i });
+    await userEvent.click(submitButton);
+
+    // Should show error
+    await waitFor(() => {
+      expect(screen.getByText(/Please select a symbol/i)).toBeInTheDocument();
+    });
+    expect(mockOnSubmit).not.toHaveBeenCalled();
+  });
+
+  it('clears error when valid symbol is selected', async () => {
+    render(<StrategyForm onSubmit={mockOnSubmit} />);
+
+    // Wait for symbols to load
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
+    });
+
+    // Submit without selecting a symbol to trigger error
+    const submitButton = screen.getByRole('button', { name: /Create Strategy/i });
+    await userEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Please select a symbol/i)).toBeInTheDocument();
+    });
+
+    // Now select a valid symbol
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.type(symbolInput, 'AAPL');
+
+    await waitFor(() => {
+      expect(screen.getByText('AAPL')).toBeInTheDocument();
+    });
+    const aaplOption = screen.getByText('AAPL').closest('li');
+    await userEvent.click(aaplOption!);
+
+    // Error should be cleared
+    expect(screen.queryByText(/Please select a symbol/i)).not.toBeInTheDocument();
   });
 });

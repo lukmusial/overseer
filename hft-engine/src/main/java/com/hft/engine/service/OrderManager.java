@@ -115,6 +115,15 @@ public class OrderManager {
     }
 
     /**
+     * Gets all tracked orders.
+     */
+    public Collection<Order> getOrders() {
+        synchronized (ordersByClientId) {
+            return new java.util.ArrayList<>(ordersByClientId.values());
+        }
+    }
+
+    /**
      * Gets all active (non-terminal) orders.
      */
     public Collection<Order> getActiveOrders() {

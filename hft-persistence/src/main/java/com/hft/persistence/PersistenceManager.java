@@ -6,11 +6,13 @@ import com.hft.core.model.Symbol;
 import com.hft.core.model.Trade;
 import com.hft.persistence.chronicle.ChronicleAuditLog;
 import com.hft.persistence.chronicle.ChronicleOrderRepository;
+import com.hft.persistence.chronicle.ChronicleStrategyRepository;
 import com.hft.persistence.chronicle.ChronicleTradeJournal;
 import com.hft.persistence.impl.FileAuditLog;
 import com.hft.persistence.impl.FileTradeJournal;
 import com.hft.persistence.impl.InMemoryOrderRepository;
 import com.hft.persistence.impl.InMemoryPositionSnapshotStore;
+import com.hft.persistence.impl.InMemoryStrategyRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,15 +29,18 @@ public class PersistenceManager implements AutoCloseable {
     private final TradeJournal tradeJournal;
     private final OrderRepository orderRepository;
     private final PositionSnapshotStore positionStore;
+    private final StrategyRepository strategyRepository;
     private final AuditLog auditLog;
 
     public PersistenceManager(TradeJournal tradeJournal,
                              OrderRepository orderRepository,
                              PositionSnapshotStore positionStore,
+                             StrategyRepository strategyRepository,
                              AuditLog auditLog) {
         this.tradeJournal = tradeJournal;
         this.orderRepository = orderRepository;
         this.positionStore = positionStore;
+        this.strategyRepository = strategyRepository;
         this.auditLog = auditLog;
     }
 
@@ -47,6 +52,7 @@ public class PersistenceManager implements AutoCloseable {
                 new InMemoryTradeJournal(),
                 new InMemoryOrderRepository(),
                 new InMemoryPositionSnapshotStore(),
+                new InMemoryStrategyRepository(),
                 new InMemoryAuditLog()
         );
     }
@@ -59,6 +65,7 @@ public class PersistenceManager implements AutoCloseable {
                 new FileTradeJournal(baseDir.resolve("trades")),
                 new InMemoryOrderRepository(), // Orders typically session-scoped
                 new InMemoryPositionSnapshotStore(),
+                new InMemoryStrategyRepository(), // Strategies use in-memory for file-based mode
                 new FileAuditLog(baseDir.resolve("audit"))
         );
     }
@@ -86,6 +93,7 @@ public class PersistenceManager implements AutoCloseable {
                 new ChronicleTradeJournal(baseDir),
                 new ChronicleOrderRepository(baseDir),
                 new InMemoryPositionSnapshotStore(), // Position snapshots kept in memory
+                new ChronicleStrategyRepository(baseDir),
                 new ChronicleAuditLog(baseDir)
         );
     }
@@ -187,6 +195,10 @@ public class PersistenceManager implements AutoCloseable {
         return positionStore;
     }
 
+    public StrategyRepository getStrategyRepository() {
+        return strategyRepository;
+    }
+
     public AuditLog getAuditLog() {
         return auditLog;
     }
@@ -196,6 +208,7 @@ public class PersistenceManager implements AutoCloseable {
     public void flush() {
         tradeJournal.flush();
         orderRepository.flush();
+        strategyRepository.flush();
         auditLog.flush();
     }
 
@@ -216,6 +229,11 @@ public class PersistenceManager implements AutoCloseable {
             positionStore.close();
         } catch (Exception e) {
             log.warn("Error closing position store", e);
+        }
+        try {
+            strategyRepository.close();
+        } catch (Exception e) {
+            log.warn("Error closing strategy repository", e);
         }
         try {
             auditLog.close();

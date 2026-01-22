@@ -121,3 +121,45 @@ export interface Notification {
   message: string;
   timestamp: number;
 }
+
+// Chart data types
+export interface Candle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface OrderMarker {
+  time: number;
+  price: number;
+  side: OrderSide;
+  quantity: number;
+  status: string;
+  strategyId: string | null;
+  orderId: string;
+}
+
+export interface TriggerRange {
+  strategyId: string;
+  strategyName: string;
+  type: string;
+  symbol: string;
+  currentPrice: number;
+  buyTriggerLow: number | null;
+  buyTriggerHigh: number | null;
+  sellTriggerLow: number | null;
+  sellTriggerHigh: number | null;
+  description: string;
+}
+
+export interface ChartData {
+  symbol: string;
+  exchange: string;
+  interval: string;
+  candles: Candle[];
+  orders: OrderMarker[];
+  triggerRanges: TriggerRange[];
+}

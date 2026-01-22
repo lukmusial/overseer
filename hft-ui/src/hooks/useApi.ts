@@ -8,6 +8,7 @@ import type {
   CreateStrategyRequest,
   ExchangeStatus,
   TradingSymbol,
+  ChartData,
 } from '../types/api';
 
 const API_BASE = '/api';
@@ -103,6 +104,18 @@ export function useApi() {
     return fetchJson<TradingSymbol[]>(`${API_BASE}/exchanges/${exchange}/symbols`);
   }, []);
 
+  // Chart operations
+  const getChartData = useCallback(async (
+    exchange: string,
+    symbol: string,
+    interval: string = '5m',
+    periods: number = 100
+  ): Promise<ChartData> => {
+    return fetchJson<ChartData>(
+      `${API_BASE}/chart/${exchange}/${symbol}?interval=${interval}&periods=${periods}`
+    );
+  }, []);
+
   return {
     getEngineStatus,
     startEngine,
@@ -120,5 +133,6 @@ export function useApi() {
     removeStrategy,
     getExchangeStatus,
     getSymbols,
+    getChartData,
   };
 }

@@ -232,6 +232,52 @@ class TradingEngineTest {
     }
 
     @Test
+    void getSnapshot_WhenNotStarted_ShouldHaveZeroUptime() {
+        TradingEngine.EngineSnapshot snapshot = engine.getSnapshot();
+
+        assertFalse(snapshot.running());
+        assertEquals(0, snapshot.startTimeMillis());
+        assertEquals(0, snapshot.uptimeMillis());
+    }
+
+    @Test
+    void getSnapshot_WhenStarted_ShouldTrackStartTime() {
+        long beforeStart = System.currentTimeMillis();
+        engine.start();
+        long afterStart = System.currentTimeMillis();
+
+        TradingEngine.EngineSnapshot snapshot = engine.getSnapshot();
+
+        assertTrue(snapshot.running());
+        assertTrue(snapshot.startTimeMillis() >= beforeStart);
+        assertTrue(snapshot.startTimeMillis() <= afterStart);
+        assertTrue(snapshot.uptimeMillis() >= 0);
+    }
+
+    @Test
+    void getSnapshot_UptimeShouldIncrease() throws Exception {
+        engine.start();
+
+        TradingEngine.EngineSnapshot snapshot1 = engine.getSnapshot();
+        Thread.sleep(50);
+        TradingEngine.EngineSnapshot snapshot2 = engine.getSnapshot();
+
+        assertTrue(snapshot2.uptimeMillis() > snapshot1.uptimeMillis());
+    }
+
+    @Test
+    void getSnapshot_WhenStopped_ShouldResetUptime() {
+        engine.start();
+        assertTrue(engine.getSnapshot().startTimeMillis() > 0);
+
+        engine.stop();
+
+        TradingEngine.EngineSnapshot snapshot = engine.getSnapshot();
+        assertEquals(0, snapshot.startTimeMillis());
+        assertEquals(0, snapshot.uptimeMillis());
+    }
+
+    @Test
     void getOrderManager_ShouldReturnManager() {
         assertNotNull(engine.getOrderManager());
     }

@@ -284,36 +284,24 @@ public class ExchangeService {
     }
 
     private List<SymbolDto> getStubAlpacaSymbols() {
+        // Top 5 most traded US stocks by market cap and volume
         return List.of(
                 SymbolDto.equity("AAPL", "Apple Inc.", "ALPACA", true, true, true),
-                SymbolDto.equity("GOOGL", "Alphabet Inc.", "ALPACA", true, true, true),
                 SymbolDto.equity("MSFT", "Microsoft Corporation", "ALPACA", true, true, true),
-                SymbolDto.equity("AMZN", "Amazon.com Inc.", "ALPACA", true, true, true),
-                SymbolDto.equity("TSLA", "Tesla Inc.", "ALPACA", true, true, true),
-                SymbolDto.equity("META", "Meta Platforms Inc.", "ALPACA", true, true, true),
                 SymbolDto.equity("NVDA", "NVIDIA Corporation", "ALPACA", true, true, true),
-                SymbolDto.equity("JPM", "JPMorgan Chase & Co.", "ALPACA", true, true, true),
-                SymbolDto.equity("V", "Visa Inc.", "ALPACA", true, true, true),
-                SymbolDto.equity("JNJ", "Johnson & Johnson", "ALPACA", true, true, true),
-                SymbolDto.equity("SPY", "SPDR S&P 500 ETF Trust", "ALPACA", true, true, true),
-                SymbolDto.equity("QQQ", "Invesco QQQ Trust", "ALPACA", true, true, true)
+                SymbolDto.equity("TSLA", "Tesla Inc.", "ALPACA", true, true, true),
+                SymbolDto.equity("GOOGL", "Alphabet Inc.", "ALPACA", true, true, true)
         );
     }
 
     private List<SymbolDto> getStubBinanceSymbols() {
+        // Top 5 most traded crypto pairs by volume
         return List.of(
                 SymbolDto.crypto("BTCUSDT", "BTC/USDT", "BINANCE", "BTC", "USDT", true),
                 SymbolDto.crypto("ETHUSDT", "ETH/USDT", "BINANCE", "ETH", "USDT", true),
-                SymbolDto.crypto("BNBUSDT", "BNB/USDT", "BINANCE", "BNB", "USDT", true),
                 SymbolDto.crypto("SOLUSDT", "SOL/USDT", "BINANCE", "SOL", "USDT", true),
-                SymbolDto.crypto("XRPUSDT", "XRP/USDT", "BINANCE", "XRP", "USDT", true),
-                SymbolDto.crypto("ADAUSDT", "ADA/USDT", "BINANCE", "ADA", "USDT", true),
-                SymbolDto.crypto("DOGEUSDT", "DOGE/USDT", "BINANCE", "DOGE", "USDT", true),
-                SymbolDto.crypto("AVAXUSDT", "AVAX/USDT", "BINANCE", "AVAX", "USDT", true),
-                SymbolDto.crypto("DOTUSDT", "DOT/USDT", "BINANCE", "DOT", "USDT", true),
-                SymbolDto.crypto("LINKUSDT", "LINK/USDT", "BINANCE", "LINK", "USDT", true),
-                SymbolDto.crypto("BTCBUSD", "BTC/BUSD", "BINANCE", "BTC", "BUSD", true),
-                SymbolDto.crypto("ETHBUSD", "ETH/BUSD", "BINANCE", "ETH", "BUSD", true)
+                SymbolDto.crypto("BNBUSDT", "BNB/USDT", "BINANCE", "BNB", "USDT", true),
+                SymbolDto.crypto("XRPUSDT", "XRP/USDT", "BINANCE", "XRP", "USDT", true)
         );
     }
 

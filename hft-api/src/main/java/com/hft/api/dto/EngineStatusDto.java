@@ -6,23 +6,38 @@ import com.hft.core.metrics.OrderMetrics;
 
 public record EngineStatusDto(
         boolean running,
+        Long startTime,
+        long uptimeMillis,
         boolean tradingEnabled,
         String tradingDisabledReason,
         long eventsPublished,
         long ringBufferCapacity,
         int totalOrders,
         int activeOrders,
+        int totalOrdersProcessed,
+        int totalTradesExecuted,
+        int activeStrategies,
+        int openPositions,
+        int pendingOrders,
         PositionSummaryDto positions,
         MetricsSummaryDto metrics
 ) {
-    public static EngineStatusDto from(TradingEngine.EngineSnapshot snapshot) {
+    public static EngineStatusDto from(TradingEngine.EngineSnapshot snapshot, int activeStrategies) {
+        long startTime = snapshot.startTimeMillis();
         return new EngineStatusDto(
                 snapshot.running(),
+                startTime > 0 ? startTime : null,
+                snapshot.uptimeMillis(),
                 snapshot.tradingEnabled(),
                 snapshot.tradingDisabledReason(),
                 snapshot.eventsPublished(),
                 snapshot.ringBufferCapacity(),
                 snapshot.totalOrders(),
+                snapshot.activeOrders(),
+                (int) snapshot.metrics().ordersSubmitted(),
+                (int) snapshot.metrics().ordersFilled(),
+                activeStrategies,
+                snapshot.positions().activePositions(),
                 snapshot.activeOrders(),
                 PositionSummaryDto.from(snapshot.positions()),
                 MetricsSummaryDto.from(snapshot.metrics())

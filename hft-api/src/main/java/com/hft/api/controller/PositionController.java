@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/positions")
-@CrossOrigin(origins = "*")
 public class PositionController {
 
     private final TradingService tradingService;

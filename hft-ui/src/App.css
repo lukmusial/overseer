@@ -552,3 +552,273 @@ th {
   font-style: italic;
   padding: 0.5rem 0;
 }
+
+/* Symbol Autocomplete */
+.symbol-autocomplete {
+  position: relative;
+}
+
+.symbol-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #1a1a2e;
+  color: #eee;
+  font-size: 0.875rem;
+}
+
+.symbol-input:focus {
+  outline: none;
+  border-color: #00d9ff;
+}
+
+.symbol-input.input-error {
+  border-color: #dc2626;
+}
+
+.symbol-input.input-valid {
+  border-color: #059669;
+}
+
+.symbol-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #1a1a2e;
+  border: 1px solid #0f3460;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 100;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.symbol-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid #0f3460;
+}
+
+.symbol-option:last-child {
+  border-bottom: none;
+}
+
+.symbol-option:hover,
+.symbol-option.highlighted {
+  background: #0f3460;
+}
+
+.symbol-option.selected {
+  background: #0284c7;
+}
+
+.symbol-option.more-items {
+  color: #64748b;
+  font-style: italic;
+  cursor: default;
+}
+
+.symbol-option.more-items:hover {
+  background: transparent;
+}
+
+.symbol-ticker {
+  font-weight: 600;
+  color: #00d9ff;
+}
+
+.symbol-name {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.selected-symbol-info {
+  color: #6ee7b7;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(6, 95, 70, 0.3);
+  border-radius: 4px;
+}
+
+.symbol-hint {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.error-message {
+  color: #fca5a5;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Candlestick Chart */
+.candlestick-chart {
+  background: #16213e;
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid #0f3460;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chart-header h3 {
+  color: #00d9ff;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.chart-controls .control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-controls label {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.chart-controls select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #1a1a2e;
+  color: #eee;
+  font-size: 0.8rem;
+}
+
+.chart-controls select:focus {
+  outline: none;
+  border-color: #00d9ff;
+}
+
+.refresh-btn {
+  padding: 0.35rem 0.75rem;
+  background: #0284c7;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #0369a1;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chart-container {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chart-error {
+  background: rgba(127, 29, 29, 0.3);
+  color: #fca5a5;
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.trigger-ranges {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #0f3460;
+}
+
+.trigger-ranges h4 {
+  color: #94a3b8;
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+.trigger-range-item {
+  background: #1a1a2e;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.trigger-range-item:last-child {
+  margin-bottom: 0;
+}
+
+.trigger-range-item strong {
+  color: #00d9ff;
+}
+
+.trigger-range-item p {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+/* Chart symbol selector */
+.chart-symbol-selector {
+  margin-bottom: 1rem;
+}
+
+.chart-symbol-selector .selector-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.chart-symbol-selector .form-group {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.chart-symbol-selector select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #1a1a2e;
+  color: #eee;
+  font-size: 0.875rem;
+}
+
+.chart-symbol-selector select:focus {
+  outline: none;
+  border-color: #00d9ff;
+}
