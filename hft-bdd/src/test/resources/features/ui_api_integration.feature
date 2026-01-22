@@ -1,3 +1,4 @@
+@integration
 Feature: UI and API Integration
   As a trading system operator
   I want the web UI and REST API to function correctly
