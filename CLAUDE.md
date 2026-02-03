@@ -1,4 +1,6 @@
-# HFT Client - Development Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 A modular high-frequency trading client in Java supporting:

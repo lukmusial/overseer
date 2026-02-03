@@ -1,6 +1,7 @@
 package com.hft.exchange.alpaca.dto;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * DTO for Alpaca quote (NBBO) API response.
@@ -12,7 +13,7 @@ public class AlpacaQuote {
     private String bp; // bid price
     private int bs;    // bid size
     private String bx; // bid exchange
-    private String c;  // condition flags
+    private List<String> c;  // condition flags (array in API response)
     private Instant t; // timestamp
     private String z;  // tape
 
@@ -64,11 +65,11 @@ public class AlpacaQuote {
         this.bx = bx;
     }
 
-    public String getC() {
+    public List<String> getC() {
         return c;
     }
 
-    public void setC(String c) {
+    public void setC(List<String> c) {
         this.c = c;
     }
 

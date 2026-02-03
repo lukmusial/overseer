@@ -5,6 +5,7 @@ build/
 
 # IDE
 .idea/
+.claude/
 *.iml
 *.ipr
 *.iws
@@ -46,3 +47,7 @@ target/
 # Chronicle data
 *.cq4
 *.cq4t
+
+# Local configuration (secrets)
+application-local.properties
+.env
