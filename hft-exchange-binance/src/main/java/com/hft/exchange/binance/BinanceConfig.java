@@ -12,7 +12,7 @@ public record BinanceConfig(
     public static final String LIVE_BASE_URL = "https://api.binance.com";
     public static final String TESTNET_BASE_URL = "https://testnet.binance.vision";
     public static final String LIVE_STREAM_URL = "wss://stream.binance.com:9443";
-    public static final String TESTNET_STREAM_URL = "wss://testnet.binance.vision";
+    public static final String TESTNET_STREAM_URL = "wss://stream.testnet.binance.vision";
 
     public BinanceConfig {
         if (apiKey == null || apiKey.isBlank()) {
