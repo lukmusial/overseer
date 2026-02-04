@@ -2,17 +2,27 @@ package com.hft.api.service;
 
 import com.hft.api.config.ExchangeProperties;
 import com.hft.api.dto.ExchangeStatusDto;
+import com.hft.api.dto.QuoteDto;
 import com.hft.api.dto.SymbolDto;
+import com.hft.core.model.Exchange;
+import com.hft.core.model.Symbol;
+import com.hft.core.port.MarketDataPort;
 import com.hft.exchange.alpaca.AlpacaConfig;
 import com.hft.exchange.alpaca.AlpacaHttpClient;
+import com.hft.exchange.alpaca.AlpacaMarketDataPort;
+import com.hft.exchange.alpaca.AlpacaWebSocketClient;
 import com.hft.exchange.alpaca.dto.AlpacaAsset;
 import com.hft.exchange.binance.BinanceConfig;
 import com.hft.exchange.binance.BinanceHttpClient;
+import com.hft.exchange.binance.BinanceMarketDataPort;
+import com.hft.exchange.binance.BinanceWebSocketClient;
 import com.hft.exchange.binance.dto.BinanceExchangeInfo;
 import com.hft.exchange.binance.dto.BinanceSymbol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -23,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -36,18 +47,32 @@ public class ExchangeService {
 
     private final ExchangeProperties properties;
     private final Environment environment;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final TradingService tradingService;
     private final Map<String, ExchangeConnection> connections = new ConcurrentHashMap<>();
 
     // HTTP clients for symbol fetching
     private AlpacaHttpClient alpacaClient;
     private BinanceHttpClient binanceClient;
 
+    // WebSocket clients and MarketDataPorts for real-time data
+    private BinanceWebSocketClient binanceWsClient;
+    private BinanceMarketDataPort binanceMarketDataPort;
+    private AlpacaWebSocketClient alpacaWsClient;
+    private AlpacaMarketDataPort alpacaMarketDataPort;
+
+    // Tracks which symbols have real (non-stub) data feeds
+    private final Set<String> realDataSymbols = ConcurrentHashMap.newKeySet();
+
     // Cached symbols
     private final Map<String, List<SymbolDto>> symbolCache = new ConcurrentHashMap<>();
 
-    public ExchangeService(ExchangeProperties properties, Environment environment) {
+    public ExchangeService(ExchangeProperties properties, Environment environment,
+                           SimpMessagingTemplate messagingTemplate, @Lazy TradingService tradingService) {
         this.properties = properties;
         this.environment = environment;
+        this.messagingTemplate = messagingTemplate;
+        this.tradingService = tradingService;
     }
 
     @PostConstruct
@@ -94,6 +119,22 @@ public class ExchangeService {
                         alpaca.getDataFeed()
                 );
                 alpacaClient = new AlpacaHttpClient(config);
+
+                // Create WebSocket client and MarketDataPort for real-time data
+                AlpacaWebSocketClient wsClient = new AlpacaWebSocketClient(config);
+                AlpacaMarketDataPort mdPort = new AlpacaMarketDataPort(alpacaClient, wsClient);
+                mdPort.addQuoteListener(quote -> {
+                    tradingService.getTradingEngine().onQuoteUpdate(quote);
+                    QuoteDto dto = QuoteDto.from(quote);
+                    String exch = quote.getSymbol().getExchange().name();
+                    String ticker = quote.getSymbol().getTicker();
+                    messagingTemplate.convertAndSend("/topic/quotes/" + exch + "/" + ticker, dto);
+                    messagingTemplate.convertAndSend("/topic/quotes", dto);
+                });
+                wsClient.connect().thenRun(() -> subscribeActiveSymbols("ALPACA", mdPort));
+                this.alpacaWsClient = wsClient;
+                this.alpacaMarketDataPort = mdPort;
+
                 connections.put("ALPACA", new ExchangeConnection("ALPACA",
                     "Alpaca Markets (" + (alpaca.isPaperTrading() ? "Paper" : "Live") + ")",
                     mode, true, true, null));
@@ -118,6 +159,21 @@ public class ExchangeService {
                     binance.isTestnet()
             );
             binanceClient = new BinanceHttpClient(config);
+
+            // Create WebSocket client and MarketDataPort for real-time data
+            BinanceWebSocketClient wsClient = new BinanceWebSocketClient(config);
+            BinanceMarketDataPort mdPort = new BinanceMarketDataPort(binanceClient, wsClient);
+            mdPort.addQuoteListener(quote -> {
+                tradingService.getTradingEngine().onQuoteUpdate(quote);
+                QuoteDto dto = QuoteDto.from(quote);
+                String exch = quote.getSymbol().getExchange().name();
+                String ticker = quote.getSymbol().getTicker();
+                messagingTemplate.convertAndSend("/topic/quotes/" + exch + "/" + ticker, dto);
+                messagingTemplate.convertAndSend("/topic/quotes", dto);
+            });
+            wsClient.connect().thenRun(() -> subscribeActiveSymbols("BINANCE", mdPort));
+            this.binanceWsClient = wsClient;
+            this.binanceMarketDataPort = mdPort;
 
             if (binance.getApiKey().isEmpty() || binance.getSecretKey().isEmpty()) {
                 connections.put("BINANCE", new ExchangeConnection("BINANCE",
@@ -327,6 +383,12 @@ public class ExchangeService {
         }
         return switch (key) {
             case "ALPACA" -> {
+                if (alpacaWsClient != null) {
+                    alpacaWsClient.disconnect();
+                    alpacaWsClient = null;
+                }
+                alpacaMarketDataPort = null;
+                realDataSymbols.removeIf(k -> k.startsWith("ALPACA:"));
                 if (alpacaClient != null) {
                     alpacaClient.close();
                     alpacaClient = null;
@@ -337,6 +399,12 @@ public class ExchangeService {
                 yield getExchangeStatus(key);
             }
             case "BINANCE" -> {
+                if (binanceWsClient != null) {
+                    binanceWsClient.disconnect();
+                    binanceWsClient = null;
+                }
+                binanceMarketDataPort = null;
+                realDataSymbols.removeIf(k -> k.startsWith("BINANCE:"));
                 if (binanceClient != null) {
                     binanceClient.close();
                     binanceClient = null;
@@ -413,6 +481,33 @@ public class ExchangeService {
     }
 
     /**
+     * Subscribes to quotes for symbols used by active strategies on the given exchange.
+     */
+    private void subscribeActiveSymbols(String exchange, MarketDataPort port) {
+        try {
+            Set<Symbol> symbols = tradingService.getStrategies().stream()
+                    .flatMap(s -> s.symbols().stream())
+                    .map(ticker -> new Symbol(ticker, Exchange.valueOf(exchange)))
+                    .collect(Collectors.toSet());
+
+            if (!symbols.isEmpty()) {
+                port.subscribeQuotes(symbols);
+                symbols.forEach(s -> realDataSymbols.add(exchange + ":" + s.getTicker()));
+                log.info("Subscribed to real-time quotes for {} on {}", symbols.size(), exchange);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to subscribe active symbols for {}: {}", exchange, e.getMessage());
+        }
+    }
+
+    /**
+     * Returns true if the given symbol has a real (non-stub) data feed.
+     */
+    public boolean isRealDataSymbol(String exchange, String ticker) {
+        return realDataSymbols.contains(exchange + ":" + ticker);
+    }
+
+    /**
      * Returns the current Alpaca HTTP client, or null if in stub mode or not initialized.
      */
     public AlpacaHttpClient getAlpacaClient() {
@@ -428,6 +523,12 @@ public class ExchangeService {
 
     @PreDestroy
     public void cleanup() {
+        if (alpacaWsClient != null) {
+            alpacaWsClient.disconnect();
+        }
+        if (binanceWsClient != null) {
+            binanceWsClient.disconnect();
+        }
         if (alpacaClient != null) {
             alpacaClient.close();
         }

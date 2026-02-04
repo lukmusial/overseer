@@ -7,6 +7,7 @@ import com.hft.core.model.Quote;
 import com.hft.core.model.Symbol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class StubMarketDataService {
     private final ExchangeProperties properties;
     private final SimpMessagingTemplate messagingTemplate;
     private final TradingService tradingService;
+    private final ExchangeService exchangeService;
     private final Random random = new Random();
 
     // Current prices (in cents/minor units)
@@ -74,10 +76,12 @@ public class StubMarketDataService {
 
     public StubMarketDataService(ExchangeProperties properties,
                                   SimpMessagingTemplate messagingTemplate,
-                                  TradingService tradingService) {
+                                  TradingService tradingService,
+                                  @Lazy ExchangeService exchangeService) {
         this.properties = properties;
         this.messagingTemplate = messagingTemplate;
         this.tradingService = tradingService;
+        this.exchangeService = exchangeService;
     }
 
     @PostConstruct
@@ -131,6 +135,11 @@ public class StubMarketDataService {
             String[] parts = key.split(":");
             String exchangeName = parts[0];
             String ticker = parts[1];
+
+            // Skip symbols that have real (non-stub) data feeds
+            if (exchangeService.isRealDataSymbol(exchangeName, ticker)) {
+                continue;
+            }
 
             // Update price with random walk
             long currentPrice = entry.getValue();

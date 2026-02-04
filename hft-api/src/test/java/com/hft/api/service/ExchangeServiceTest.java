@@ -2,19 +2,25 @@ package com.hft.api.service;
 
 import com.hft.api.config.ExchangeProperties;
 import com.hft.api.dto.ExchangeStatusDto;
+import com.hft.api.dto.StrategyDto;
 import com.hft.api.dto.SymbolDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.env.StandardEnvironment;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ExchangeServiceTest {
 
     private ExchangeService exchangeService;
     private ExchangeProperties properties;
+    private SimpMessagingTemplate messagingTemplate;
+    private TradingService tradingService;
 
     @BeforeEach
     void setUp() {
@@ -36,7 +42,11 @@ class ExchangeServiceTest {
         binance.setSecretKey("");
         properties.setBinance(binance);
 
-        exchangeService = new ExchangeService(properties, new StandardEnvironment());
+        messagingTemplate = mock(SimpMessagingTemplate.class);
+        tradingService = mock(TradingService.class);
+        when(tradingService.getStrategies()).thenReturn(List.of());
+
+        exchangeService = new ExchangeService(properties, new StandardEnvironment(), messagingTemplate, tradingService);
         exchangeService.initialize();
     }
 
@@ -198,7 +208,7 @@ class ExchangeServiceTest {
         binance.setMode("stub");
         disabledProps.setBinance(binance);
 
-        ExchangeService service = new ExchangeService(disabledProps, new StandardEnvironment());
+        ExchangeService service = new ExchangeService(disabledProps, new StandardEnvironment(), messagingTemplate, tradingService);
         service.initialize();
 
         ExchangeStatusDto alpacaStatus = service.getExchangeStatus("ALPACA");
@@ -328,5 +338,25 @@ class ExchangeServiceTest {
         assertTrue(crypto.tradable());
         assertFalse(crypto.marginable());
         assertFalse(crypto.shortable());
+    }
+
+    @Test
+    void isRealDataSymbol_inStubMode_returnsFalse() {
+        assertFalse(exchangeService.isRealDataSymbol("BINANCE", "BTCUSDT"),
+                "Stub mode should not have real data symbols");
+        assertFalse(exchangeService.isRealDataSymbol("ALPACA", "AAPL"),
+                "Stub mode should not have real data symbols");
+    }
+
+    @Test
+    void switchMode_backToStub_clearsRealDataSymbols() {
+        // Switch to testnet (will create WS clients)
+        exchangeService.switchMode("BINANCE", "testnet");
+
+        // Switch back to stub - should clear real data symbols
+        exchangeService.switchMode("BINANCE", "stub");
+
+        assertFalse(exchangeService.isRealDataSymbol("BINANCE", "BTCUSDT"),
+                "After switching back to stub, real data symbols should be cleared");
     }
 }

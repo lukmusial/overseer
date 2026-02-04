@@ -1001,3 +1001,145 @@ button:disabled {
 .symbol-search-item.more-items:hover {
   background: transparent;
 }
+
+/* Strategy Info Tooltip */
+.type-with-info {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.strategy-info-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.info-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #00d9ff;
+  background: transparent;
+  color: #00d9ff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.info-btn:hover {
+  background: #00d9ff;
+  color: #0d1b30;
+}
+
+.strategy-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 380px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #0d1b30;
+  border: 1px solid #0f3460;
+  border-radius: 8px;
+  padding: 1rem;
+  z-index: 200;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.strategy-info-wrapper:hover .strategy-tooltip {
+  display: block;
+}
+
+.tooltip-header {
+  color: #00d9ff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.tooltip-description {
+  color: #94a3b8;
+  margin-bottom: 0.75rem;
+}
+
+.tooltip-section {
+  margin-bottom: 0.75rem;
+}
+
+.tooltip-section strong {
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tooltip-section ul {
+  margin: 0.35rem 0 0 1.2rem;
+  padding: 0;
+  color: #e2e8f0;
+}
+
+.tooltip-section li {
+  margin-bottom: 0.2rem;
+}
+
+.tooltip-diagram {
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 0.7rem;
+  color: #6ee7b7;
+  background: #0a1628;
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin-top: 0.35rem;
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.4;
+}
+
+.tooltip-params {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.tooltip-param {
+  background: #0a1628;
+  border-radius: 4px;
+  padding: 0.4rem 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: baseline;
+}
+
+.param-name {
+  color: #00d9ff;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.param-value {
+  color: #6ee7b7;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.75rem;
+}
+
+.param-desc {
+  color: #64748b;
+  font-size: 0.7rem;
+  width: 100%;
+}
