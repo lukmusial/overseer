@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi';
 
 interface Props {
   onSubmit: (strategy: CreateStrategyRequest) => void | Promise<void>;
+  symbolRefreshKey?: number;
 }
 
 type StrategyType = 'momentum' | 'meanreversion' | 'vwap' | 'twap';
@@ -43,7 +44,7 @@ const DEFAULT_PARAMS: Record<StrategyType, Record<string, unknown>> = {
   },
 };
 
-export function StrategyForm({ onSubmit }: Props) {
+export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
   const { getSymbols } = useApi();
   const [name, setName] = useState('');
   const [type, setType] = useState<StrategyType>('momentum');
@@ -89,7 +90,7 @@ export function StrategyForm({ onSubmit }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [exchange, getSymbols]);
+  }, [exchange, getSymbols, symbolRefreshKey]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

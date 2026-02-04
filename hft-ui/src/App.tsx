@@ -222,7 +222,7 @@ export default function App() {
               onStop={handleStopEngine}
             />
             <ExchangeStatusPanel exchanges={exchanges} onSwitchMode={handleSwitchMode} />
-            <StrategyForm onSubmit={handleCreateStrategy} />
+            <StrategyForm onSubmit={handleCreateStrategy} symbolRefreshKey={symbolRefreshKey} />
           </div>
           <div className="col-right">
             <ChartPanel exchanges={exchanges} strategies={strategies} symbolRefreshKey={symbolRefreshKey} />

@@ -35,7 +35,7 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey }: ChartPan
       setLoading(true);
       try {
         const data = await getSymbols(selectedExchange);
-        setSymbols(data);
+        setSymbols(data.sort((a, b) => a.symbol.localeCompare(b.symbol)));
         // Auto-select first symbol if none selected
         if (data.length > 0 && !selectedSymbol) {
           setSelectedSymbol(data[0].symbol);
@@ -99,6 +99,9 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey }: ChartPan
   };
 
   const handleSearchFocus = () => {
+    if (selectedSymbol) {
+      setSymbolSearch('');
+    }
     setSymbolDropdownOpen(true);
   };
 
