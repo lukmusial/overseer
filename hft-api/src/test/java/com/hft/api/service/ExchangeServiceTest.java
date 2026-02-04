@@ -5,6 +5,7 @@ import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.SymbolDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.StandardEnvironment;
 
 import java.util.List;
 
@@ -35,7 +36,7 @@ class ExchangeServiceTest {
         binance.setSecretKey("");
         properties.setBinance(binance);
 
-        exchangeService = new ExchangeService(properties);
+        exchangeService = new ExchangeService(properties, new StandardEnvironment());
         exchangeService.initialize();
     }
 
@@ -197,7 +198,7 @@ class ExchangeServiceTest {
         binance.setMode("stub");
         disabledProps.setBinance(binance);
 
-        ExchangeService service = new ExchangeService(disabledProps);
+        ExchangeService service = new ExchangeService(disabledProps, new StandardEnvironment());
         service.initialize();
 
         ExchangeStatusDto alpacaStatus = service.getExchangeStatus("ALPACA");

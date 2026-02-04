@@ -12,13 +12,17 @@ import com.hft.exchange.binance.dto.BinanceExchangeInfo;
 import com.hft.exchange.binance.dto.BinanceSymbol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -31,6 +35,7 @@ public class ExchangeService {
     private static final Logger log = LoggerFactory.getLogger(ExchangeService.class);
 
     private final ExchangeProperties properties;
+    private final Environment environment;
     private final Map<String, ExchangeConnection> connections = new ConcurrentHashMap<>();
 
     // HTTP clients for symbol fetching
@@ -40,8 +45,9 @@ public class ExchangeService {
     // Cached symbols
     private final Map<String, List<SymbolDto>> symbolCache = new ConcurrentHashMap<>();
 
-    public ExchangeService(ExchangeProperties properties) {
+    public ExchangeService(ExchangeProperties properties, Environment environment) {
         this.properties = properties;
+        this.environment = environment;
     }
 
     @PostConstruct
@@ -310,10 +316,15 @@ public class ExchangeService {
 
     /**
      * Switches the runtime mode for an exchange, tearing down the existing connection
-     * and reinitializing with the new mode.
+     * and reinitializing with the new mode. Loads credentials from application-local.properties
+     * if they are not already present in the current properties.
      */
     public synchronized ExchangeStatusDto switchMode(String exchange, String newMode) {
         String key = exchange.toUpperCase();
+        boolean isNonStub = !"stub".equalsIgnoreCase(newMode);
+        if (isNonStub) {
+            loadLocalCredentials();
+        }
         return switch (key) {
             case "ALPACA" -> {
                 if (alpacaClient != null) {
@@ -337,6 +348,68 @@ public class ExchangeService {
             }
             default -> null;
         };
+    }
+
+    /**
+     * Loads API credentials from application-local.properties if they are missing
+     * from the current properties. This allows switching from stub to live/testnet
+     * modes at runtime even when the app was started in stub profile.
+     */
+    private void loadLocalCredentials() {
+        Properties localProps = new Properties();
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream("application-local.properties")) {
+            if (is == null) {
+                log.debug("No application-local.properties found, skipping credential loading");
+                return;
+            }
+            localProps.load(is);
+        } catch (IOException e) {
+            log.warn("Failed to load application-local.properties: {}", e.getMessage());
+            return;
+        }
+
+        ExchangeProperties.AlpacaProperties alpaca = properties.getAlpaca();
+        if (alpaca.getApiKey().isEmpty()) {
+            String key = resolveCredential(localProps, "hft.exchanges.alpaca.api-key", "ALPACA_API_KEY");
+            if (!key.isEmpty()) {
+                alpaca.setApiKey(key);
+                log.info("Loaded Alpaca API key from local properties/environment");
+            }
+        }
+        if (alpaca.getSecretKey().isEmpty()) {
+            String key = resolveCredential(localProps, "hft.exchanges.alpaca.secret-key", "ALPACA_SECRET_KEY");
+            if (!key.isEmpty()) {
+                alpaca.setSecretKey(key);
+                log.info("Loaded Alpaca secret key from local properties/environment");
+            }
+        }
+
+        ExchangeProperties.BinanceProperties binance = properties.getBinance();
+        if (binance.getApiKey().isEmpty()) {
+            String key = resolveCredential(localProps, "hft.exchanges.binance.api-key", "BINANCE_API_KEY");
+            if (!key.isEmpty()) {
+                binance.setApiKey(key);
+                log.info("Loaded Binance API key from local properties/environment");
+            }
+        }
+        if (binance.getSecretKey().isEmpty()) {
+            String key = resolveCredential(localProps, "hft.exchanges.binance.secret-key", "BINANCE_SECRET_KEY");
+            if (!key.isEmpty()) {
+                binance.setSecretKey(key);
+                log.info("Loaded Binance secret key from local properties/environment");
+            }
+        }
+    }
+
+    private String resolveCredential(Properties localProps, String propKey, String envKey) {
+        // Try local properties file first
+        String value = localProps.getProperty(propKey, "");
+        if (!value.isEmpty()) {
+            return value;
+        }
+        // Fall back to environment variable
+        String envValue = environment.getProperty(envKey, "");
+        return envValue;
     }
 
     @PreDestroy
