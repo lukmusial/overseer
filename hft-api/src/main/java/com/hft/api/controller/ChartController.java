@@ -83,7 +83,7 @@ public class ChartController {
             @PathVariable String exchange,
             @PathVariable String symbol) {
 
-        List<TriggerRangeDto> ranges = chartDataService.getTriggerRanges(symbol, exchange);
+        List<TriggerRangeDto> ranges = chartDataService.getTriggerRanges(symbol, exchange, null);
         return ResponseEntity.ok(ranges);
     }
 

@@ -70,7 +70,7 @@ export function StrategyForm({ onSubmit }: Props) {
     getSymbols(exchange)
       .then((data) => {
         if (!cancelled) {
-          setSymbols(data);
+          setSymbols(data.sort((a, b) => a.symbol.localeCompare(b.symbol)));
         }
       })
       .catch((err) => {
@@ -124,6 +124,10 @@ export function StrategyForm({ onSubmit }: Props) {
   );
 
   const handleSymbolInputChange = (value: string) => {
+    // Clear existing selection when user starts typing
+    if (selectedSymbol && value !== selectedSymbol.symbol) {
+      setSelectedSymbol(null);
+    }
     setSymbolInput(value);
     setShowDropdown(true);
     setHighlightedIndex(-1);
@@ -135,8 +139,6 @@ export function StrategyForm({ onSubmit }: Props) {
     );
     if (exactMatch) {
       setSelectedSymbol(exactMatch);
-    } else {
-      setSelectedSymbol(null);
     }
   };
 
@@ -263,7 +265,13 @@ export function StrategyForm({ onSubmit }: Props) {
                 type="text"
                 value={symbolInput}
                 onChange={(e) => handleSymbolInputChange(e.target.value)}
-                onFocus={() => setShowDropdown(true)}
+                onFocus={() => {
+                  if (selectedSymbol) {
+                    setSelectedSymbol(null);
+                    setSymbolInput('');
+                  }
+                  setShowDropdown(true);
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder="Type to search symbols..."
                 className={`symbol-input ${symbolError ? 'input-error' : ''} ${selectedSymbol ? 'input-valid' : ''}`}

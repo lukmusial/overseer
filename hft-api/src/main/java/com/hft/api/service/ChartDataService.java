@@ -87,7 +87,10 @@ public class ChartDataService {
     public ChartDataDto getChartData(String symbolTicker, String exchangeName, String interval, int periods) {
         List<CandleDto> candles = getHistoricalCandles(symbolTicker, exchangeName, interval, periods);
         List<OrderMarkerDto> orders = getOrderMarkers(symbolTicker, exchangeName);
-        List<TriggerRangeDto> triggerRanges = getTriggerRanges(symbolTicker, exchangeName);
+
+        // Use last candle close as fallback price for trigger ranges
+        Double lastCandlePrice = candles.isEmpty() ? null : candles.get(candles.size() - 1).close();
+        List<TriggerRangeDto> triggerRanges = getTriggerRanges(symbolTicker, exchangeName, lastCandlePrice);
 
         String cacheKey = symbolTicker + ":" + exchangeName + ":" + interval + ":" + periods;
         String dataSource = cacheDataSource.getOrDefault(cacheKey, "stub");
@@ -338,12 +341,19 @@ public class ChartDataService {
     /**
      * Calculate trigger ranges for active strategies on this symbol.
      */
-    public List<TriggerRangeDto> getTriggerRanges(String symbolTicker, String exchangeName) {
+    public List<TriggerRangeDto> getTriggerRanges(String symbolTicker, String exchangeName, Double lastCandlePrice) {
         List<TriggerRangeDto> ranges = new ArrayList<>();
 
-        // Get current price
+        // Get current price: prefer real-time quote, then last candle close, then static fallback
         Long currentPriceCents = stubMarketDataService.getCurrentPrice(exchangeName, symbolTicker);
-        double currentPrice = currentPriceCents != null ? currentPriceCents / 100.0 : BASE_PRICES.getOrDefault(symbolTicker, 100.0);
+        double currentPrice;
+        if (currentPriceCents != null) {
+            currentPrice = currentPriceCents / 100.0;
+        } else if (lastCandlePrice != null) {
+            currentPrice = lastCandlePrice;
+        } else {
+            currentPrice = BASE_PRICES.getOrDefault(symbolTicker, 100.0);
+        }
 
         // Get active strategies for this symbol
         for (StrategyDto strategy : tradingService.getStrategies()) {
