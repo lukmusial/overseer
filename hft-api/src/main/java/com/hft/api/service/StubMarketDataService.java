@@ -37,6 +37,10 @@ public class StubMarketDataService {
     // Volatility factors (basis points per tick, e.g., 5 = 0.05%)
     private final Map<String, Integer> volatility = new ConcurrentHashMap<>();
 
+    // Trend state for autocorrelated price movements (makes momentum strategies viable)
+    // Drift is an AR(1) process that biases the random walk direction, creating realistic trends
+    private final Map<String, Double> drift = new ConcurrentHashMap<>();
+
     // Base prices based on approximate January 2026 market values (in cents)
     private static final Map<String, Long> ALPACA_BASE_PRICES = Map.of(
             "AAPL", 23500L,    // ~$235
@@ -141,13 +145,23 @@ public class StubMarketDataService {
                 continue;
             }
 
-            // Update price with random walk
+            // Update price with trending random walk (AR(1) drift + noise)
             long currentPrice = entry.getValue();
             int vol = volatility.getOrDefault(key, 15);
 
-            // Random walk: price change is random within volatility bounds
-            // Change = price * (random(-vol, +vol) / 10000)
-            double changePercent = (random.nextDouble() * 2 - 1) * vol / 10000.0;
+            // Evolve drift: mean-reverting AR(1) process with random shocks
+            // drift(t) = 0.98 * drift(t-1) + noise
+            // This creates realistic trending periods that momentum strategies can detect
+            double currentDrift = drift.getOrDefault(key, 0.0);
+            double driftShock = (random.nextGaussian() * vol * 0.3) / 10000.0;
+            currentDrift = 0.98 * currentDrift + driftShock;
+            // Clamp drift to prevent runaway trends
+            currentDrift = Math.max(-0.005, Math.min(0.005, currentDrift));
+            drift.put(key, currentDrift);
+
+            // Price change = drift (trend) + noise (random)
+            double noise = (random.nextGaussian() * vol * 0.7) / 10000.0;
+            double changePercent = currentDrift + noise;
             long priceChange = (long) (currentPrice * changePercent);
             long newPrice = Math.max(1, currentPrice + priceChange);
             currentPrices.put(key, newPrice);

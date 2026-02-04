@@ -21,10 +21,20 @@ public class OrderHandler implements EventHandler<TradingEvent> {
 
     private final OrderManager orderManager;
     private final Map<Exchange, OrderPort> orderPorts;
+    private volatile FillCallback fillCallback;
+
+    @FunctionalInterface
+    public interface FillCallback {
+        void onFill(Order order, long fillQuantity, long fillPrice);
+    }
 
     public OrderHandler(OrderManager orderManager) {
         this.orderManager = orderManager;
         this.orderPorts = new ConcurrentHashMap<>();
+    }
+
+    public void setFillCallback(FillCallback callback) {
+        this.fillCallback = callback;
     }
 
     public void registerOrderPort(Exchange exchange, OrderPort orderPort) {
@@ -79,6 +89,13 @@ public class OrderHandler implements EventHandler<TradingEvent> {
                 .thenAccept(submittedOrder -> {
                     log.debug("Order submitted: {}", submittedOrder.getExchangeOrderId());
                     orderManager.updateOrder(submittedOrder);
+
+                    // If order was immediately filled, publish fill event for metrics/position tracking
+                    if (submittedOrder.getStatus() == OrderStatus.FILLED && fillCallback != null) {
+                        fillCallback.onFill(submittedOrder,
+                                submittedOrder.getFilledQuantity(),
+                                submittedOrder.getAverageFilledPrice());
+                    }
                 })
                 .exceptionally(e -> {
                     log.error("Order submission failed: {}", order.getClientOrderId(), e);

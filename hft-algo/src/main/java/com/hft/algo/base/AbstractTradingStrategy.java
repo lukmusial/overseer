@@ -312,6 +312,15 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         long maxOrderSize = parameters.getLong("maxOrderSize", 1000);
         quantity = Math.min(quantity, maxOrderSize);
 
+        // Cap quantity by max notional value to avoid risk limit violations
+        // Default $500K per order, configurable via maxOrderNotional parameter (in dollars)
+        if (price > 0) {
+            long maxNotional = parameters.getLong("maxOrderNotional", 500_000);
+            int priceScale = quote.getPriceScale();
+            long maxQtyByNotional = maxNotional * priceScale / price;
+            quantity = Math.min(quantity, Math.max(maxQtyByNotional, 0));
+        }
+
         if (quantity > 0) {
             OrderRequest request = OrderRequest.builder()
                     .symbol(symbol)

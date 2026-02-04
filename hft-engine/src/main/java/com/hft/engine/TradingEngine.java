@@ -84,6 +84,8 @@ public class TradingEngine {
 
         // Initialize handlers
         this.orderHandler = new OrderHandler(orderManager);
+        this.orderHandler.setFillCallback((order, qty, price) ->
+                onOrderFilled(order, qty, price));
         this.positionHandler = new PositionHandler(positionManager);
         this.riskHandler = new RiskHandler(riskManager);
         this.metricsHandler = new MetricsHandler(orderMetrics);
