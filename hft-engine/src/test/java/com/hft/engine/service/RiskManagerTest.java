@@ -149,7 +149,7 @@ class RiskManagerTest {
 
     @Test
     void recordFill_ShouldUpdateNotionalTraded() {
-        riskManager.recordFill(testSymbol, OrderSide.BUY, 100, 15000L);
+        riskManager.recordFill(testSymbol, OrderSide.BUY, 100, 15000L, 100);
 
         long notionalTraded = riskManager.getNotionalTradedToday();
         assertEquals(15000L, notionalTraded); // 100 * 15000 / 100 = 15000
@@ -210,7 +210,7 @@ class RiskManagerTest {
         for (int i = 0; i < 10; i++) {
             riskManager.checkPreTradeRisk(createOrder(testSymbol, OrderSide.BUY, 10, 15000L));
         }
-        riskManager.recordFill(testSymbol, OrderSide.BUY, 100, 15000L);
+        riskManager.recordFill(testSymbol, OrderSide.BUY, 100, 15000L, 100);
 
         assertTrue(riskManager.getOrdersSubmittedToday() > 0);
         assertTrue(riskManager.getNotionalTradedToday() > 0);

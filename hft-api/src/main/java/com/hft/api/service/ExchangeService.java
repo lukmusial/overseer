@@ -107,6 +107,7 @@ public class ExchangeService {
         if (alpaca.isStub()) {
             connections.put("ALPACA", new ExchangeConnection("ALPACA", "Alpaca Markets (Stub)", mode, true, true, null));
             symbolCache.put("ALPACA", getStubAlpacaSymbols());
+            tradingService.getTradingEngine().registerExchange(Exchange.ALPACA, new StubOrderPort());
             log.info("Alpaca running in STUB mode - simulated connection");
         } else {
             if (alpaca.getApiKey().isEmpty() || alpaca.getSecretKey().isEmpty()) {
@@ -159,6 +160,7 @@ public class ExchangeService {
         if (binance.isStub()) {
             connections.put("BINANCE", new ExchangeConnection("BINANCE", "Binance (Stub)", mode, true, true, null));
             symbolCache.put("BINANCE", getStubBinanceSymbols());
+            tradingService.getTradingEngine().registerExchange(Exchange.BINANCE, new StubOrderPort());
             log.info("Binance running in STUB mode - simulated connection");
         } else {
             // Binance exchangeInfo is a public endpoint, create client even without credentials

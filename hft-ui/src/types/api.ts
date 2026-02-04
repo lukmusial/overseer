@@ -28,6 +28,7 @@ export interface Order {
   stopPrice: number;
   filledQuantity: number;
   averageFilledPrice: number;
+  priceScale: number;
   status: OrderStatus;
   rejectReason: string | null;
   strategyId: string | null;

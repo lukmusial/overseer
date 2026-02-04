@@ -36,6 +36,9 @@ public class TradingEvent {
     private long tradeId;
     private long commission;
 
+    // Price scaling
+    private int priceScale = 100;
+
     // Strategy reference
     private String strategyId;
 
@@ -62,6 +65,7 @@ public class TradingEvent {
         askSize = 0;
         tradeId = 0;
         commission = 0;
+        priceScale = 100;
         strategyId = null;
     }
 
@@ -88,6 +92,7 @@ public class TradingEvent {
         this.askSize = other.askSize;
         this.tradeId = other.tradeId;
         this.commission = other.commission;
+        this.priceScale = other.priceScale;
         this.strategyId = other.strategyId;
     }
 
@@ -103,6 +108,7 @@ public class TradingEvent {
         this.price = order.getPrice();
         this.stopPrice = order.getStopPrice();
         this.quantity = order.getQuantity();
+        this.priceScale = order.getPriceScale();
         this.strategyId = order.getStrategyId();
     }
 
@@ -133,6 +139,7 @@ public class TradingEvent {
         this.side = order.getSide();
         this.filledQuantity = fillQty;
         this.filledPrice = fillPrice;
+        this.priceScale = order.getPriceScale();
         this.status = order.getFilledQuantity() + fillQty >= order.getQuantity()
                 ? OrderStatus.FILLED : OrderStatus.PARTIALLY_FILLED;
     }
@@ -239,6 +246,9 @@ public class TradingEvent {
 
     public long getCommission() { return commission; }
     public void setCommission(long commission) { this.commission = commission; }
+
+    public int getPriceScale() { return priceScale; }
+    public void setPriceScale(int priceScale) { this.priceScale = priceScale; }
 
     public String getStrategyId() { return strategyId; }
     public void setStrategyId(String strategyId) { this.strategyId = strategyId; }

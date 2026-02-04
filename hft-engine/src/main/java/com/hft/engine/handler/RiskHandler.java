@@ -47,7 +47,8 @@ public class RiskHandler implements EventHandler<TradingEvent> {
                 event.getSymbol(),
                 event.getSide(),
                 event.getFilledQuantity(),
-                event.getFilledPrice()
+                event.getFilledPrice(),
+                event.getPriceScale()
         );
     }
 

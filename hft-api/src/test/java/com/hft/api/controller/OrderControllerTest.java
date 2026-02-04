@@ -109,7 +109,7 @@ class OrderControllerTest {
         return new OrderDto(
                 id, null, "AAPL", "ALPACA",
                 OrderSide.BUY, OrderType.LIMIT, TimeInForce.DAY,
-                100, 15000L, 0L, 0L, 0L,
+                100, 15000L, 0L, 0L, 0L, 100,
                 status, null, null,
                 System.nanoTime(), System.nanoTime()
         );

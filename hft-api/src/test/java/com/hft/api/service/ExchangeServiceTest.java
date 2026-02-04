@@ -4,6 +4,7 @@ import com.hft.api.config.ExchangeProperties;
 import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.StrategyDto;
 import com.hft.api.dto.SymbolDto;
+import com.hft.engine.TradingEngine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.env.StandardEnvironment;
@@ -46,6 +47,8 @@ class ExchangeServiceTest {
         messagingTemplate = mock(SimpMessagingTemplate.class);
         tradingService = mock(TradingService.class);
         when(tradingService.getStrategies()).thenReturn(List.of());
+        TradingEngine mockEngine = mock(TradingEngine.class);
+        when(tradingService.getTradingEngine()).thenReturn(mockEngine);
         stubMarketDataService = mock(StubMarketDataService.class);
 
         exchangeService = new ExchangeService(properties, new StandardEnvironment(), messagingTemplate, tradingService, stubMarketDataService);

@@ -31,6 +31,11 @@ public class OrderController {
         return ResponseEntity.ok(tradingService.getActiveOrders());
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<List<OrderDto>> getAllOrders() {
+        return ResponseEntity.ok(tradingService.getAllOrders());
+    }
+
     @GetMapping("/{clientOrderId}")
     public ResponseEntity<OrderDto> getOrder(@PathVariable long clientOrderId) {
         return tradingService.getOrder(clientOrderId)

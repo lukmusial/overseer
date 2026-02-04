@@ -179,6 +179,12 @@ public class TradingService {
                 .collect(Collectors.toList());
     }
 
+    public List<OrderDto> getAllOrders() {
+        return tradingEngine.getOrderManager().getOrders().stream()
+                .map(OrderDto::from)
+                .collect(Collectors.toList());
+    }
+
     public Optional<OrderDto> getOrder(long clientOrderId) {
         Order order = tradingEngine.getOrderManager().getOrder(clientOrderId);
         return order != null ? Optional.of(OrderDto.from(order)) : Optional.empty();

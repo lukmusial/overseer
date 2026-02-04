@@ -63,6 +63,12 @@ public class TradingEngineAlgorithmContext implements AlgorithmContext {
             order.strategyId(request.getAlgorithmId());
         }
 
+        // Set price scale from the latest quote so risk checks use the correct scale
+        Quote quote = latestQuotes.get(request.getSymbol());
+        if (quote != null) {
+            order.setPriceScale(quote.getPriceScale());
+        }
+
         String rejection = tradingEngine.submitOrder(order);
         if (rejection != null) {
             log.warn("Order rejected by engine: {}", rejection);

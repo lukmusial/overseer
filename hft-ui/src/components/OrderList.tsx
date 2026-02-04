@@ -47,7 +47,7 @@ export function OrderList({ orders, onCancel }: Props) {
               <td className={order.side === 'BUY' ? 'buy' : 'sell'}>{order.side}</td>
               <td>{order.type}</td>
               <td>{order.quantity}</td>
-              <td>{order.price > 0 ? formatPrice(order.price) : '-'}</td>
+              <td>{order.price > 0 ? formatPrice(order.price, order.priceScale || 100) : '-'}</td>
               <td>{order.filledQuantity}/{order.quantity}</td>
               <td>
                 <span className={`status-badge status-${order.status.toLowerCase()}`}>
