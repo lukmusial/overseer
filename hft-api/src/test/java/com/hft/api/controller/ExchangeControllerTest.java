@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -130,5 +131,41 @@ class ExchangeControllerTest {
 
         mockMvc.perform(post("/api/exchanges/UNKNOWN/symbols/refresh"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void switchMode_validRequest_returnsUpdatedStatus() throws Exception {
+        ExchangeStatusDto status = new ExchangeStatusDto(
+                "BINANCE", "Binance (Testnet)", "testnet", true, true, System.currentTimeMillis(), null
+        );
+        when(exchangeService.switchMode("BINANCE", "testnet")).thenReturn(status);
+
+        mockMvc.perform(put("/api/exchanges/BINANCE/mode")
+                        .contentType("application/json")
+                        .content("{\"mode\":\"testnet\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exchange").value("BINANCE"))
+                .andExpect(jsonPath("$.mode").value("testnet"))
+                .andExpect(jsonPath("$.connected").value(true));
+
+        verify(exchangeService).switchMode("BINANCE", "testnet");
+    }
+
+    @Test
+    void switchMode_unknownExchange_returnsNotFound() throws Exception {
+        when(exchangeService.switchMode(anyString(), anyString())).thenReturn(null);
+
+        mockMvc.perform(put("/api/exchanges/UNKNOWN/mode")
+                        .contentType("application/json")
+                        .content("{\"mode\":\"stub\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void switchMode_emptyMode_returnsBadRequest() throws Exception {
+        mockMvc.perform(put("/api/exchanges/BINANCE/mode")
+                        .contentType("application/json")
+                        .content("{\"mode\":\"\"}"))
+                .andExpect(status().isBadRequest());
     }
 }

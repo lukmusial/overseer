@@ -1,8 +1,10 @@
 package com.hft.api.controller;
 
+import com.hft.api.dto.ExchangeModeRequest;
 import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.SymbolDto;
 import com.hft.api.service.ExchangeService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,6 +37,20 @@ public class ExchangeController {
     @GetMapping("/status/{exchange}")
     public ResponseEntity<ExchangeStatusDto> getExchangeStatus(@PathVariable String exchange) {
         ExchangeStatusDto status = exchangeService.getExchangeStatus(exchange);
+        if (status == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(status);
+    }
+
+    /**
+     * Switches the runtime mode for an exchange.
+     */
+    @PutMapping("/{exchange}/mode")
+    public ResponseEntity<ExchangeStatusDto> switchMode(
+            @PathVariable String exchange,
+            @Valid @RequestBody ExchangeModeRequest request) {
+        ExchangeStatusDto status = exchangeService.switchMode(exchange, request.mode());
         if (status == null) {
             return ResponseEntity.notFound().build();
         }

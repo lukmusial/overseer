@@ -100,6 +100,13 @@ export function useApi() {
     return fetchJson<ExchangeStatus[]>(`${API_BASE}/exchanges/status`);
   }, []);
 
+  const switchMode = useCallback(async (exchange: string, mode: string): Promise<ExchangeStatus> => {
+    return fetchJson<ExchangeStatus>(`${API_BASE}/exchanges/${exchange}/mode`, {
+      method: 'PUT',
+      body: JSON.stringify({ mode }),
+    });
+  }, []);
+
   const getSymbols = useCallback(async (exchange: string): Promise<TradingSymbol[]> => {
     return fetchJson<TradingSymbol[]>(`${API_BASE}/exchanges/${exchange}/symbols`);
   }, []);
@@ -132,6 +139,7 @@ export function useApi() {
     stopStrategy,
     removeStrategy,
     getExchangeStatus,
+    switchMode,
     getSymbols,
     getChartData,
   };

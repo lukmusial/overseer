@@ -208,6 +208,67 @@ class ExchangeServiceTest {
     }
 
     @Test
+    void switchMode_alpacaStubToSandbox_reinitializes() {
+        ExchangeStatusDto before = exchangeService.getExchangeStatus("ALPACA");
+        assertEquals("stub", before.mode());
+
+        ExchangeStatusDto after = exchangeService.switchMode("ALPACA", "sandbox");
+
+        assertNotNull(after);
+        assertEquals("ALPACA", after.exchange());
+        assertEquals("sandbox", after.mode());
+    }
+
+    @Test
+    void switchMode_binanceStubToTestnet_reinitializes() {
+        ExchangeStatusDto before = exchangeService.getExchangeStatus("BINANCE");
+        assertEquals("stub", before.mode());
+
+        ExchangeStatusDto after = exchangeService.switchMode("BINANCE", "testnet");
+
+        assertNotNull(after);
+        assertEquals("BINANCE", after.exchange());
+        assertEquals("testnet", after.mode());
+    }
+
+    @Test
+    void switchMode_backToStub_restoresSymbols() {
+        // Switch away from stub
+        exchangeService.switchMode("ALPACA", "sandbox");
+
+        // Switch back to stub
+        exchangeService.switchMode("ALPACA", "stub");
+
+        ExchangeStatusDto status = exchangeService.getExchangeStatus("ALPACA");
+        assertEquals("stub", status.mode());
+        assertTrue(status.connected());
+
+        List<SymbolDto> symbols = exchangeService.getSymbols("ALPACA");
+        assertFalse(symbols.isEmpty());
+        assertTrue(symbols.stream().anyMatch(s -> s.symbol().equals("AAPL")));
+    }
+
+    @Test
+    void switchMode_unknownExchange_returnsNull() {
+        ExchangeStatusDto result = exchangeService.switchMode("UNKNOWN", "stub");
+        assertNull(result);
+    }
+
+    @Test
+    void switchMode_clearsCacheForExchange() {
+        // Populate cache
+        List<SymbolDto> before = exchangeService.getSymbols("ALPACA");
+        assertFalse(before.isEmpty());
+
+        // Switch mode - cache should be cleared
+        exchangeService.switchMode("ALPACA", "sandbox");
+
+        // After switching to sandbox (no API keys), fetching symbols returns stub fallback
+        List<SymbolDto> after = exchangeService.getSymbols("ALPACA");
+        assertNotSame(before, after, "Cache should have been cleared");
+    }
+
+    @Test
     void symbolDto_equityFactoryMethod_setsCorrectFields() {
         SymbolDto equity = SymbolDto.equity("TEST", "Test Company", "EXCHANGE", true, true, false);
 

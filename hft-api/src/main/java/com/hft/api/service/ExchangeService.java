@@ -308,6 +308,37 @@ public class ExchangeService {
         );
     }
 
+    /**
+     * Switches the runtime mode for an exchange, tearing down the existing connection
+     * and reinitializing with the new mode.
+     */
+    public synchronized ExchangeStatusDto switchMode(String exchange, String newMode) {
+        String key = exchange.toUpperCase();
+        return switch (key) {
+            case "ALPACA" -> {
+                if (alpacaClient != null) {
+                    alpacaClient.close();
+                    alpacaClient = null;
+                }
+                symbolCache.remove(key);
+                properties.getAlpaca().setMode(newMode);
+                initializeAlpaca();
+                yield getExchangeStatus(key);
+            }
+            case "BINANCE" -> {
+                if (binanceClient != null) {
+                    binanceClient.close();
+                    binanceClient = null;
+                }
+                symbolCache.remove(key);
+                properties.getBinance().setMode(newMode);
+                initializeBinance();
+                yield getExchangeStatus(key);
+            }
+            default -> null;
+        };
+    }
+
     @PreDestroy
     public void cleanup() {
         if (alpacaClient != null) {

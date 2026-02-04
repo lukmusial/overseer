@@ -147,6 +147,34 @@ describe('useApi', () => {
     });
   });
 
+  describe('switchMode', () => {
+    it('should call PUT with correct exchange and mode', async () => {
+      const mockStatus = {
+        exchange: 'BINANCE',
+        name: 'Binance (Testnet)',
+        mode: 'testnet',
+        connected: true,
+        authenticated: true,
+        lastHeartbeat: Date.now(),
+        errorMessage: null,
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockStatus),
+      });
+
+      const { result } = renderHook(() => useApi());
+      const status = await result.current.switchMode('BINANCE', 'testnet');
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/exchanges/BINANCE/mode', expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ mode: 'testnet' }),
+      }));
+      expect(status.mode).toBe('testnet');
+    });
+  });
+
   describe('getStrategies', () => {
     it('should fetch strategies', async () => {
       const mockStrategies = [

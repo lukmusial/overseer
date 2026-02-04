@@ -156,6 +156,11 @@ export interface TriggerRange {
   description: string;
 }
 
+export const EXCHANGE_MODES: Record<string, string[]> = {
+  ALPACA: ['stub', 'sandbox', 'live'],
+  BINANCE: ['stub', 'testnet', 'live'],
+};
+
 export interface ChartData {
   symbol: string;
   exchange: string;

@@ -186,6 +186,13 @@ export default function App() {
     setInspectedStrategy(strategy);
   }, []);
 
+  // Exchange mode switching
+  const handleSwitchMode = useCallback(async (exchange: string, mode: string) => {
+    await api.switchMode(exchange, mode);
+    const exchangeStatus = await api.getExchangeStatus();
+    setExchanges(exchangeStatus);
+  }, [api]);
+
   // Order operations
   const handleCancelOrder = useCallback(async (orderId: number) => {
     try {
@@ -211,7 +218,7 @@ export default function App() {
               onStart={handleStartEngine}
               onStop={handleStopEngine}
             />
-            <ExchangeStatusPanel exchanges={exchanges} />
+            <ExchangeStatusPanel exchanges={exchanges} onSwitchMode={handleSwitchMode} />
             <StrategyForm onSubmit={handleCreateStrategy} />
           </div>
           <div className="col-right">
