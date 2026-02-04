@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { StrategyList } from './StrategyList';
 import type { Strategy } from '../types/api';
@@ -169,5 +169,39 @@ describe('StrategyList', () => {
     expect(screen.getByText('+$7.00')).toBeInTheDocument();
     // strat-3: realized -300 + unrealized 0 = -300 cents = -$3.00
     expect(screen.getByText('-$3.00')).toBeInTheDocument();
+  });
+
+  it('shows newly created strategy when list is re-rendered with updated strategies', () => {
+    const { rerender } = render(<StrategyList {...defaultProps} strategies={[]} />);
+
+    // Initially empty
+    expect(screen.getByText('No strategies configured')).toBeInTheDocument();
+
+    // Simulate a new strategy being created and added to state
+    const newStrategy: Strategy = {
+      id: 'strat-new',
+      name: 'New TWAP Strategy',
+      type: 'TWAP',
+      state: 'INITIALIZED',
+      symbols: ['MSFT'],
+      parameters: { targetQuantity: 500, durationMinutes: 30, sliceIntervalSeconds: 30, maxParticipationRate: 0.1 },
+      progress: 0,
+      stats: null,
+    };
+
+    rerender(<StrategyList {...defaultProps} strategies={[newStrategy]} />);
+
+    // Strategy should now appear in the list
+    expect(screen.queryByText('No strategies configured')).not.toBeInTheDocument();
+    expect(screen.getByText('Strategies (1)')).toBeInTheDocument();
+    expect(screen.getByText('New TWAP Strategy')).toBeInTheDocument();
+    expect(screen.getByText('MSFT')).toBeInTheDocument();
+    expect(screen.getByText('INITIALIZED')).toBeInTheDocument();
+
+    // Adding another strategy should update the count
+    rerender(<StrategyList {...defaultProps} strategies={[newStrategy, ...mockStrategies]} />);
+    expect(screen.getByText('Strategies (4)')).toBeInTheDocument();
+    expect(screen.getByText('New TWAP Strategy')).toBeInTheDocument();
+    expect(screen.getByText('BTC Momentum')).toBeInTheDocument();
   });
 });

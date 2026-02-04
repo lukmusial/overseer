@@ -54,6 +54,8 @@ public class TradingService {
 
     @PreDestroy
     public void shutdown() {
+        log.info("Shutting down TradingService, flushing persistence...");
+        persistenceManager.flush();
         persistenceManager.close();
     }
 

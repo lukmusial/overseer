@@ -21,6 +21,7 @@ class ExchangeServiceTest {
     private ExchangeProperties properties;
     private SimpMessagingTemplate messagingTemplate;
     private TradingService tradingService;
+    private StubMarketDataService stubMarketDataService;
 
     @BeforeEach
     void setUp() {
@@ -45,8 +46,9 @@ class ExchangeServiceTest {
         messagingTemplate = mock(SimpMessagingTemplate.class);
         tradingService = mock(TradingService.class);
         when(tradingService.getStrategies()).thenReturn(List.of());
+        stubMarketDataService = mock(StubMarketDataService.class);
 
-        exchangeService = new ExchangeService(properties, new StandardEnvironment(), messagingTemplate, tradingService);
+        exchangeService = new ExchangeService(properties, new StandardEnvironment(), messagingTemplate, tradingService, stubMarketDataService);
         exchangeService.initialize();
     }
 
@@ -208,7 +210,7 @@ class ExchangeServiceTest {
         binance.setMode("stub");
         disabledProps.setBinance(binance);
 
-        ExchangeService service = new ExchangeService(disabledProps, new StandardEnvironment(), messagingTemplate, tradingService);
+        ExchangeService service = new ExchangeService(disabledProps, new StandardEnvironment(), messagingTemplate, tradingService, stubMarketDataService);
         service.initialize();
 
         ExchangeStatusDto alpacaStatus = service.getExchangeStatus("ALPACA");

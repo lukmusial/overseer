@@ -188,7 +188,7 @@ public class BinanceWebSocketClient {
         return config.getStreamUrl() + "/ws";
     }
 
-    private void handleMessage(String text) {
+    void handleMessage(String text) {
         try {
             JsonNode root = objectMapper.readTree(text);
 
@@ -205,8 +205,11 @@ public class BinanceWebSocketClient {
                 JsonNode data = root.path("data");
                 routeStreamMessage(stream, data);
             } else if (root.has("e")) {
-                // Direct event format
+                // Direct event format (has event type field)
                 routeEventMessage(root);
+            } else if (root.has("s") && root.has("b") && root.has("a")) {
+                // Direct bookTicker format (no "e" or "stream" wrapper)
+                notifyTickerListeners(root);
             }
         } catch (Exception e) {
             log.error("Error parsing message: {}", text, e);

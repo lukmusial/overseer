@@ -47,32 +47,38 @@ Never skip tests, application startup verification, documentation updates, or co
 
 ```bash
 # Standard workflow for backend changes
-./gradlew test && ./gradlew :hft-app:bootRun &
+./gradlew test
+./scripts/run-app.sh &
 sleep 15 && curl -s http://localhost:8080/api/engine/status && pkill -f HftApplication
 git add -A && git commit -m "Description of change"
 
 # Standard workflow for frontend changes
-cd hft-ui && npm test && cd .. && git add -A && git commit -m "Description of change"
+cd hft-ui && npm test && cd ..
+./scripts/run-app.sh --frontend   # Rebuild UI assets
+git add -A && git commit -m "Description of change"
 
 # Full stack changes (verify both backend and frontend)
 ./gradlew test && cd hft-ui && npm test && cd ..
-./gradlew :hft-app:bootRun &
+./scripts/run-app.sh --full &
 sleep 15 && curl -s http://localhost:8080/api/engine/status && pkill -f HftApplication
 git add -A && git commit -m "Description of change"
 ```
 
-### Quick Application Startup Check
+### Starting the Application
 
-To verify the application starts correctly:
+Use `scripts/run-app.sh` to start the app. It automatically kills any prior running instance.
+
 ```bash
-# Start the application
-./gradlew :hft-app:bootRun
-
-# In another terminal, verify it responds
-curl http://localhost:8080/api/engine/status
-
-# Stop with Ctrl+C
+./scripts/run-app.sh              # Backend only (skip frontend build)
+./scripts/run-app.sh --full       # Rebuild frontend + start app
+./scripts/run-app.sh --frontend   # Rebuild frontend assets only (no app start)
 ```
+
+**IMPORTANT: Frontend changes require a rebuild.** If you modify any files under `hft-ui/src/`,
+the frontend must be rebuilt before the running application will serve the updated UI. Either:
+- Use `./scripts/run-app.sh --full` to rebuild and restart in one step
+- Or run `./scripts/run-app.sh --frontend` to rebuild assets, then restart the app
+- Using `-PskipFrontend` or the bare `./scripts/run-app.sh` will NOT pick up UI changes
 
 ### Testing Requirements (MANDATORY)
 
@@ -172,18 +178,21 @@ cd hft-ui && npm run test:watch
 # Run JMH benchmarks
 ./gradlew :hft-bdd:jmh
 
-# Start the application (builds frontend automatically)
-./gradlew :hft-app:bootRun
+# Start the application (kills prior instance, skips frontend build)
+./scripts/run-app.sh
 
-# Skip frontend build for faster backend-only iteration
-./gradlew :hft-app:bootRun -PskipFrontend
+# Start with frontend rebuild (use after UI changes)
+./scripts/run-app.sh --full
+
+# Rebuild frontend assets only
+./scripts/run-app.sh --frontend
 ```
 
 ### Frontend Build Automation
 
 The frontend (hft-ui) is automatically built and bundled when running:
 - `./gradlew build`
-- `./gradlew :hft-app:bootRun`
+- `./gradlew :hft-app:bootRun` (without `-PskipFrontend`)
 - `./gradlew :hft-app:bootJar`
 
 This is handled by Gradle tasks:
@@ -191,10 +200,8 @@ This is handled by Gradle tasks:
 - `buildFrontend` - Runs `npm run build` (TypeScript compile + Vite bundle)
 - `copyFrontend` - Copies dist to `hft-app/src/main/resources/static`
 
-To skip frontend build for faster backend-only development:
-```bash
-./gradlew :hft-app:bootRun -PskipFrontend
-```
+**When using `./scripts/run-app.sh` (default, no flags) or `-PskipFrontend`, the frontend is NOT rebuilt.**
+If you have pending UI changes, use `./scripts/run-app.sh --full` or `./scripts/run-app.sh --frontend`.
 
 For frontend-only development with hot reload:
 ```bash

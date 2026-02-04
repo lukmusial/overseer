@@ -166,6 +166,7 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey }: ChartPan
           exchange={selectedExchange}
           symbol={selectedSymbol}
           strategies={strategies}
+          refreshKey={symbolRefreshKey}
         />
       ) : (
         <div className="empty-message">

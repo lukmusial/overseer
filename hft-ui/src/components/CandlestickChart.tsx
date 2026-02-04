@@ -7,12 +7,13 @@ interface CandlestickChartProps {
   exchange: string;
   symbol: string;
   strategies?: Strategy[];
+  refreshKey?: number;
 }
 
 const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'];
 const PERIOD_OPTIONS = [50, 100, 200, 500];
 
-export function CandlestickChart({ exchange, symbol, strategies = [] }: CandlestickChartProps) {
+export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey }: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -42,7 +43,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [] }: Candlest
     } finally {
       setLoading(false);
     }
-  }, [exchange, symbol, interval, periods, getChartData]);
+  }, [exchange, symbol, interval, periods, getChartData, refreshKey]);
 
   // Initialize chart
   useEffect(() => {

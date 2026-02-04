@@ -50,7 +50,7 @@ export interface Position {
   isFlat: boolean;
 }
 
-export type AlgorithmState = 'CREATED' | 'RUNNING' | 'PAUSED' | 'STOPPED' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
+export type AlgorithmState = 'CREATED' | 'INITIALIZED' | 'RUNNING' | 'PAUSED' | 'STOPPED' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
 
 export interface StrategyStats {
   startTimeNanos: number;

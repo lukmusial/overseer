@@ -221,6 +221,40 @@ describe('StrategyForm', () => {
     }));
   });
 
+  it('allows editing fractional parameter values like signal threshold', async () => {
+    render(<StrategyForm onSubmit={mockOnSubmit} />);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
+    });
+
+    // Find the signalThreshold input (default value 0.02)
+    const thresholdInput = screen.getByDisplayValue('0.02') as HTMLInputElement;
+
+    // Clear and type a new fractional value
+    await userEvent.clear(thresholdInput);
+    await userEvent.type(thresholdInput, '0.005');
+
+    // The input should show the full value including decimal
+    expect(thresholdInput.value).toBe('0.005');
+
+    // Select a symbol and submit to verify the value is sent as a number
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...');
+    await userEvent.type(symbolInput, 'AAPL');
+    await waitFor(() => {
+      expect(screen.getByText('AAPL')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByText('AAPL').closest('li')!);
+
+    await userEvent.click(screen.getByRole('button', { name: /Create Strategy/i }));
+
+    expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      parameters: expect.objectContaining({
+        signalThreshold: 0.005,
+      }),
+    }));
+  });
+
   it('allows submitting without a custom name', async () => {
     render(<StrategyForm onSubmit={mockOnSubmit} />);
 
@@ -328,6 +362,56 @@ describe('StrategyForm', () => {
       expect(screen.getByText(/Please select a symbol/i)).toBeInTheDocument();
     });
     expect(mockOnSubmit).not.toHaveBeenCalled();
+  });
+
+  it('awaits onSubmit before clearing form fields', async () => {
+    let resolveSubmit: () => void;
+    const submitPromise = new Promise<void>((resolve) => {
+      resolveSubmit = resolve;
+    });
+    mockOnSubmit.mockReturnValue(submitPromise);
+
+    render(<StrategyForm onSubmit={mockOnSubmit} />);
+
+    // Wait for symbols to load
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading symbols.../i)).not.toBeInTheDocument();
+    });
+
+    // Fill in name
+    const nameInput = screen.getByPlaceholderText('My Strategy') as HTMLInputElement;
+    await userEvent.type(nameInput, 'Await Test');
+
+    // Select a symbol
+    const symbolInput = screen.getByPlaceholderText('Type to search symbols...') as HTMLInputElement;
+    await userEvent.type(symbolInput, 'AAPL');
+    await waitFor(() => {
+      expect(screen.getByText('AAPL')).toBeInTheDocument();
+    });
+    const aaplOption = screen.getByText('AAPL').closest('li');
+    await userEvent.click(aaplOption!);
+
+    // Submit form (onSubmit returns a pending promise)
+    const submitButton = screen.getByRole('button', { name: /Create Strategy/i });
+    await userEvent.click(submitButton);
+
+    // onSubmit was called but promise hasn't resolved yet
+    expect(mockOnSubmit).toHaveBeenCalled();
+
+    // Form fields should NOT be cleared yet (submit is still in progress)
+    expect(nameInput.value).toBe('Await Test');
+    expect(symbolInput.value).toBe('AAPL');
+
+    // Now resolve the submit promise
+    await act(async () => {
+      resolveSubmit!();
+    });
+
+    // After resolve, form fields should be cleared
+    await waitFor(() => {
+      expect(nameInput.value).toBe('');
+    });
+    expect(symbolInput.value).toBe('');
   });
 
   it('clears error when valid symbol is selected', async () => {

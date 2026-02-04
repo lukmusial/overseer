@@ -124,6 +124,53 @@ class ChronicleStrategyRepositoryTest {
     }
 
     @Test
+    void rebuildIndex_shouldRestoreNewStrategiesCreatedAfterDeletes() {
+        // Save some strategies
+        repository.save(new StrategyDefinition(
+                "old-1", "Old Strategy 1", "momentum",
+                List.of("AAPL"), "ALPACA", Map.of("shortPeriod", 10L), "INITIALIZED"
+        ));
+        repository.save(new StrategyDefinition(
+                "old-2", "Old Strategy 2", "vwap",
+                List.of("GOOGL"), "ALPACA", Map.of(), "INITIALIZED"
+        ));
+
+        // Delete all old strategies
+        repository.delete("old-1");
+        repository.delete("old-2");
+
+        // Save new strategies after the deletes
+        repository.save(new StrategyDefinition(
+                "new-1", "New Strategy 1", "twap",
+                List.of("BTCUSDT"), "BINANCE", Map.of("durationMinutes", 30L), "INITIALIZED"
+        ));
+        repository.save(new StrategyDefinition(
+                "new-2", "New Strategy 2", "meanreversion",
+                List.of("ETHUSDT"), "BINANCE", Map.of("lookbackPeriod", 20L), "RUNNING"
+        ));
+
+        // Close and reopen to force replay from Chronicle Queue
+        repository.close();
+        repository = new ChronicleStrategyRepository(tempDir);
+
+        // Only new strategies should exist
+        List<StrategyDefinition> all = repository.findAll();
+        assertEquals(2, all.size());
+
+        Map<String, StrategyDefinition> byId = new java.util.HashMap<>();
+        all.forEach(d -> byId.put(d.id(), d));
+
+        assertFalse(byId.containsKey("old-1"), "Deleted strategy old-1 should not reappear");
+        assertFalse(byId.containsKey("old-2"), "Deleted strategy old-2 should not reappear");
+        assertTrue(byId.containsKey("new-1"), "New strategy new-1 should survive restart");
+        assertTrue(byId.containsKey("new-2"), "New strategy new-2 should survive restart");
+        assertEquals("New Strategy 1", byId.get("new-1").name());
+        assertEquals("twap", byId.get("new-1").type());
+        assertEquals("New Strategy 2", byId.get("new-2").name());
+        assertEquals("RUNNING", byId.get("new-2").state());
+    }
+
+    @Test
     void parametersWithSpecialCharacters_shouldBePreserved() {
         Map<String, Object> params = Map.of(
                 "key=with=equals", "value;with;semicolons",

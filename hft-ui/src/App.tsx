@@ -145,8 +145,9 @@ export default function App() {
   // Strategy operations
   const handleCreateStrategy = useCallback(async (request: CreateStrategyRequest) => {
     try {
-      const strategy = await api.createStrategy(request);
-      setStrategies((prev) => [...prev, strategy]);
+      await api.createStrategy(request);
+      const strats = await api.getStrategies();
+      setStrategies(strats);
     } catch (error) {
       console.error('Failed to create strategy:', error);
     }

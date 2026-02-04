@@ -3,7 +3,7 @@ import type { CreateStrategyRequest, TradingSymbol } from '../types/api';
 import { useApi } from '../hooks/useApi';
 
 interface Props {
-  onSubmit: (strategy: CreateStrategyRequest) => void;
+  onSubmit: (strategy: CreateStrategyRequest) => void | Promise<void>;
 }
 
 type StrategyType = 'momentum' | 'meanreversion' | 'vwap' | 'twap';
@@ -108,10 +108,11 @@ export function StrategyForm({ onSubmit }: Props) {
   };
 
   const handleParamChange = (key: string, value: string) => {
-    const numValue = parseFloat(value);
+    // Store raw string during editing to preserve intermediate
+    // decimal input like "0.", "0.0" (parseFloat would swallow these)
     setParameters((prev) => ({
       ...prev,
-      [key]: isNaN(numValue) ? value : numValue,
+      [key]: value,
     }));
   };
 
@@ -190,7 +191,7 @@ export function StrategyForm({ onSubmit }: Props) {
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateSymbol()) {
@@ -198,12 +199,19 @@ export function StrategyForm({ onSubmit }: Props) {
       return;
     }
 
-    onSubmit({
+    // Parse string parameter values back to numbers for submission
+    const parsedParameters: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(parameters)) {
+      const num = parseFloat(String(val));
+      parsedParameters[key] = isNaN(num) ? val : num;
+    }
+
+    await onSubmit({
       name: name || undefined,
       type,
       symbols: [selectedSymbol!.symbol],
       exchange,
-      parameters,
+      parameters: parsedParameters,
     });
     setName('');
     setSelectedSymbol(null);

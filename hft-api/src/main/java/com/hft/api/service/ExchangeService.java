@@ -49,6 +49,7 @@ public class ExchangeService {
     private final Environment environment;
     private final SimpMessagingTemplate messagingTemplate;
     private final TradingService tradingService;
+    private final StubMarketDataService stubMarketDataService;
     private final Map<String, ExchangeConnection> connections = new ConcurrentHashMap<>();
 
     // HTTP clients for symbol fetching
@@ -68,11 +69,13 @@ public class ExchangeService {
     private final Map<String, List<SymbolDto>> symbolCache = new ConcurrentHashMap<>();
 
     public ExchangeService(ExchangeProperties properties, Environment environment,
-                           SimpMessagingTemplate messagingTemplate, @Lazy TradingService tradingService) {
+                           SimpMessagingTemplate messagingTemplate, @Lazy TradingService tradingService,
+                           @Lazy StubMarketDataService stubMarketDataService) {
         this.properties = properties;
         this.environment = environment;
         this.messagingTemplate = messagingTemplate;
         this.tradingService = tradingService;
+        this.stubMarketDataService = stubMarketDataService;
     }
 
     @PostConstruct
@@ -125,6 +128,11 @@ public class ExchangeService {
                 AlpacaMarketDataPort mdPort = new AlpacaMarketDataPort(alpacaClient, wsClient);
                 mdPort.addQuoteListener(quote -> {
                     tradingService.getTradingEngine().onQuoteUpdate(quote);
+                    long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
+                    stubMarketDataService.updatePrice(
+                            quote.getSymbol().getExchange().name(),
+                            quote.getSymbol().getTicker(),
+                            priceCents);
                     QuoteDto dto = QuoteDto.from(quote);
                     String exch = quote.getSymbol().getExchange().name();
                     String ticker = quote.getSymbol().getTicker();
@@ -165,6 +173,11 @@ public class ExchangeService {
             BinanceMarketDataPort mdPort = new BinanceMarketDataPort(binanceClient, wsClient);
             mdPort.addQuoteListener(quote -> {
                 tradingService.getTradingEngine().onQuoteUpdate(quote);
+                long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
+                stubMarketDataService.updatePrice(
+                        quote.getSymbol().getExchange().name(),
+                        quote.getSymbol().getTicker(),
+                        priceCents);
                 QuoteDto dto = QuoteDto.from(quote);
                 String exch = quote.getSymbol().getExchange().name();
                 String ticker = quote.getSymbol().getTicker();

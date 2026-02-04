@@ -184,6 +184,14 @@ public class StubMarketDataService {
     }
 
     /**
+     * Updates the current price for a symbol from an external source (e.g., real exchange data).
+     * This ensures chart trigger ranges use real prices when available.
+     */
+    public void updatePrice(String exchange, String ticker, long priceCents) {
+        currentPrices.put(exchange + ":" + ticker, priceCents);
+    }
+
+    /**
      * Returns all current prices.
      */
     public Map<String, Long> getAllPrices() {

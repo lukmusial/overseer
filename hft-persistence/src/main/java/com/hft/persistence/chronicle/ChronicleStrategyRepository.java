@@ -16,12 +16,15 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * Maintains an in-memory index for fast lookups while
  * persisting all strategy definitions to Chronicle Queue.
+ *
+ * Uses ThreadLocal appenders because Chronicle Queue's StoreAppender
+ * has thread affinity and cannot be shared across threads.
  */
 public class ChronicleStrategyRepository implements StrategyRepository {
     private static final Logger log = LoggerFactory.getLogger(ChronicleStrategyRepository.class);
 
     private final ChronicleQueue queue;
-    private final ExcerptAppender appender;
+    private final ThreadLocal<ExcerptAppender> appenderLocal;
 
     // In-memory index for fast lookups
     private final Map<String, StrategyDefinition> strategiesById = new ConcurrentHashMap<>();
@@ -29,7 +32,7 @@ public class ChronicleStrategyRepository implements StrategyRepository {
     public ChronicleStrategyRepository(Path basePath) {
         this.queue = ChronicleQueue.singleBuilder(basePath.resolve("strategies"))
                 .build();
-        this.appender = queue.createAppender();
+        this.appenderLocal = ThreadLocal.withInitial(queue::createAppender);
 
         // Rebuild in-memory index from queue
         rebuildIndex();
@@ -40,9 +43,13 @@ public class ChronicleStrategyRepository implements StrategyRepository {
 
     private void rebuildIndex() {
         try (ExcerptTailer tailer = queue.createTailer()) {
-            StrategyWire wire = new StrategyWire();
-
-            while (tailer.readDocument(w -> w.read("strategy").marshallable(wire))) {
+            while (true) {
+                // Create a fresh wire per document to avoid state leakage
+                // (e.g. 'deleted' flag persisting across reads)
+                StrategyWire wire = new StrategyWire();
+                if (!tailer.readDocument(w -> w.read("strategy").marshallable(wire))) {
+                    break;
+                }
                 if (wire.isDeleted()) {
                     strategiesById.remove(wire.getId());
                 } else {
@@ -58,7 +65,7 @@ public class ChronicleStrategyRepository implements StrategyRepository {
     @Override
     public void save(StrategyDefinition strategy) {
         StrategyWire wire = StrategyWire.from(strategy);
-        appender.writeDocument(w -> w.write("strategy").marshallable(wire));
+        appenderLocal.get().writeDocument(w -> w.write("strategy").marshallable(wire));
         strategiesById.put(strategy.id(), strategy);
         log.debug("Saved strategy: {} ({})", strategy.id(), strategy.name());
     }
@@ -76,19 +83,20 @@ public class ChronicleStrategyRepository implements StrategyRepository {
     @Override
     public void delete(String id) {
         StrategyWire wire = StrategyWire.deleted(id);
-        appender.writeDocument(w -> w.write("strategy").marshallable(wire));
+        appenderLocal.get().writeDocument(w -> w.write("strategy").marshallable(wire));
         strategiesById.remove(id);
         log.debug("Deleted strategy: {}", id);
     }
 
     @Override
     public void flush() {
-        // Chronicle auto-flushes
+        // Chronicle Queue writes go directly to memory-mapped file.
+        // The OS handles flushing to disk.
     }
 
     @Override
     public void close() {
-        log.info("Closing Chronicle strategy repository");
+        log.info("Closing Chronicle strategy repository ({} strategies)", strategiesById.size());
         queue.close();
     }
 }

@@ -175,6 +175,8 @@ public class BinanceMarketDataPort implements MarketDataPort {
             quote.setBidSize(parseQuantity(node.path("B").asText()));
             quote.setAskSize(parseQuantity(node.path("A").asText()));
 
+            quote.setPriceScale(PRICE_SCALE);
+
             // Binance bookTicker doesn't have timestamp, use local time
             quote.setTimestamp(receiveTime);
             quote.setReceivedAt(receiveTime);

@@ -148,44 +148,46 @@ function StrategyInfoTooltip({ strategy }: { strategy: Strategy }) {
     <span className="strategy-info-wrapper">
       <button className="info-btn" aria-label={`Info about ${strategy.type}`} type="button">i</button>
       <div className="strategy-tooltip" role="tooltip">
-        <div className="tooltip-header">{strategy.type} Strategy</div>
-        <p className="tooltip-description">{explanation.description}</p>
+        <div className="strategy-tooltip-content">
+          <div className="tooltip-header">{strategy.type} Strategy</div>
+          <p className="tooltip-description">{explanation.description}</p>
 
-        <div className="tooltip-section">
-          <strong>How it works</strong>
-          <ul>
-            {explanation.howItWorks.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
+          <div className="tooltip-section">
+            <strong>How it works</strong>
+            <ul>
+              {explanation.howItWorks.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </div>
 
-        <div className="tooltip-section">
-          <strong>Signal diagram</strong>
-          <pre className="tooltip-diagram">{explanation.diagram}</pre>
-        </div>
+          <div className="tooltip-section">
+            <strong>Signal diagram</strong>
+            <pre className="tooltip-diagram">{explanation.diagram}</pre>
+          </div>
 
-        <div className="tooltip-section">
-          <strong>When it trades</strong>
-          <ul>
-            {explanation.whenItTrades.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
+          <div className="tooltip-section">
+            <strong>When it trades</strong>
+            <ul>
+              {explanation.whenItTrades.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </div>
 
-        <div className="tooltip-section">
-          <strong>Parameters</strong>
-          <div className="tooltip-params">
-            {explanation.parameters.map((param) => (
-              <div className="tooltip-param" key={param.name}>
-                <span className="param-name">{param.name}</span>
-                {strategy.parameters[param.name] !== undefined && (
-                  <span className="param-value">= {String(strategy.parameters[param.name])}</span>
-                )}
-                <span className="param-desc">{param.description}</span>
-              </div>
-            ))}
+          <div className="tooltip-section">
+            <strong>Parameters</strong>
+            <div className="tooltip-params">
+              {explanation.parameters.map((param) => (
+                <div className="tooltip-param" key={param.name}>
+                  <span className="param-name">{param.name}</span>
+                  {strategy.parameters[param.name] !== undefined && (
+                    <span className="param-value">= {String(strategy.parameters[param.name])}</span>
+                  )}
+                  <span className="param-desc">{param.description}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

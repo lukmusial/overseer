@@ -2,6 +2,7 @@ package com.hft.api.controller;
 
 import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.SymbolDto;
+import com.hft.api.service.ChartDataService;
 import com.hft.api.service.ExchangeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,9 @@ class ExchangeControllerTest {
 
     @MockBean
     private ExchangeService exchangeService;
+
+    @MockBean
+    private ChartDataService chartDataService;
 
     @Test
     void getExchangeStatus_returnsAllExchanges() throws Exception {

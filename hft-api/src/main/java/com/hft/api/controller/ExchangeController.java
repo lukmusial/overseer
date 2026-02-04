@@ -3,6 +3,7 @@ package com.hft.api.controller;
 import com.hft.api.dto.ExchangeModeRequest;
 import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.SymbolDto;
+import com.hft.api.service.ChartDataService;
 import com.hft.api.service.ExchangeService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -18,9 +19,11 @@ import java.util.List;
 public class ExchangeController {
 
     private final ExchangeService exchangeService;
+    private final com.hft.api.service.ChartDataService chartDataService;
 
-    public ExchangeController(ExchangeService exchangeService) {
+    public ExchangeController(ExchangeService exchangeService, com.hft.api.service.ChartDataService chartDataService) {
         this.exchangeService = exchangeService;
+        this.chartDataService = chartDataService;
     }
 
     /**
@@ -54,6 +57,8 @@ public class ExchangeController {
         if (status == null) {
             return ResponseEntity.notFound().build();
         }
+        // Clear chart data cache so next request fetches fresh data in the new mode
+        chartDataService.clearCache();
         return ResponseEntity.ok(status);
     }
 
