@@ -171,8 +171,9 @@ public class StubMarketDataService {
             messagingTemplate.convertAndSend("/topic/quotes/" + exchangeName + "/" + ticker, dto);
             messagingTemplate.convertAndSend("/topic/quotes", dto);
 
-            // Feed to trading engine for strategies
+            // Feed to trading engine and dispatch to strategies
             tradingService.getTradingEngine().onQuoteUpdate(quote);
+            tradingService.dispatchQuoteToStrategies(quote);
         }
     }
 

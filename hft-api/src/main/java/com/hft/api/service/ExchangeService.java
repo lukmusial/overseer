@@ -128,6 +128,7 @@ public class ExchangeService {
                 AlpacaMarketDataPort mdPort = new AlpacaMarketDataPort(alpacaClient, wsClient);
                 mdPort.addQuoteListener(quote -> {
                     tradingService.getTradingEngine().onQuoteUpdate(quote);
+                    tradingService.dispatchQuoteToStrategies(quote);
                     long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
                     stubMarketDataService.updatePrice(
                             quote.getSymbol().getExchange().name(),
@@ -173,6 +174,7 @@ public class ExchangeService {
             BinanceMarketDataPort mdPort = new BinanceMarketDataPort(binanceClient, wsClient);
             mdPort.addQuoteListener(quote -> {
                 tradingService.getTradingEngine().onQuoteUpdate(quote);
+                tradingService.dispatchQuoteToStrategies(quote);
                 long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
                 stubMarketDataService.updatePrice(
                         quote.getSymbol().getExchange().name(),
@@ -525,6 +527,25 @@ public class ExchangeService {
      */
     public AlpacaHttpClient getAlpacaClient() {
         return alpacaClient;
+    }
+
+    /**
+     * Returns an Alpaca HTTP client for data-only purposes (e.g., chart candles).
+     * If no trading client exists (stub mode), tries to create one from local credentials.
+     */
+    public AlpacaHttpClient getAlpacaDataClient() {
+        if (alpacaClient != null) {
+            return alpacaClient;
+        }
+        // Try to create a data-only client from credentials
+        loadLocalCredentials();
+        ExchangeProperties.AlpacaProperties alpaca = properties.getAlpaca();
+        if (!alpaca.getApiKey().isEmpty() && !alpaca.getSecretKey().isEmpty()) {
+            AlpacaConfig config = new AlpacaConfig(
+                    alpaca.getApiKey(), alpaca.getSecretKey(), true, alpaca.getDataFeed());
+            return new AlpacaHttpClient(config);
+        }
+        return null;
     }
 
     /**

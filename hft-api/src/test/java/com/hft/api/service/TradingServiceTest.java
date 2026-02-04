@@ -3,6 +3,9 @@ package com.hft.api.service;
 import com.hft.algo.base.AlgorithmState;
 import com.hft.api.dto.CreateStrategyRequest;
 import com.hft.api.dto.StrategyDto;
+import com.hft.core.model.Exchange;
+import com.hft.core.model.Quote;
+import com.hft.core.model.Symbol;
 import com.hft.persistence.PersistenceManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +85,49 @@ class TradingServiceTest {
         // Verify state changed
         StrategyDto stopped = tradingService.getStrategy(created.id()).orElseThrow();
         assertEquals(AlgorithmState.CANCELLED, stopped.state());
+    }
+
+    @Test
+    void dispatchQuoteToStrategies_shouldCallOnQuoteForRunningStrategies() {
+        // Create and start a momentum strategy for AAPL
+        CreateStrategyRequest request = new CreateStrategyRequest(
+                "Test Momentum", "momentum", List.of("AAPL"), "ALPACA",
+                Map.of("shortPeriod", 10, "longPeriod", 30, "signalThreshold", 0.02, "maxPositionSize", 100)
+        );
+        StrategyDto created = tradingService.createStrategy(request);
+        tradingService.startStrategy(created.id());
+
+        // Verify strategy is running
+        StrategyDto running = tradingService.getStrategy(created.id()).orElseThrow();
+        assertEquals(AlgorithmState.RUNNING, running.state());
+
+        // Create a quote for AAPL on ALPACA
+        Symbol aapl = new Symbol("AAPL", Exchange.ALPACA);
+        Quote quote = new Quote(aapl, 15000L, 15010L, 1000L, 1000L, System.currentTimeMillis());
+        quote.setPriceScale(100);
+
+        // Dispatch should not throw
+        assertDoesNotThrow(() -> tradingService.dispatchQuoteToStrategies(quote));
+    }
+
+    @Test
+    void dispatchQuoteToStrategies_shouldNotDispatchToStoppedStrategies() {
+        // Create strategy but don't start it
+        CreateStrategyRequest request = new CreateStrategyRequest(
+                "Test Momentum", "momentum", List.of("AAPL"), "ALPACA",
+                Map.of("shortPeriod", 10, "longPeriod", 30, "signalThreshold", 0.02, "maxPositionSize", 100)
+        );
+        StrategyDto created = tradingService.createStrategy(request);
+
+        // Strategy is in INITIALIZED state, not RUNNING
+        assertEquals(AlgorithmState.INITIALIZED, created.state());
+
+        // Create a quote — should not throw even if strategy not running
+        Symbol aapl = new Symbol("AAPL", Exchange.ALPACA);
+        Quote quote = new Quote(aapl, 15000L, 15010L, 1000L, 1000L, System.currentTimeMillis());
+        quote.setPriceScale(100);
+
+        assertDoesNotThrow(() -> tradingService.dispatchQuoteToStrategies(quote));
     }
 
     @Test

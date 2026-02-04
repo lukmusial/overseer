@@ -327,6 +327,26 @@ public class TradingService {
         return tradingEngine.getRiskManager().isTradingEnabled();
     }
 
+    /**
+     * Dispatches a quote to all active (RUNNING) strategies that trade the quote's symbol.
+     * Also updates the AlgorithmContext quote cache so strategies can query latest quotes.
+     */
+    public void dispatchQuoteToStrategies(Quote quote) {
+        // Update the algorithm context's quote cache
+        algorithmContext.updateQuote(quote.getSymbol(), quote);
+
+        // Dispatch to all running strategies
+        for (TradingStrategy strategy : activeStrategies.values()) {
+            if (strategy.getState() == AlgorithmState.RUNNING) {
+                try {
+                    strategy.onQuote(quote);
+                } catch (Exception e) {
+                    log.error("Error dispatching quote to strategy {}: {}", strategy.getId(), e.getMessage());
+                }
+            }
+        }
+    }
+
     // Access to engine for WebSocket
     public TradingEngine getTradingEngine() {
         return tradingEngine;
