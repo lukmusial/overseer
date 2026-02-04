@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hft.exchange.alpaca.dto.AlpacaAsset;
+import com.hft.exchange.alpaca.dto.AlpacaBarsResponse;
 
 import java.io.IOException;
 import java.util.List;
@@ -280,6 +281,19 @@ public class AlpacaHttpClient {
      */
     public CompletableFuture<List<AlpacaAsset>> getActiveCrypto() {
         return getAssets("crypto", "active");
+    }
+
+    /**
+     * Fetches historical bar (OHLCV) data for a stock symbol.
+     *
+     * @param symbol    Stock symbol (e.g., "AAPL")
+     * @param timeframe Bar timeframe (e.g., "1Min", "5Min", "15Min", "1Hour", "1Day")
+     * @param limit     Number of bars to return
+     * @return AlpacaBarsResponse containing the list of bars
+     */
+    public CompletableFuture<AlpacaBarsResponse> getBars(String symbol, String timeframe, int limit) {
+        String path = "/v2/stocks/" + symbol + "/bars?timeframe=" + timeframe + "&limit=" + limit;
+        return getMarketData(path, AlpacaBarsResponse.class);
     }
 
     public void close() {

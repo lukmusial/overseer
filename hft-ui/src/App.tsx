@@ -27,6 +27,7 @@ export default function App() {
   const [exchanges, setExchanges] = useState<ExchangeStatusType[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
   const [inspectedStrategy, setInspectedStrategy] = useState<Strategy | null>(null);
+  const [symbolRefreshKey, setSymbolRefreshKey] = useState(0);
 
   const api = useApi();
   const { connected, subscribe } = useWebSocket({
@@ -191,6 +192,7 @@ export default function App() {
     await api.switchMode(exchange, mode);
     const exchangeStatus = await api.getExchangeStatus();
     setExchanges(exchangeStatus);
+    setSymbolRefreshKey((prev) => prev + 1);
   }, [api]);
 
   // Order operations
@@ -222,7 +224,7 @@ export default function App() {
             <StrategyForm onSubmit={handleCreateStrategy} />
           </div>
           <div className="col-right">
-            <ChartPanel exchanges={exchanges} strategies={strategies} />
+            <ChartPanel exchanges={exchanges} strategies={strategies} symbolRefreshKey={symbolRefreshKey} />
             <StrategyList
               strategies={strategies}
               onStart={handleStartStrategy}

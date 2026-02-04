@@ -412,6 +412,20 @@ public class ExchangeService {
         return envValue;
     }
 
+    /**
+     * Returns the current Alpaca HTTP client, or null if in stub mode or not initialized.
+     */
+    public AlpacaHttpClient getAlpacaClient() {
+        return alpacaClient;
+    }
+
+    /**
+     * Returns the current Binance HTTP client, or null if in stub mode or not initialized.
+     */
+    public BinanceHttpClient getBinanceClient() {
+        return binanceClient;
+    }
+
     @PreDestroy
     public void cleanup() {
         if (alpacaClient != null) {

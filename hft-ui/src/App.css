@@ -899,3 +899,76 @@ button:disabled {
   outline: none;
   border-color: #00d9ff;
 }
+
+/* Searchable symbol selector */
+.symbol-search-container {
+  position: relative;
+}
+
+.symbol-search-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #1a1a2e;
+  color: #eee;
+  font-size: 0.875rem;
+}
+
+.symbol-search-input:focus {
+  outline: none;
+  border-color: #00d9ff;
+}
+
+.symbol-search-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.symbol-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #1a1a2e;
+  border: 1px solid #0f3460;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 100;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.symbol-search-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid #0f3460;
+}
+
+.symbol-search-item:last-child {
+  border-bottom: none;
+}
+
+.symbol-search-item:hover {
+  background: #0f3460;
+}
+
+.symbol-search-item.selected {
+  background: #0284c7;
+}
+
+.symbol-search-item.more-items {
+  color: #64748b;
+  font-style: italic;
+  cursor: default;
+}
+
+.symbol-search-item.more-items:hover {
+  background: transparent;
+}

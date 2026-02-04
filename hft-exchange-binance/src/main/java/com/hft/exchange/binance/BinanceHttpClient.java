@@ -235,6 +235,20 @@ public class BinanceHttpClient {
         return publicGet("/api/v3/exchangeInfo", BinanceExchangeInfo.class);
     }
 
+    /**
+     * Fetches kline/candlestick data for a symbol.
+     * This is a public endpoint that does not require authentication.
+     *
+     * @param symbol   Trading pair symbol (e.g., "BTCUSDT")
+     * @param interval Kline interval (e.g., "1m", "5m", "15m", "1h", "4h", "1d")
+     * @param limit    Number of klines to return (max 1000)
+     * @return JSON array of arrays: [[openTime, open, high, low, close, volume, ...], ...]
+     */
+    public CompletableFuture<JsonNode> getKlines(String symbol, String interval, int limit) {
+        String path = "/api/v3/klines?symbol=" + symbol + "&interval=" + interval + "&limit=" + limit;
+        return publicGet(path, JsonNode.class);
+    }
+
     public void close() {
         httpClient.dispatcher().executorService().shutdown();
         httpClient.connectionPool().evictAll();

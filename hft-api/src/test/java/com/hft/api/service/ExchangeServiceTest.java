@@ -270,6 +270,37 @@ class ExchangeServiceTest {
     }
 
     @Test
+    void getAlpacaClient_inStubMode_returnsNull() {
+        assertNull(exchangeService.getAlpacaClient(),
+                "Alpaca client should be null in stub mode");
+    }
+
+    @Test
+    void getBinanceClient_inStubMode_returnsNull() {
+        assertNull(exchangeService.getBinanceClient(),
+                "Binance client should be null in stub mode");
+    }
+
+    @Test
+    void getBinanceClient_afterSwitchToTestnet_returnsNonNull() {
+        exchangeService.switchMode("BINANCE", "testnet");
+
+        assertNotNull(exchangeService.getBinanceClient(),
+                "Binance client should be non-null after switching to testnet");
+    }
+
+    @Test
+    void getAlpacaClient_afterSwitchBackToStub_returnsNull() {
+        // Switch to sandbox and back to stub
+        exchangeService.switchMode("ALPACA", "sandbox");
+        exchangeService.switchMode("ALPACA", "stub");
+
+        // After switching back to stub, client should be null
+        assertNull(exchangeService.getAlpacaClient(),
+                "Alpaca client should be null after switching back to stub");
+    }
+
+    @Test
     void symbolDto_equityFactoryMethod_setsCorrectFields() {
         SymbolDto equity = SymbolDto.equity("TEST", "Test Company", "EXCHANGE", true, true, false);
 

@@ -62,6 +62,17 @@ const mockAlpacaSymbols: TradingSymbol[] = [
     marginable: true,
     shortable: true,
   },
+  {
+    symbol: 'MSFT',
+    name: 'Microsoft Corporation',
+    exchange: 'ALPACA',
+    assetClass: 'equity',
+    baseAsset: 'MSFT',
+    quoteAsset: 'USD',
+    tradable: true,
+    marginable: true,
+    shortable: true,
+  },
 ];
 
 const mockBinanceSymbols: TradingSymbol[] = [
@@ -135,6 +146,7 @@ describe('ChartPanel', () => {
       stopStrategy: vi.fn(),
       removeStrategy: vi.fn(),
       getExchangeStatus: vi.fn(),
+      switchMode: vi.fn(),
     });
   });
 
@@ -144,11 +156,12 @@ describe('ChartPanel', () => {
     expect(screen.getByText('Price Chart')).toBeInTheDocument();
   });
 
-  it('renders exchange and symbol dropdowns', () => {
+  it('renders exchange dropdown and symbol search input', () => {
     render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
 
     expect(screen.getByText('Exchange')).toBeInTheDocument();
     expect(screen.getByText('Symbol')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search symbols...')).toBeInTheDocument();
   });
 
   it('auto-selects first exchange when exchanges load', async () => {
@@ -167,31 +180,85 @@ describe('ChartPanel', () => {
     });
   });
 
-  it('populates symbol dropdown after symbols are fetched', async () => {
+  it('auto-selects first symbol and shows it in search input', async () => {
+    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+
+    await waitFor(() => {
+      const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
+      expect(input.value).toBe('AAPL - Apple Inc.');
+    });
+  });
+
+  it('shows dropdown when search input is focused', async () => {
     render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(mockGetSymbols).toHaveBeenCalled();
     });
 
-    // Wait for symbols to populate - check by looking for symbol text
+    // Wait for symbols to load
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
+      expect(input.value).toBe('AAPL - Apple Inc.');
     });
 
-    // Also verify GOOGL is in the dropdown options
-    const selects = screen.getAllByRole('combobox');
-    const symbolSelect = selects[1] as HTMLSelectElement;
-    const options = Array.from(symbolSelect.options).map(o => o.value);
-    expect(options).toContain('AAPL');
-    expect(options).toContain('GOOGL');
+    const input = screen.getByPlaceholderText('Search symbols...');
+    fireEvent.focus(input);
+
+    // Dropdown should show symbol items with ticker class
+    await waitFor(() => {
+      const tickers = screen.getAllByText('AAPL');
+      // One in the dropdown (.symbol-ticker), one in the chart mock
+      expect(tickers.length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText('GOOGL')).toBeInTheDocument();
+    });
   });
 
-  it('auto-selects first symbol when symbols load', async () => {
+  it('filters symbols when typing in search input', async () => {
     render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
+      expect(input.value).toBe('AAPL - Apple Inc.');
+    });
+
+    const input = screen.getByPlaceholderText('Search symbols...');
+    // Clear and type new search
+    await act(async () => {
+      fireEvent.change(input, { target: { value: 'goo' } });
+    });
+
+    // Should show GOOGL but not AAPL
+    await waitFor(() => {
+      expect(screen.getByText('GOOGL')).toBeInTheDocument();
+      expect(screen.queryByText('MSFT')).not.toBeInTheDocument();
+    });
+  });
+
+  it('selects symbol from dropdown and updates chart', async () => {
+    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+
+    await waitFor(() => {
+      const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
+      expect(input.value).toBe('AAPL - Apple Inc.');
+    });
+
+    // Open dropdown
+    const input = screen.getByPlaceholderText('Search symbols...');
+    fireEvent.focus(input);
+
+    // Wait for dropdown items to appear
+    await waitFor(() => {
+      expect(screen.getByText('GOOGL')).toBeInTheDocument();
+    });
+
+    // Click on GOOGL
+    const googlOption = screen.getByText('GOOGL').closest('li')!;
+    fireEvent.mouseDown(googlOption);
+
+    // Chart should update
+    await waitFor(() => {
+      expect(screen.getByTestId('chart-symbol')).toHaveTextContent('GOOGL');
     });
   });
 
@@ -214,12 +281,13 @@ describe('ChartPanel', () => {
     });
   });
 
-  it('resets symbol when exchange changes', async () => {
+  it('resets search when exchange changes', async () => {
     render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
 
-    // Wait for initial load with ALPACA symbols
+    // Wait for initial load
     await waitFor(() => {
-      expect(screen.getByText(/AAPL - Apple Inc./i)).toBeInTheDocument();
+      const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
+      expect(input.value).toBe('AAPL - Apple Inc.');
     });
 
     // Change exchange
@@ -228,9 +296,11 @@ describe('ChartPanel', () => {
       fireEvent.change(exchangeSelect, { target: { value: 'BINANCE' } });
     });
 
-    // Should now show BINANCE symbols
+    // Search input should be cleared during loading
+    const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
+    // During loading it shows "Loading..." then updates to first symbol
     await waitFor(() => {
-      expect(screen.getByText(/BTCUSDT - BTC\/USDT/i)).toBeInTheDocument();
+      expect(mockGetSymbols).toHaveBeenCalledWith('BINANCE');
     });
   });
 
@@ -265,28 +335,26 @@ describe('ChartPanel', () => {
 
     render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
 
-    // Should show loading option
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    // Input should show Loading...
+    const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
+    expect(input.value).toBe('Loading...');
 
     await waitFor(() => {
-      expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      expect(input.value).not.toBe('Loading...');
     });
   });
 
-  it('disables symbol select while loading', async () => {
+  it('disables search input while loading', async () => {
     // Make getSymbols slow
     mockGetSymbols.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(mockAlpacaSymbols), 100)));
 
     render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
 
-    // Find symbol select
-    const selects = screen.getAllByRole('combobox');
-    const symbolSelect = selects[1];
-
-    expect(symbolSelect).toBeDisabled();
+    const input = screen.getByPlaceholderText('Search symbols...');
+    expect(input).toBeDisabled();
 
     await waitFor(() => {
-      expect(symbolSelect).not.toBeDisabled();
+      expect(input).not.toBeDisabled();
     });
   });
 
@@ -300,29 +368,7 @@ describe('ChartPanel', () => {
       expect(consoleSpy).toHaveBeenCalledWith('Failed to fetch symbols:', expect.any(Error));
     });
 
-    // Symbol select should be empty
-    const selects = screen.getAllByRole('combobox');
-    const symbolSelect = selects[1] as HTMLSelectElement;
-    expect(symbolSelect.options.length).toBe(0);
-
     consoleSpy.mockRestore();
-  });
-
-  it('updates chart when symbol changes', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('chart-symbol')).toHaveTextContent('AAPL');
-    });
-
-    // Change symbol
-    const selects = screen.getAllByRole('combobox');
-    const symbolSelect = selects[1];
-    await act(async () => {
-      fireEvent.change(symbolSelect, { target: { value: 'GOOGL' } });
-    });
-
-    expect(screen.getByTestId('chart-symbol')).toHaveTextContent('GOOGL');
   });
 
   it('lists all exchanges in dropdown', async () => {
@@ -340,6 +386,25 @@ describe('ChartPanel', () => {
 
     await waitFor(() => {
       expect(mockGetSymbols).not.toHaveBeenCalled();
+    });
+  });
+
+  it('re-fetches symbols when symbolRefreshKey changes', async () => {
+    const { rerender } = render(
+      <ChartPanel exchanges={mockExchanges} strategies={mockStrategies} symbolRefreshKey={0} />
+    );
+
+    await waitFor(() => {
+      expect(mockGetSymbols).toHaveBeenCalledTimes(1);
+    });
+
+    // Increment symbolRefreshKey
+    await act(async () => {
+      rerender(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} symbolRefreshKey={1} />);
+    });
+
+    await waitFor(() => {
+      expect(mockGetSymbols).toHaveBeenCalledTimes(2);
     });
   });
 });

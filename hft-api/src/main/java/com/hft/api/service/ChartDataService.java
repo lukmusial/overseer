@@ -1,17 +1,25 @@
 package com.hft.api.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.hft.api.dto.*;
 import com.hft.algo.base.AlgorithmState;
 import com.hft.algo.base.TradingStrategy;
 import com.hft.core.model.Exchange;
 import com.hft.core.model.Order;
 import com.hft.core.model.Symbol;
+import com.hft.exchange.alpaca.AlpacaHttpClient;
+import com.hft.exchange.alpaca.dto.AlpacaBar;
+import com.hft.exchange.alpaca.dto.AlpacaBarsResponse;
+import com.hft.exchange.binance.BinanceHttpClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Service for generating chart data including historical candles,
@@ -20,8 +28,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class ChartDataService {
 
+    private static final Logger log = LoggerFactory.getLogger(ChartDataService.class);
+
     private final TradingService tradingService;
     private final StubMarketDataService stubMarketDataService;
+    private final ExchangeService exchangeService;
+
+    // Cache TTL for real exchange data (30 seconds)
+    private static final long REAL_DATA_CACHE_TTL_MS = 30_000;
 
     // Base prices for stub data generation (same as StubMarketDataService)
     private static final Map<String, Double> BASE_PRICES = Map.of(
@@ -53,10 +67,16 @@ public class ChartDataService {
 
     // Cache for generated historical data
     private final Map<String, List<CandleDto>> candleCache = new ConcurrentHashMap<>();
+    // Timestamps for cache entries (used for time-based expiry of real data)
+    private final Map<String, Long> cacheTimestamps = new ConcurrentHashMap<>();
+    // Track which cache entries are from real exchange data (vs stub)
+    private final Map<String, Boolean> cacheIsReal = new ConcurrentHashMap<>();
 
-    public ChartDataService(TradingService tradingService, StubMarketDataService stubMarketDataService) {
+    public ChartDataService(TradingService tradingService, StubMarketDataService stubMarketDataService,
+                            ExchangeService exchangeService) {
         this.tradingService = tradingService;
         this.stubMarketDataService = stubMarketDataService;
+        this.exchangeService = exchangeService;
     }
 
     /**
@@ -71,14 +91,155 @@ public class ChartDataService {
     }
 
     /**
-     * Generate historical candlestick data.
+     * Get historical candlestick data, fetching from real exchange when available.
      */
     public List<CandleDto> getHistoricalCandles(String symbolTicker, String exchangeName, String interval, int periods) {
         String cacheKey = symbolTicker + ":" + exchangeName + ":" + interval + ":" + periods;
 
-        // Use cached data if available (regenerate periodically in real app)
-        return candleCache.computeIfAbsent(cacheKey, k ->
-                generateStubCandles(symbolTicker, interval, periods));
+        // Check if cached data exists and is still valid
+        List<CandleDto> cached = candleCache.get(cacheKey);
+        if (cached != null) {
+            Boolean isReal = cacheIsReal.getOrDefault(cacheKey, false);
+            if (!isReal && !hasRealClient(exchangeName)) {
+                // Stub data never expires when no real client is available
+                return cached;
+            }
+            if (isReal) {
+                // Real data expires after TTL
+                Long timestamp = cacheTimestamps.get(cacheKey);
+                if (timestamp != null && (System.currentTimeMillis() - timestamp) < REAL_DATA_CACHE_TTL_MS) {
+                    return cached;
+                }
+            }
+            // Stub data with a real client available, or expired real data — re-fetch
+        }
+
+        // Try to fetch real data from exchange
+        List<CandleDto> candles = tryFetchRealCandles(symbolTicker, exchangeName, interval, periods);
+
+        if (candles != null && !candles.isEmpty()) {
+            candleCache.put(cacheKey, candles);
+            cacheTimestamps.put(cacheKey, System.currentTimeMillis());
+            cacheIsReal.put(cacheKey, true);
+            return candles;
+        }
+
+        // Fall back to stub data
+        if (cached != null) {
+            return cached;
+        }
+        List<CandleDto> stubCandles = generateStubCandles(symbolTicker, interval, periods);
+        candleCache.put(cacheKey, stubCandles);
+        cacheIsReal.put(cacheKey, false);
+        return stubCandles;
+    }
+
+    /**
+     * Check if a real exchange client is available for the given exchange.
+     */
+    private boolean hasRealClient(String exchangeName) {
+        return switch (exchangeName.toUpperCase()) {
+            case "BINANCE" -> exchangeService.getBinanceClient() != null;
+            case "ALPACA" -> exchangeService.getAlpacaClient() != null;
+            default -> false;
+        };
+    }
+
+    /**
+     * Attempt to fetch real candle data from the exchange.
+     * Returns null if no client is available or the fetch fails.
+     */
+    private List<CandleDto> tryFetchRealCandles(String symbolTicker, String exchangeName, String interval, int periods) {
+        try {
+            return switch (exchangeName.toUpperCase()) {
+                case "BINANCE" -> fetchBinanceCandles(symbolTicker, interval, periods);
+                case "ALPACA" -> fetchAlpacaCandles(symbolTicker, interval, periods);
+                default -> null;
+            };
+        } catch (Exception e) {
+            log.warn("Failed to fetch real candles for {} on {}: {}", symbolTicker, exchangeName, e.getMessage());
+            return null;
+        }
+    }
+
+    private List<CandleDto> fetchBinanceCandles(String symbol, String interval, int periods) throws Exception {
+        BinanceHttpClient client = exchangeService.getBinanceClient();
+        if (client == null) {
+            return null;
+        }
+
+        JsonNode klines = client.getKlines(symbol, interval, periods)
+                .get(15, TimeUnit.SECONDS);
+
+        if (klines == null || !klines.isArray() || klines.isEmpty()) {
+            return null;
+        }
+
+        List<CandleDto> candles = new ArrayList<>();
+        for (JsonNode kline : klines) {
+            // Binance kline format: [openTime, open, high, low, close, volume, ...]
+            long openTimeMs = kline.get(0).asLong();
+            double open = Double.parseDouble(kline.get(1).asText());
+            double high = Double.parseDouble(kline.get(2).asText());
+            double low = Double.parseDouble(kline.get(3).asText());
+            double close = Double.parseDouble(kline.get(4).asText());
+            long volume = (long) Double.parseDouble(kline.get(5).asText());
+
+            candles.add(new CandleDto(openTimeMs / 1000, round(open), round(high), round(low), round(close), volume));
+        }
+
+        return candles;
+    }
+
+    private List<CandleDto> fetchAlpacaCandles(String symbol, String interval, int periods) throws Exception {
+        AlpacaHttpClient client = exchangeService.getAlpacaClient();
+        if (client == null) {
+            return null;
+        }
+
+        String alpacaTimeframe = toAlpacaTimeframe(interval);
+        AlpacaBarsResponse response = client.getBars(symbol, alpacaTimeframe, periods)
+                .get(15, TimeUnit.SECONDS);
+
+        if (response == null || response.getBars() == null || response.getBars().isEmpty()) {
+            return null;
+        }
+
+        List<CandleDto> candles = new ArrayList<>();
+        for (AlpacaBar bar : response.getBars()) {
+            long timeSeconds = bar.getT() != null ? bar.getT().getEpochSecond() : 0;
+            double open = parseDouble(bar.getO());
+            double high = parseDouble(bar.getH());
+            double low = parseDouble(bar.getL());
+            double close = parseDouble(bar.getC());
+
+            candles.add(new CandleDto(timeSeconds, round(open), round(high), round(low), round(close), bar.getV()));
+        }
+
+        return candles;
+    }
+
+    /**
+     * Convert our interval format to Alpaca's timeframe format.
+     */
+    private String toAlpacaTimeframe(String interval) {
+        return switch (interval) {
+            case "1m" -> "1Min";
+            case "5m" -> "5Min";
+            case "15m" -> "15Min";
+            case "30m" -> "30Min";
+            case "1h" -> "1Hour";
+            case "4h" -> "4Hour";
+            case "1d" -> "1Day";
+            default -> "1Min";
+        };
+    }
+
+    private double parseDouble(String value) {
+        if (value == null || value.isEmpty()) {
+            return 0.0;
+        }
+        return Double.parseDouble(value);
     }
 
     /**
@@ -318,5 +479,7 @@ public class ChartDataService {
      */
     public void clearCache() {
         candleCache.clear();
+        cacheTimestamps.clear();
+        cacheIsReal.clear();
     }
 }
