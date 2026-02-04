@@ -53,7 +53,7 @@ public class ExchangeService {
             initializeAlpaca();
         } else {
             log.info("Alpaca exchange is disabled");
-            connections.put("ALPACA", new ExchangeConnection("ALPACA", "Alpaca Markets", false, false, "Disabled in configuration"));
+            connections.put("ALPACA", new ExchangeConnection("ALPACA", "Alpaca Markets", "disabled", false, false, "Disabled in configuration"));
         }
 
         // Initialize Binance connection
@@ -61,7 +61,7 @@ public class ExchangeService {
             initializeBinance();
         } else {
             log.info("Binance exchange is disabled");
-            connections.put("BINANCE", new ExchangeConnection("BINANCE", "Binance", false, false, "Disabled in configuration"));
+            connections.put("BINANCE", new ExchangeConnection("BINANCE", "Binance", "disabled", false, false, "Disabled in configuration"));
         }
     }
 
@@ -71,14 +71,14 @@ public class ExchangeService {
         log.info("Initializing Alpaca in {} mode", mode);
 
         if (alpaca.isStub()) {
-            connections.put("ALPACA", new ExchangeConnection("ALPACA", "Alpaca Markets (Stub)", true, true, null));
+            connections.put("ALPACA", new ExchangeConnection("ALPACA", "Alpaca Markets (Stub)", mode, true, true, null));
             symbolCache.put("ALPACA", getStubAlpacaSymbols());
             log.info("Alpaca running in STUB mode - simulated connection");
         } else {
             if (alpaca.getApiKey().isEmpty() || alpaca.getSecretKey().isEmpty()) {
                 connections.put("ALPACA", new ExchangeConnection("ALPACA",
                     "Alpaca Markets (" + (alpaca.isPaperTrading() ? "Paper" : "Live") + ")",
-                    false, false, "API credentials not configured"));
+                    mode, false, false, "API credentials not configured"));
             } else {
                 // Create HTTP client for real API calls
                 AlpacaConfig config = new AlpacaConfig(
@@ -90,7 +90,7 @@ public class ExchangeService {
                 alpacaClient = new AlpacaHttpClient(config);
                 connections.put("ALPACA", new ExchangeConnection("ALPACA",
                     "Alpaca Markets (" + (alpaca.isPaperTrading() ? "Paper" : "Live") + ")",
-                    true, true, null));
+                    mode, true, true, null));
             }
         }
     }
@@ -101,7 +101,7 @@ public class ExchangeService {
         log.info("Initializing Binance in {} mode", mode);
 
         if (binance.isStub()) {
-            connections.put("BINANCE", new ExchangeConnection("BINANCE", "Binance (Stub)", true, true, null));
+            connections.put("BINANCE", new ExchangeConnection("BINANCE", "Binance (Stub)", mode, true, true, null));
             symbolCache.put("BINANCE", getStubBinanceSymbols());
             log.info("Binance running in STUB mode - simulated connection");
         } else {
@@ -116,11 +116,11 @@ public class ExchangeService {
             if (binance.getApiKey().isEmpty() || binance.getSecretKey().isEmpty()) {
                 connections.put("BINANCE", new ExchangeConnection("BINANCE",
                     "Binance (" + (binance.isTestnet() ? "Testnet" : "Live") + ")",
-                    true, false, "API credentials not configured (read-only)"));
+                    mode, true, false, "API credentials not configured (read-only)"));
             } else {
                 connections.put("BINANCE", new ExchangeConnection("BINANCE",
                     "Binance (" + (binance.isTestnet() ? "Testnet" : "Live") + ")",
-                    true, true, null));
+                    mode, true, true, null));
             }
         }
     }
@@ -151,7 +151,7 @@ public class ExchangeService {
         ExchangeConnection existing = connections.get(exchange.toUpperCase());
         if (existing != null) {
             connections.put(exchange.toUpperCase(), new ExchangeConnection(
-                existing.exchange, existing.name, connected, authenticated, error
+                existing.exchange, existing.name, existing.mode, connected, authenticated, error
             ));
         }
     }
@@ -162,14 +162,16 @@ public class ExchangeService {
     private static class ExchangeConnection {
         final String exchange;
         final String name;
+        final String mode;
         final boolean connected;
         final boolean authenticated;
         final String errorMessage;
         final long lastHeartbeat;
 
-        ExchangeConnection(String exchange, String name, boolean connected, boolean authenticated, String errorMessage) {
+        ExchangeConnection(String exchange, String name, String mode, boolean connected, boolean authenticated, String errorMessage) {
             this.exchange = exchange;
             this.name = name;
+            this.mode = mode;
             this.connected = connected;
             this.authenticated = authenticated;
             this.errorMessage = errorMessage;
@@ -180,6 +182,7 @@ public class ExchangeService {
             return new ExchangeStatusDto(
                 exchange,
                 name,
+                mode,
                 connected,
                 authenticated,
                 connected ? lastHeartbeat : null,

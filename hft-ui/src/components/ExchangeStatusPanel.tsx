@@ -33,6 +33,11 @@ export function ExchangeStatusPanel({ exchanges }: Props) {
             <div className="exchange-header">
               <span className={`status-indicator ${exchange.connected ? 'connected' : 'disconnected'}`} />
               <span className="exchange-name">{exchange.name}</span>
+              {exchange.mode && (
+                <span className={`mode-badge mode-${exchange.mode}`}>
+                  {exchange.mode.charAt(0).toUpperCase() + exchange.mode.slice(1)}
+                </span>
+              )}
             </div>
             <div className="exchange-details">
               <div className="detail-item">

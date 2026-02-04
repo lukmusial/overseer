@@ -59,6 +59,7 @@ class ExchangeServiceTest {
         assertNotNull(alpaca);
         assertEquals("ALPACA", alpaca.exchange());
         assertTrue(alpaca.name().contains("Stub"));
+        assertEquals("stub", alpaca.mode());
         assertTrue(alpaca.connected());
         assertTrue(alpaca.authenticated());
         assertNull(alpaca.errorMessage());
@@ -71,6 +72,7 @@ class ExchangeServiceTest {
         assertNotNull(binance);
         assertEquals("BINANCE", binance.exchange());
         assertTrue(binance.name().contains("Stub"));
+        assertEquals("stub", binance.mode());
         assertTrue(binance.connected());
         assertTrue(binance.authenticated());
         assertNull(binance.errorMessage());

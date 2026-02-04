@@ -78,6 +78,7 @@ export interface Strategy {
 export interface ExchangeStatus {
   exchange: string;
   name: string;
+  mode: string;
   connected: boolean;
   authenticated: boolean;
   lastHeartbeat: number | null;

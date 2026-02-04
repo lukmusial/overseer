@@ -27,8 +27,8 @@ class ExchangeControllerTest {
     @Test
     void getExchangeStatus_returnsAllExchanges() throws Exception {
         List<ExchangeStatusDto> statuses = List.of(
-                new ExchangeStatusDto("ALPACA", "Alpaca Markets", true, true, System.currentTimeMillis(), null),
-                new ExchangeStatusDto("BINANCE", "Binance", true, false, null, "API credentials not configured")
+                new ExchangeStatusDto("ALPACA", "Alpaca Markets", "stub", true, true, System.currentTimeMillis(), null),
+                new ExchangeStatusDto("BINANCE", "Binance", "stub", true, false, null, "API credentials not configured")
         );
         when(exchangeService.getExchangeStatus()).thenReturn(statuses);
 
@@ -44,7 +44,7 @@ class ExchangeControllerTest {
     @Test
     void getExchangeStatus_forSpecificExchange_returnsStatus() throws Exception {
         ExchangeStatusDto status = new ExchangeStatusDto(
-                "ALPACA", "Alpaca Markets (Paper)", true, true, System.currentTimeMillis(), null
+                "ALPACA", "Alpaca Markets (Paper)", "paper", true, true, System.currentTimeMillis(), null
         );
         when(exchangeService.getExchangeStatus("ALPACA")).thenReturn(status);
 

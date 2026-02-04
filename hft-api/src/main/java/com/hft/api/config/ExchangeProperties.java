@@ -84,7 +84,7 @@ public class ExchangeProperties {
         }
 
         public boolean isPaperTrading() {
-            return "paper".equalsIgnoreCase(mode);
+            return "paper".equalsIgnoreCase(mode) || "sandbox".equalsIgnoreCase(mode);
         }
 
         public boolean isStub() {

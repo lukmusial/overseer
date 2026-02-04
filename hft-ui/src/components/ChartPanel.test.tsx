@@ -22,6 +22,7 @@ const mockExchanges: ExchangeStatus[] = [
   {
     exchange: 'ALPACA',
     name: 'Alpaca Markets',
+    mode: 'stub',
     connected: true,
     authenticated: true,
     lastHeartbeat: Date.now(),
@@ -30,6 +31,7 @@ const mockExchanges: ExchangeStatus[] = [
   {
     exchange: 'BINANCE',
     name: 'Binance',
+    mode: 'stub',
     connected: true,
     authenticated: true,
     lastHeartbeat: Date.now(),

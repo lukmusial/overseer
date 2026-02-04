@@ -116,6 +116,7 @@ describe('useApi', () => {
         {
           exchange: 'ALPACA',
           name: 'Alpaca Markets',
+          mode: 'stub',
           connected: true,
           authenticated: true,
           lastHeartbeat: Date.now(),
@@ -124,6 +125,7 @@ describe('useApi', () => {
         {
           exchange: 'BINANCE',
           name: 'Binance',
+          mode: 'stub',
           connected: true,
           authenticated: false,
           lastHeartbeat: null,
