@@ -243,7 +243,10 @@ class BinanceTestnetIntegrationTest {
         // First get current quote to set a reasonable limit price
         Quote quote = marketDataPort.getQuote(TEST_SYMBOL).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
         // Set limit price 20% below current bid to ensure it doesn't fill immediately
-        long limitPrice = (long) (quote.getBidPrice() * 0.80);
+        // Round to tick size 0.01 (= 1_000_000 in PRICE_SCALE) to comply with PRICE_FILTER
+        long rawPrice = (long) (quote.getBidPrice() * 0.80);
+        long tickSize = 1_000_000L; // 0.01 USDT in internal representation
+        long limitPrice = (rawPrice / tickSize) * tickSize;
 
         // Quantity: 0.001 BTC = 100_000 in scaled units (100_000_000 scale)
         long quantity = 100_000L;
