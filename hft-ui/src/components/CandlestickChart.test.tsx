@@ -37,6 +37,7 @@ const mockChartData: ChartData = {
   symbol: 'AAPL',
   exchange: 'ALPACA',
   interval: '5m',
+  dataSource: 'stub',
   candles: [
     { time: 1700000000, open: 150.0, high: 151.0, low: 149.0, close: 150.5, volume: 1000 },
     { time: 1700000300, open: 150.5, high: 152.0, low: 150.0, close: 151.5, volume: 1200 },

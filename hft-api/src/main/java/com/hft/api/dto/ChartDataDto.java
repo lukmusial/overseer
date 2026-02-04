@@ -9,6 +9,7 @@ public record ChartDataDto(
         String symbol,
         String exchange,
         String interval,        // e.g., "1m", "5m", "1h", "1d"
+        String dataSource,      // "stub", "live", "testnet", "sandbox"
         List<CandleDto> candles,
         List<OrderMarkerDto> orders,
         List<TriggerRangeDto> triggerRanges

@@ -165,6 +165,7 @@ export interface ChartData {
   symbol: string;
   exchange: string;
   interval: string;
+  dataSource: string;  // "stub", "live", "testnet", "sandbox"
   candles: Candle[];
   orders: OrderMarker[];
   triggerRanges: TriggerRange[];

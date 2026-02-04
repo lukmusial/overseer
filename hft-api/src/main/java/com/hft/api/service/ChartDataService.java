@@ -71,6 +71,8 @@ public class ChartDataService {
     private final Map<String, Long> cacheTimestamps = new ConcurrentHashMap<>();
     // Track which cache entries are from real exchange data (vs stub)
     private final Map<String, Boolean> cacheIsReal = new ConcurrentHashMap<>();
+    // Track the data source for each cache entry
+    private final Map<String, String> cacheDataSource = new ConcurrentHashMap<>();
 
     public ChartDataService(TradingService tradingService, StubMarketDataService stubMarketDataService,
                             ExchangeService exchangeService) {
@@ -87,7 +89,10 @@ public class ChartDataService {
         List<OrderMarkerDto> orders = getOrderMarkers(symbolTicker, exchangeName);
         List<TriggerRangeDto> triggerRanges = getTriggerRanges(symbolTicker, exchangeName);
 
-        return new ChartDataDto(symbolTicker, exchangeName, interval, candles, orders, triggerRanges);
+        String cacheKey = symbolTicker + ":" + exchangeName + ":" + interval + ":" + periods;
+        String dataSource = cacheDataSource.getOrDefault(cacheKey, "stub");
+
+        return new ChartDataDto(symbolTicker, exchangeName, interval, dataSource, candles, orders, triggerRanges);
     }
 
     /**
@@ -115,12 +120,14 @@ public class ChartDataService {
         }
 
         // Try to fetch real data from exchange
-        List<CandleDto> candles = tryFetchRealCandles(symbolTicker, exchangeName, interval, periods);
+        String[] sourceOut = new String[1];
+        List<CandleDto> candles = tryFetchRealCandles(symbolTicker, exchangeName, interval, periods, sourceOut);
 
         if (candles != null && !candles.isEmpty()) {
             candleCache.put(cacheKey, candles);
             cacheTimestamps.put(cacheKey, System.currentTimeMillis());
             cacheIsReal.put(cacheKey, true);
+            cacheDataSource.put(cacheKey, sourceOut[0] != null ? sourceOut[0] : "live");
             return candles;
         }
 
@@ -131,6 +138,7 @@ public class ChartDataService {
         List<CandleDto> stubCandles = generateStubCandles(symbolTicker, interval, periods);
         candleCache.put(cacheKey, stubCandles);
         cacheIsReal.put(cacheKey, false);
+        cacheDataSource.put(cacheKey, "stub");
         return stubCandles;
     }
 
@@ -148,12 +156,13 @@ public class ChartDataService {
     /**
      * Attempt to fetch real candle data from the exchange.
      * Returns null if no client is available or the fetch fails.
+     * Sets sourceOut[0] to the data source label (e.g., "live", "sandbox").
      */
-    private List<CandleDto> tryFetchRealCandles(String symbolTicker, String exchangeName, String interval, int periods) {
+    private List<CandleDto> tryFetchRealCandles(String symbolTicker, String exchangeName, String interval, int periods, String[] sourceOut) {
         try {
             return switch (exchangeName.toUpperCase()) {
-                case "BINANCE" -> fetchBinanceCandles(symbolTicker, interval, periods);
-                case "ALPACA" -> fetchAlpacaCandles(symbolTicker, interval, periods);
+                case "BINANCE" -> fetchBinanceCandles(symbolTicker, interval, periods, sourceOut);
+                case "ALPACA" -> fetchAlpacaCandles(symbolTicker, interval, periods, sourceOut);
                 default -> null;
             };
         } catch (Exception e) {
@@ -162,13 +171,15 @@ public class ChartDataService {
         }
     }
 
-    private List<CandleDto> fetchBinanceCandles(String symbol, String interval, int periods) throws Exception {
+    private List<CandleDto> fetchBinanceCandles(String symbol, String interval, int periods, String[] sourceOut) throws Exception {
         BinanceHttpClient client = exchangeService.getBinanceClient();
         if (client == null) {
             return null;
         }
 
-        JsonNode klines = client.getKlines(symbol, interval, periods)
+        // Always use the live Binance endpoint for market data — testnet is unreliable
+        sourceOut[0] = "live";
+        JsonNode klines = client.getKlinesLive(symbol, interval, periods)
                 .get(15, TimeUnit.SECONDS);
 
         if (klines == null || !klines.isArray() || klines.isEmpty()) {
@@ -191,12 +202,14 @@ public class ChartDataService {
         return candles;
     }
 
-    private List<CandleDto> fetchAlpacaCandles(String symbol, String interval, int periods) throws Exception {
+    private List<CandleDto> fetchAlpacaCandles(String symbol, String interval, int periods, String[] sourceOut) throws Exception {
         AlpacaHttpClient client = exchangeService.getAlpacaClient();
         if (client == null) {
             return null;
         }
 
+        // Alpaca market data always comes from the same endpoint regardless of paper/live
+        sourceOut[0] = "live";
         String alpacaTimeframe = toAlpacaTimeframe(interval);
         AlpacaBarsResponse response = client.getBars(symbol, alpacaTimeframe, periods)
                 .get(15, TimeUnit.SECONDS);
@@ -481,5 +494,6 @@ public class ChartDataService {
         candleCache.clear();
         cacheTimestamps.clear();
         cacheIsReal.clear();
+        cacheDataSource.clear();
     }
 }

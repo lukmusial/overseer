@@ -200,10 +200,31 @@ export function CandlestickChart({ exchange, symbol, strategies = [] }: Candlest
   // Get strategies that have activity on this symbol
   const relevantStrategies = strategies.filter(s => s.symbols.includes(symbol));
 
+  const dataSourceLabel = chartData?.dataSource === 'live'
+    ? 'Live Market Data'
+    : chartData?.dataSource === 'stub'
+    ? 'Simulated Data'
+    : chartData?.dataSource
+    ? `${chartData.dataSource} Data`
+    : null;
+
+  const dataSourceClass = chartData?.dataSource === 'live'
+    ? 'data-source-live'
+    : chartData?.dataSource === 'stub'
+    ? 'data-source-stub'
+    : 'data-source-other';
+
   return (
     <div className="candlestick-chart">
       <div className="chart-header">
-        <h3>{symbol} ({exchange})</h3>
+        <h3>
+          {symbol} ({exchange})
+          {dataSourceLabel && (
+            <span className={`data-source-badge ${dataSourceClass}`}>
+              {dataSourceLabel}
+            </span>
+          )}
+        </h3>
         <div className="chart-controls">
           <div className="control-group">
             <label>Interval:</label>

@@ -72,7 +72,7 @@ class ChartDataServiceTest {
         String klineJson = "[[1700000000000,\"42000.50\",\"42500.00\",\"41900.00\",\"42300.00\",\"1234.5\",1700000300000,\"0\",100,\"0\",\"0\",\"0\"]]";
         JsonNode klineNode = mapper.readTree(klineJson);
 
-        when(mockClient.getKlines(eq("BTCUSDT"), eq("5m"), eq(10)))
+        when(mockClient.getKlinesLive(eq("BTCUSDT"), eq("5m"), eq(10)))
                 .thenReturn(CompletableFuture.completedFuture(klineNode));
 
         List<CandleDto> candles = chartDataService.getHistoricalCandles("BTCUSDT", "BINANCE", "5m", 10);
@@ -143,7 +143,7 @@ class ChartDataServiceTest {
         String klineJson = "[[1700000000000,\"42000.00\",\"42500.00\",\"41900.00\",\"42300.00\",\"1234.5\",1700000300000,\"0\",100,\"0\",\"0\",\"0\"]]";
         JsonNode klineNode = mapper.readTree(klineJson);
 
-        when(mockClient.getKlines(anyString(), anyString(), anyInt()))
+        when(mockClient.getKlinesLive(anyString(), anyString(), anyInt()))
                 .thenReturn(CompletableFuture.completedFuture(klineNode));
 
         // First call fetches from exchange
@@ -153,7 +153,7 @@ class ChartDataServiceTest {
 
         assertSame(first, second, "Should return cached real data within TTL");
         // Only one call to getKlines because second was cached
-        verify(mockClient, times(1)).getKlines(anyString(), anyString(), anyInt());
+        verify(mockClient, times(1)).getKlinesLive(anyString(), anyString(), anyInt());
     }
 
     @Test
@@ -161,7 +161,7 @@ class ChartDataServiceTest {
         BinanceHttpClient mockClient = mock(BinanceHttpClient.class);
         when(exchangeService.getBinanceClient()).thenReturn(mockClient);
 
-        when(mockClient.getKlines(anyString(), anyString(), anyInt()))
+        when(mockClient.getKlinesLive(anyString(), anyString(), anyInt()))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Network error")));
 
         List<CandleDto> candles = chartDataService.getHistoricalCandles("BTCUSDT", "BINANCE", "5m", 10);

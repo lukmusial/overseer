@@ -236,7 +236,7 @@ public class BinanceHttpClient {
     }
 
     /**
-     * Fetches kline/candlestick data for a symbol.
+     * Fetches kline/candlestick data for a symbol using the configured base URL.
      * This is a public endpoint that does not require authentication.
      *
      * @param symbol   Trading pair symbol (e.g., "BTCUSDT")
@@ -247,6 +247,22 @@ public class BinanceHttpClient {
     public CompletableFuture<JsonNode> getKlines(String symbol, String interval, int limit) {
         String path = "/api/v3/klines?symbol=" + symbol + "&interval=" + interval + "&limit=" + limit;
         return publicGet(path, JsonNode.class);
+    }
+
+    /**
+     * Fetches kline/candlestick data always from the live Binance endpoint.
+     * Testnet market data is unreliable, so chart data always uses live prices.
+     * This is a public endpoint that does not require authentication.
+     */
+    public CompletableFuture<JsonNode> getKlinesLive(String symbol, String interval, int limit) {
+        String url = BinanceConfig.LIVE_BASE_URL + "/api/v3/klines?symbol=" + symbol
+                + "&interval=" + interval + "&limit=" + limit;
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .build();
+
+        return executeAsync(request, JsonNode.class);
     }
 
     public void close() {
