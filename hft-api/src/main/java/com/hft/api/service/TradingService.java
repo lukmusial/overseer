@@ -275,6 +275,18 @@ public class TradingService {
     // Strategy operations
 
     public StrategyDto createStrategy(CreateStrategyRequest request) {
+        // Check for duplicate name
+        String customName = request.name();
+        if (customName != null && !customName.isBlank()) {
+            boolean nameExists = activeStrategies.values().stream()
+                    .filter(s -> s instanceof AbstractTradingStrategy)
+                    .map(s -> ((AbstractTradingStrategy) s).getDisplayName())
+                    .anyMatch(name -> customName.equalsIgnoreCase(name));
+            if (nameExists) {
+                throw new IllegalArgumentException("Strategy name already exists: " + customName);
+            }
+        }
+
         Set<Symbol> symbols = request.symbols().stream()
                 .map(s -> new Symbol(s, Exchange.valueOf(request.exchange())))
                 .collect(Collectors.toSet());
@@ -284,7 +296,6 @@ public class TradingService {
             request.parameters().forEach(params::set);
         }
 
-        String customName = request.name();
         TradingStrategy strategy;
         switch (request.type().toLowerCase()) {
             case "momentum" -> strategy = new MomentumStrategy(symbols, params, customName);

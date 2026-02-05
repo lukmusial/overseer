@@ -3,7 +3,7 @@ import type { CreateStrategyRequest, TradingSymbol } from '../types/api';
 import { useApi } from '../hooks/useApi';
 
 interface Props {
-  onSubmit: (strategy: CreateStrategyRequest) => void | Promise<void>;
+  onSubmit: (strategy: CreateStrategyRequest) => Promise<void>;
   symbolRefreshKey?: number;
 }
 
@@ -59,6 +59,8 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [symbolError, setSymbolError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -198,6 +200,7 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError('');
 
     if (!validateSymbol()) {
       inputRef.current?.focus();
@@ -211,16 +214,24 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
       parsedParameters[key] = isNaN(num) ? val : num;
     }
 
-    await onSubmit({
-      name: name || undefined,
-      type,
-      symbols: [selectedSymbol!.symbol],
-      exchange,
-      parameters: parsedParameters,
-    });
-    setName('');
-    setSelectedSymbol(null);
-    setSymbolInput('');
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        name: name || undefined,
+        type,
+        symbols: [selectedSymbol!.symbol],
+        exchange,
+        parameters: parsedParameters,
+      });
+      setName('');
+      setSelectedSymbol(null);
+      setSymbolInput('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create strategy';
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const selectedType = STRATEGY_TYPES.find(t => t.value === type);
@@ -339,12 +350,15 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
             )}
           </div>
         ))}
+        {submitError && (
+          <div className="error-message submit-error">{submitError}</div>
+        )}
         <button
           type="submit"
           className="btn-primary"
-          disabled={loadingSymbols || symbols.length === 0}
+          disabled={loadingSymbols || symbols.length === 0 || isSubmitting}
         >
-          Create Strategy
+          {isSubmitting ? 'Creating...' : 'Create Strategy'}
         </button>
       </form>
     </div>

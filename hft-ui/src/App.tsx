@@ -262,6 +262,7 @@ export default function App() {
             <PositionList positions={positions} />
             <OrderList
               orders={orders}
+              strategies={strategies}
               onCancel={handleCancelOrder}
               maxOrders={MAX_ORDERS_DISPLAY}
               showViewAll={orders.length >= MAX_ORDERS_DISPLAY}

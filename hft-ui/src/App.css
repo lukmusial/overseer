@@ -780,6 +780,31 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* Order table columns */
+.reject-reason {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fca5a5;
+  font-size: 0.75rem;
+}
+
+.strategy-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Submit error in form */
+.submit-error {
+  background: #7f1d1d;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
 /* Candlestick Chart */
 .candlestick-chart {
   background: #16213e;

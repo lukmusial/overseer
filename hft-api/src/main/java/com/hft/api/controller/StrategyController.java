@@ -21,9 +21,13 @@ public class StrategyController {
     }
 
     @PostMapping
-    public ResponseEntity<StrategyDto> createStrategy(@Valid @RequestBody CreateStrategyRequest request) {
-        StrategyDto strategy = tradingService.createStrategy(request);
-        return ResponseEntity.ok(strategy);
+    public ResponseEntity<?> createStrategy(@Valid @RequestBody CreateStrategyRequest request) {
+        try {
+            StrategyDto strategy = tradingService.createStrategy(request);
+            return ResponseEntity.ok(strategy);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @GetMapping

@@ -245,11 +245,24 @@ describe('useApi', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
+        json: () => Promise.resolve({}),
       });
 
       const { result } = renderHook(() => useApi());
 
       await expect(result.current.getEngineStatus()).rejects.toThrow('HTTP error! status: 404');
+    });
+
+    it('should throw error with message from response body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'Strategy name already exists: Test' }),
+      });
+
+      const { result } = renderHook(() => useApi());
+
+      await expect(result.current.getEngineStatus()).rejects.toThrow('Strategy name already exists: Test');
     });
 
     it('should throw error on network failure', async () => {

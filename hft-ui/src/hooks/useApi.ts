@@ -23,6 +23,18 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
+    // Try to parse error message from response body
+    try {
+      const errorData = await response.json();
+      if (errorData.error) {
+        throw new Error(errorData.error);
+      }
+    } catch (parseError) {
+      // If we couldn't parse the error, just use the status
+      if (parseError instanceof Error && parseError.message !== `HTTP error! status: ${response.status}`) {
+        throw parseError;
+      }
+    }
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 

@@ -1,15 +1,22 @@
-import type { Order } from '../types/api';
+import type { Order, Strategy } from '../types/api';
 import { formatPrice } from '../utils/format';
 
 interface Props {
   orders: Order[];
+  strategies: Strategy[];
   onCancel: (orderId: number) => void;
   maxOrders?: number;
   showViewAll?: boolean;
   onViewAll?: () => void;
 }
 
-export function OrderList({ orders, onCancel, maxOrders, showViewAll, onViewAll }: Props) {
+function getStrategyName(strategyId: string | null | undefined, strategies: Strategy[]): string {
+  if (!strategyId) return '-';
+  const strategy = strategies.find(s => s.id === strategyId);
+  return strategy ? strategy.name : strategyId;
+}
+
+export function OrderList({ orders, strategies, onCancel, maxOrders, showViewAll, onViewAll }: Props) {
   if (orders.length === 0) {
     return (
       <div className="card">
@@ -47,6 +54,7 @@ export function OrderList({ orders, onCancel, maxOrders, showViewAll, onViewAll 
             <th>Price</th>
             <th>Filled</th>
             <th>Status</th>
+            <th>Reason</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -54,7 +62,7 @@ export function OrderList({ orders, onCancel, maxOrders, showViewAll, onViewAll 
           {displayOrders.map((order) => (
             <tr key={order.clientOrderId}>
               <td>{order.clientOrderId}</td>
-              <td className="strategy-id">{order.strategyId || '-'}</td>
+              <td className="strategy-name">{getStrategyName(order.strategyId, strategies)}</td>
               <td>{order.symbol}</td>
               <td className={order.side === 'BUY' ? 'buy' : 'sell'}>{order.side}</td>
               <td>{order.type}</td>
@@ -65,6 +73,9 @@ export function OrderList({ orders, onCancel, maxOrders, showViewAll, onViewAll 
                 <span className={`status-badge status-${order.status.toLowerCase()}`}>
                   {order.status}
                 </span>
+              </td>
+              <td className="reject-reason" title={order.rejectReason || undefined}>
+                {order.rejectReason || '-'}
               </td>
               <td>
                 {canCancel(order.status) && (

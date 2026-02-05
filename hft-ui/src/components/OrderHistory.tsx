@@ -8,6 +8,12 @@ interface Props {
   onBack?: () => void;  // Optional - navigation handled by app header
 }
 
+function getStrategyName(strategyId: string | null | undefined, strategies: Strategy[]): string {
+  if (!strategyId) return '-';
+  const strategy = strategies.find(s => s.id === strategyId);
+  return strategy ? strategy.name : strategyId;
+}
+
 const ORDER_STATUSES = [
   'PENDING',
   'SUBMITTED',
@@ -160,6 +166,7 @@ export function OrderHistory({ strategies }: Props) {
                   <th>Price</th>
                   <th>Filled</th>
                   <th>Status</th>
+                  <th>Reason</th>
                   <th>Created</th>
                 </tr>
               </thead>
@@ -167,7 +174,7 @@ export function OrderHistory({ strategies }: Props) {
                 {orders.map((order) => (
                   <tr key={order.clientOrderId}>
                     <td>{order.clientOrderId}</td>
-                    <td className="strategy-id">{order.strategyId || '-'}</td>
+                    <td className="strategy-name">{getStrategyName(order.strategyId, strategies)}</td>
                     <td>{order.symbol}</td>
                     <td className={order.side === 'BUY' ? 'buy' : 'sell'}>{order.side}</td>
                     <td>{order.type}</td>
@@ -178,6 +185,9 @@ export function OrderHistory({ strategies }: Props) {
                       <span className={`status-badge status-${order.status.toLowerCase()}`}>
                         {order.status}
                       </span>
+                    </td>
+                    <td className="reject-reason" title={order.rejectReason || undefined}>
+                      {order.rejectReason || '-'}
                     </td>
                     <td>{new Date(order.createdAt / 1000000).toLocaleString()}</td>
                   </tr>
