@@ -12,6 +12,7 @@ const mockStrategies: Strategy[] = [
     symbols: ['BTCUSDT'],
     parameters: { shortPeriod: 5, longPeriod: 15, signalThreshold: 0.005, maxPositionSize: 100 },
     progress: 0,
+    priceScale: 100,
     stats: {
       startTimeNanos: 0,
       endTimeNanos: 0,
@@ -32,6 +33,7 @@ const mockStrategies: Strategy[] = [
     symbols: ['ETHUSDT'],
     parameters: { lookbackPeriod: 20, entryZScore: 2.0, exitZScore: 0.5, maxPositionSize: 500 },
     progress: 0,
+    priceScale: 100,
     stats: null,
   },
   {
@@ -42,6 +44,7 @@ const mockStrategies: Strategy[] = [
     symbols: ['AAPL'],
     parameters: { targetQuantity: 1000, durationMinutes: 60, maxParticipationRate: 0.25, side: 'BUY' },
     progress: 1.0,
+    priceScale: 100,
     stats: {
       startTimeNanos: 0,
       endTimeNanos: 0,
@@ -186,6 +189,7 @@ describe('StrategyList', () => {
       symbols: ['MSFT'],
       parameters: { targetQuantity: 500, durationMinutes: 30, sliceIntervalSeconds: 30, maxParticipationRate: 0.1 },
       progress: 0,
+      priceScale: 100,
       stats: null,
     };
 

@@ -1,4 +1,5 @@
 import type { Strategy } from '../types/api';
+import { formatPnl } from '../utils/format';
 
 interface Props {
   strategies: Strategy[];
@@ -205,11 +206,6 @@ function getStateColor(state: string): string {
   }
 }
 
-function formatPnl(value: number): string {
-  const formatted = (value / 100).toFixed(2);
-  return value >= 0 ? `+$${formatted}` : `-$${Math.abs(value / 100).toFixed(2)}`;
-}
-
 export function StrategyList({ strategies, onStart, onStop, onRemove, onInspect }: Props) {
   if (strategies.length === 0) {
     return (
@@ -258,8 +254,8 @@ export function StrategyList({ strategies, onStart, onStop, onRemove, onInspect 
                   {strategy.state}
                 </span>
               </td>
-              <td className={strategy.stats && strategy.stats.realizedPnl >= 0 ? 'profit' : 'loss'}>
-                {strategy.stats ? formatPnl(strategy.stats.realizedPnl + strategy.stats.unrealizedPnl) : '-'}
+              <td className={strategy.stats && (strategy.stats.realizedPnl + strategy.stats.unrealizedPnl) >= 0 ? 'profit' : 'loss'}>
+                {strategy.stats ? formatPnl(strategy.stats.realizedPnl + strategy.stats.unrealizedPnl, strategy.priceScale) : '-'}
               </td>
               <td className="actions">
                 {strategy.state === 'RUNNING' ? (

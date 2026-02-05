@@ -28,15 +28,17 @@ export function formatPrice(price: number, scale: number = 100): string {
 /**
  * Formats a P&L value with sign and currency symbol.
  * Uses the scale to determine decimal places.
+ * Format: +$X.XX for positive, -$X.XX for negative
  */
 export function formatPnl(pnl: number, scale: number = 100): string {
   const decimals = Math.min(getDecimalsFromScale(scale), 2);
   const value = pnl / scale;
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}$${value.toLocaleString(undefined, {
+  const absValue = Math.abs(value);
+  const formatted = absValue.toLocaleString(undefined, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  })}`;
+  });
+  return value >= 0 ? `+$${formatted}` : `-$${formatted}`;
 }
 
 /**
