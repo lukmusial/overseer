@@ -98,7 +98,8 @@ public class PositionManager {
     }
 
     /**
-     * Gets total realized P&L across all positions.
+     * Gets total realized P&L across all positions (in raw scaled units - use with caution).
+     * For risk checks, use getTotalRealizedPnlDollars() instead.
      */
     public long getTotalRealizedPnl() {
         // Recalculate for accuracy
@@ -110,7 +111,8 @@ public class PositionManager {
     }
 
     /**
-     * Gets total unrealized P&L across all positions.
+     * Gets total unrealized P&L across all positions (in raw scaled units - use with caution).
+     * For risk checks, use getTotalUnrealizedPnlDollars() instead.
      */
     public long getTotalUnrealizedPnl() {
         long total = 0;
@@ -121,10 +123,46 @@ public class PositionManager {
     }
 
     /**
-     * Gets total P&L (realized + unrealized).
+     * Gets total P&L (realized + unrealized) in raw scaled units.
+     * For risk checks, use getTotalPnlDollars() instead.
      */
     public long getTotalPnl() {
         return getTotalRealizedPnl() + getTotalUnrealizedPnl();
+    }
+
+    /**
+     * Gets total realized P&L across all positions converted to cents (scale 100).
+     * Properly handles positions with different price scales.
+     */
+    public long getTotalRealizedPnlCents() {
+        long totalCents = 0;
+        for (Position position : positions.values()) {
+            // Convert from position's scale to cents (scale 100)
+            // P&L / priceScale * 100 = P&L * 100 / priceScale
+            totalCents += position.getRealizedPnl() * 100 / position.getPriceScale();
+        }
+        return totalCents;
+    }
+
+    /**
+     * Gets total unrealized P&L across all positions converted to cents (scale 100).
+     * Properly handles positions with different price scales.
+     */
+    public long getTotalUnrealizedPnlCents() {
+        long totalCents = 0;
+        for (Position position : positions.values()) {
+            // Convert from position's scale to cents (scale 100)
+            totalCents += position.getUnrealizedPnl() * 100 / position.getPriceScale();
+        }
+        return totalCents;
+    }
+
+    /**
+     * Gets total P&L (realized + unrealized) converted to cents (scale 100).
+     * Use this for risk limit comparisons where limits are in cents.
+     */
+    public long getTotalPnlCents() {
+        return getTotalRealizedPnlCents() + getTotalUnrealizedPnlCents();
     }
 
     /**

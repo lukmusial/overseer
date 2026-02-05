@@ -79,10 +79,10 @@ public class RiskManager {
             return "Daily notional limit exceeded";
         }
 
-        // Check loss limits
-        long totalPnl = positionManager.getTotalPnl();
-        if (totalPnl < -limits.maxDailyLoss()) {
-            return "Daily loss limit exceeded: " + totalPnl;
+        // Check loss limits (compare in cents since positions may have different price scales)
+        long totalPnlCents = positionManager.getTotalPnlCents();
+        if (totalPnlCents < -limits.maxDailyLoss()) {
+            return "Daily loss limit exceeded: " + (totalPnlCents / 100) + " dollars (limit: $" + (limits.maxDailyLoss() / 100) + ")";
         }
 
         // Increment counter
