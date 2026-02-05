@@ -168,6 +168,7 @@ public class TradingEvent {
         this.askPrice = quote.getAskPrice();
         this.bidSize = quote.getBidSize();
         this.askSize = quote.getAskSize();
+        this.priceScale = quote.getPriceScale();
     }
 
     public void populateTradeUpdate(Trade trade) {
