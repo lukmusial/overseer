@@ -86,12 +86,12 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // Pip-Boy theme colors (muted for readability)
-    const pipGreen = '#30b830';
-    const pipGreenDim = '#30a030';
-    const pipGreenDark = '#1a701a';
+    // Pip-Boy theme colors
+    const pipGreen = '#18dc18';
+    const pipGreenDim = '#18c018';
+    const pipGreenDark = '#0a800a';
     const pipBg = '#0a0a0a';
-    const pipRed = '#e04040';
+    const pipRed = '#f04848';
 
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
@@ -228,9 +228,9 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       ? chartData.orders
       : chartData.orders.filter(o => o.strategyId === selectedStrategy);
 
-    // Pip-Boy theme colors for markers (muted)
-    const pipGreen = '#30b830';
-    const pipRed = '#e04040';
+    // Pip-Boy theme colors for markers
+    const pipGreen = '#18dc18';
+    const pipRed = '#f04848';
 
     const markers: SeriesMarker<Time>[] = filteredOrders.map((order: OrderMarker) => ({
       time: order.time as Time,

@@ -6,27 +6,27 @@
    Retro-futuristic terminal aesthetic inspired by Vault-Tec technology
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* CSS Variables - Pip-Boy Color Palette (muted for readability) */
+/* CSS Variables - Pip-Boy Color Palette */
 :root {
-  --pip-green: #30b830;
-  --pip-green-bright: #50d050;
-  --pip-green-dim: #28a028;
-  --pip-green-dark: #1a701a;
-  --pip-green-glow: rgba(48, 184, 48, 0.25);
-  --pip-green-subtle: rgba(48, 184, 48, 0.1);
-  --pip-amber: #e0a000;
-  --pip-amber-dim: #b08000;
-  --pip-red: #e04040;
-  --pip-red-dim: #b03030;
+  --pip-green: #18dc18;
+  --pip-green-bright: #40f040;
+  --pip-green-dim: #14b814;
+  --pip-green-dark: #0a800a;
+  --pip-green-glow: rgba(24, 220, 24, 0.28);
+  --pip-green-subtle: rgba(24, 220, 24, 0.1);
+  --pip-amber: #f0a800;
+  --pip-amber-dim: #c08800;
+  --pip-red: #f04848;
+  --pip-red-dim: #c03838;
   --pip-bg-dark: #0a0a0a;
   --pip-bg: #0d0d0d;
   --pip-bg-light: #1a1a1a;
   --pip-bg-lighter: #252525;
-  --pip-border: #30b830;
-  --pip-border-dim: #1a701a;
-  --pip-text: #40c040;
-  --pip-text-dim: #30a030;
-  --pip-text-bright: #60d860;
+  --pip-border: #18dc18;
+  --pip-border-dim: #0a800a;
+  --pip-text: #20e020;
+  --pip-text-dim: #18c018;
+  --pip-text-bright: #50f850;
   --pip-scanline: rgba(0, 0, 0, 0.08);
   --pip-font: 'Share Tech Mono', 'VT323', 'Courier New', monospace;
 }
