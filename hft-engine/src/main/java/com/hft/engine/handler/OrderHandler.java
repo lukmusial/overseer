@@ -63,6 +63,9 @@ public class OrderHandler implements EventHandler<TradingEvent> {
                 event.getPrice()
         );
 
+        // Copy price scale from event (critical for correct price display)
+        order.setPriceScale(event.getPriceScale());
+
         if (event.getTimeInForce() != null) {
             order.setTimeInForce(event.getTimeInForce());
         }
