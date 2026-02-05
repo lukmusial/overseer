@@ -29,17 +29,12 @@ function getIntervalMs(interval: string): number {
 }
 
 // Get candle start time for a given timestamp (returns seconds for lightweight-charts)
+// Aligns timestamp to interval boundary (floor division)
+// Uses integer math to avoid floating point issues
 function getCandleTime(timestampMs: number, intervalMs: number): number {
-  return Math.floor(timestampMs / intervalMs) * intervalMs / 1000;
-}
-
-// Check if a timestamp (ms) falls within the same candle interval as a candle time (seconds)
-function isSameCandleInterval(timestampMs: number, candleTimeSeconds: number, intervalMs: number): boolean {
-  const intervalSeconds = intervalMs / 1000;
-  const candleStart = candleTimeSeconds;
-  const candleEnd = candleTimeSeconds + intervalSeconds;
-  const quoteTimeSeconds = timestampMs / 1000;
-  return quoteTimeSeconds >= candleStart && quoteTimeSeconds < candleEnd;
+  const intervalSec = intervalMs / 1000;
+  const timestampSec = Math.floor(timestampMs / 1000);
+  return Math.floor(timestampSec / intervalSec) * intervalSec;
 }
 
 export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey, subscribe }: CandlestickChartProps) {
@@ -166,33 +161,33 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       const intervalMs = getIntervalMs(interval);
       const currentCandleTime = currentCandleRef.current.time as number;
 
-      // Check if quote falls within the current candle's interval
-      if (isSameCandleInterval(quote.timestamp, currentCandleTime, intervalMs)) {
-        // Update current candle
+      // Calculate which candle this quote belongs to (aligned to interval boundary)
+      const quoteCandleTime = getCandleTime(quote.timestamp, intervalMs);
+
+      if (quoteCandleTime === currentCandleTime) {
+        // Quote belongs to current candle - update it
         const updated: CandlestickData<Time> = {
-          ...currentCandleRef.current,
+          time: currentCandleTime as Time,
+          open: currentCandleRef.current.open,
           high: Math.max(currentCandleRef.current.high, quote.midPrice),
           low: Math.min(currentCandleRef.current.low, quote.midPrice),
           close: quote.midPrice,
         };
         currentCandleRef.current = updated;
         candlestickSeriesRef.current.update(updated);
-      } else {
-        // Quote is outside current candle interval - create new candle
-        const newCandleTime = getCandleTime(quote.timestamp, intervalMs);
-        // Only create new candle if it's in the future (not backfill)
-        if (newCandleTime > currentCandleTime) {
-          const newCandle: CandlestickData<Time> = {
-            time: newCandleTime as Time,
-            open: quote.midPrice,
-            high: quote.midPrice,
-            low: quote.midPrice,
-            close: quote.midPrice,
-          };
-          currentCandleRef.current = newCandle;
-          candlestickSeriesRef.current.update(newCandle);
-        }
+      } else if (quoteCandleTime > currentCandleTime) {
+        // Quote belongs to a new candle - create it
+        const newCandle: CandlestickData<Time> = {
+          time: quoteCandleTime as Time,
+          open: quote.midPrice,
+          high: quote.midPrice,
+          low: quote.midPrice,
+          close: quote.midPrice,
+        };
+        currentCandleRef.current = newCandle;
+        candlestickSeriesRef.current.update(newCandle);
       }
+      // Ignore quotes for past candles (shouldn't happen in real-time)
     });
 
     return unsubscribe;
