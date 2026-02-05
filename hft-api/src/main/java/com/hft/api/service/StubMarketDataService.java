@@ -41,7 +41,11 @@ public class StubMarketDataService {
     // Drift is an AR(1) process that biases the random walk direction, creating realistic trends
     private final Map<String, Double> drift = new ConcurrentHashMap<>();
 
-    // Base prices based on approximate January 2026 market values (in cents)
+    // Price scales for each exchange
+    private static final int ALPACA_PRICE_SCALE = 100;           // 2 decimal places (cents)
+    private static final int BINANCE_PRICE_SCALE = 100_000_000;  // 8 decimal places
+
+    // Base prices based on approximate January 2026 market values (in cents for Alpaca)
     private static final Map<String, Long> ALPACA_BASE_PRICES = Map.of(
             "AAPL", 23500L,    // ~$235
             "MSFT", 42500L,    // ~$425
@@ -50,13 +54,14 @@ public class StubMarketDataService {
             "GOOGL", 19200L    // ~$192
     );
 
-    // Crypto prices in cents (higher precision for larger values)
+    // Crypto prices in 8-decimal format (BINANCE_PRICE_SCALE)
+    // $105,000 = 105000 * 100_000_000 = 10_500_000_000_000
     private static final Map<String, Long> BINANCE_BASE_PRICES = Map.of(
-            "BTCUSDT", 10500000L,  // ~$105,000
-            "ETHUSDT", 325000L,    // ~$3,250
-            "SOLUSDT", 22500L,     // ~$225
-            "BNBUSDT", 65000L,     // ~$650
-            "XRPUSDT", 225L        // ~$2.25
+            "BTCUSDT", 10_500_000_000_000L,  // ~$105,000
+            "ETHUSDT", 325_000_000_000L,     // ~$3,250
+            "SOLUSDT", 22_500_000_000L,      // ~$225
+            "BNBUSDT", 65_000_000_000L,      // ~$650
+            "XRPUSDT", 225_000_000L          // ~$2.25
     );
 
     // Volatility in basis points (100 bp = 1%)
@@ -175,10 +180,11 @@ public class StubMarketDataService {
             long bidSize = 100 + random.nextInt(9900);
             long askSize = 100 + random.nextInt(9900);
 
-            // Create quote
+            // Create quote with correct price scale for exchange
             Symbol symbol = new Symbol(ticker, Exchange.valueOf(exchangeName));
             Quote quote = new Quote(symbol, bidPrice, askPrice, bidSize, askSize, timestamp);
-            quote.setPriceScale(100);
+            int priceScale = "BINANCE".equals(exchangeName) ? BINANCE_PRICE_SCALE : ALPACA_PRICE_SCALE;
+            quote.setPriceScale(priceScale);
 
             // Broadcast quote
             QuoteDto dto = QuoteDto.from(quote);
