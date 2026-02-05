@@ -229,7 +229,7 @@ export default function App() {
     <div className="app">
       <header>
         <div className="header-left">
-          <h1>HFT Trading Dashboard</h1>
+          <h1>Overseer Dashboard</h1>
           <nav className="main-nav">
             <button
               className={`nav-link ${!showOrderHistory && !showRiskLimits ? 'active' : ''}`}

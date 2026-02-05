@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FALLOUT PIP-BOY THEME - HFT Trading Dashboard
+   FALLOUT PIP-BOY THEME - Overseer Dashboard
    Retro-futuristic terminal aesthetic inspired by Vault-Tec technology
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -227,24 +227,28 @@ main {
 }
 
 .card h2 {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: var(--pip-green-bright);
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--pip-border-dim);
+  margin: -0.75rem -1rem 0.75rem -1rem;
+  padding: 0.6rem 1rem;
+  background: var(--pip-bg);
+  border-bottom: 2px solid var(--pip-green);
+  box-shadow:
+    0 2px 0 var(--pip-border-dim),
+    0 0 15px var(--pip-green-glow);
   text-transform: uppercase;
   letter-spacing: 2px;
   font-weight: normal;
+  text-shadow: 0 0 8px var(--pip-green);
 }
 
 .card h2::before {
-  content: "[ ";
-  color: var(--pip-green-dim);
+  content: "► ";
+  color: var(--pip-green);
 }
 
 .card h2::after {
-  content: " ]";
-  color: var(--pip-green-dim);
+  content: "";
 }
 
 .card h3 {
