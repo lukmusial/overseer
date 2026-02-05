@@ -3,6 +3,7 @@ package com.hft.api.websocket;
 import com.hft.api.dto.EngineStatusDto;
 import com.hft.api.dto.OrderDto;
 import com.hft.api.dto.PositionDto;
+import com.hft.api.dto.StrategyDto;
 import com.hft.api.service.TradingService;
 import com.hft.core.model.Order;
 import com.hft.core.model.OrderStatus;
@@ -12,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import java.util.List;
 
 @Component
 public class TradingWebSocketHandler {
@@ -41,6 +43,18 @@ public class TradingWebSocketHandler {
     }
 
     /**
+     * Broadcasts all strategy updates every 2 seconds.
+     * This ensures UI stays in sync with strategy stats.
+     */
+    @Scheduled(fixedRate = 2000)
+    public void broadcastStrategies() {
+        List<StrategyDto> strategies = tradingService.getStrategies();
+        for (StrategyDto strategy : strategies) {
+            messagingTemplate.convertAndSend("/topic/strategies", strategy);
+        }
+    }
+
+    /**
      * Broadcasts order updates in real-time.
      */
     private void onOrderUpdate(Order order) {
@@ -50,7 +64,20 @@ public class TradingWebSocketHandler {
         // Dispatch fill to strategy so it can update its stats
         if (order.getStatus() == OrderStatus.FILLED || order.getStatus() == OrderStatus.PARTIALLY_FILLED) {
             tradingService.dispatchFillToStrategy(order);
+            // Broadcast updated strategy stats immediately after fill
+            broadcastStrategyUpdate(order.getStrategyId());
         }
+    }
+
+    /**
+     * Broadcasts a single strategy update.
+     */
+    private void broadcastStrategyUpdate(String strategyId) {
+        if (strategyId == null) {
+            return;
+        }
+        tradingService.getStrategy(strategyId).ifPresent(strategy ->
+            messagingTemplate.convertAndSend("/topic/strategies", strategy));
     }
 
     /**
