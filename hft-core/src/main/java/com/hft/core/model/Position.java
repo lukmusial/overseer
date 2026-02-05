@@ -58,6 +58,11 @@ public class Position {
      * Updates position after a trade execution.
      */
     public void applyTrade(Trade trade) {
+        // Update price scale from trade (important for correct P&L display)
+        if (trade.getPriceScale() > 0) {
+            this.priceScale = trade.getPriceScale();
+        }
+
         long tradeQty = trade.getSide() == OrderSide.BUY ? trade.getQuantity() : -trade.getQuantity();
         long tradePrice = trade.getPrice();
         long tradeCost = tradePrice * Math.abs(trade.getQuantity()) / priceScale;

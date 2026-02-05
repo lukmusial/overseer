@@ -45,6 +45,7 @@ public class PositionHandler implements EventHandler<TradingEvent> {
         trade.setSide(event.getSide());
         trade.setQuantity(event.getFilledQuantity());
         trade.setPrice(event.getFilledPrice());
+        trade.setPriceScale(event.getPriceScale());
         trade.setClientOrderId(event.getClientOrderId());
         trade.setExchangeOrderId(event.getExchangeOrderId());
         trade.setCommission(event.getCommission());
