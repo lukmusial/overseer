@@ -6,28 +6,28 @@
    Retro-futuristic terminal aesthetic inspired by Vault-Tec technology
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* CSS Variables - Pip-Boy Color Palette */
+/* CSS Variables - Pip-Boy Color Palette (muted for readability) */
 :root {
-  --pip-green: #00ff00;
-  --pip-green-bright: #33ff33;
-  --pip-green-dim: #00cc00;
-  --pip-green-dark: #009900;
-  --pip-green-glow: rgba(0, 255, 0, 0.3);
-  --pip-green-subtle: rgba(0, 255, 0, 0.1);
-  --pip-amber: #ffb000;
-  --pip-amber-dim: #cc8800;
-  --pip-red: #ff3333;
-  --pip-red-dim: #cc0000;
+  --pip-green: #30b830;
+  --pip-green-bright: #50d050;
+  --pip-green-dim: #28a028;
+  --pip-green-dark: #1a701a;
+  --pip-green-glow: rgba(48, 184, 48, 0.25);
+  --pip-green-subtle: rgba(48, 184, 48, 0.1);
+  --pip-amber: #e0a000;
+  --pip-amber-dim: #b08000;
+  --pip-red: #e04040;
+  --pip-red-dim: #b03030;
   --pip-bg-dark: #0a0a0a;
   --pip-bg: #0d0d0d;
   --pip-bg-light: #1a1a1a;
   --pip-bg-lighter: #252525;
-  --pip-border: #00ff00;
-  --pip-border-dim: #006600;
-  --pip-text: #00ff00;
-  --pip-text-dim: #00aa00;
-  --pip-text-bright: #66ff66;
-  --pip-scanline: rgba(0, 0, 0, 0.1);
+  --pip-border: #30b830;
+  --pip-border-dim: #1a701a;
+  --pip-text: #40c040;
+  --pip-text-dim: #30a030;
+  --pip-text-bright: #60d860;
+  --pip-scanline: rgba(0, 0, 0, 0.08);
   --pip-font: 'Share Tech Mono', 'VT323', 'Courier New', monospace;
 }
 
@@ -126,7 +126,7 @@ header h1::before {
   color: var(--pip-green-dim);
   padding: 0.4rem 1rem;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-family: var(--pip-font);
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -150,7 +150,7 @@ header h1::before {
 
 .connection-status {
   padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 1px;
   border: 1px solid;
@@ -248,7 +248,7 @@ main {
 }
 
 .card h3 {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   color: var(--pip-green-dim);
   margin: 0.75rem 0 0.5rem;
   text-transform: uppercase;
@@ -272,13 +272,13 @@ main {
 
 .status-item .label {
   color: var(--pip-green-dim);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
 }
 
 .status-item .value {
   font-weight: normal;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }
 
 .status-item .value.running {
@@ -301,7 +301,7 @@ button {
   cursor: pointer;
   border: 1px solid var(--pip-green);
   padding: 0.4rem 0.8rem;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   font-family: var(--pip-font);
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -380,7 +380,7 @@ button:disabled {
 .form-group label {
   display: block;
   color: var(--pip-green-dim);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   margin-bottom: 0.25rem;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -393,7 +393,7 @@ button:disabled {
   border: 1px solid var(--pip-border-dim);
   background: var(--pip-bg-dark);
   color: var(--pip-green);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-family: var(--pip-font);
 }
 
@@ -408,7 +408,7 @@ button:disabled {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 th, td {
@@ -422,7 +422,7 @@ th {
   font-weight: normal;
   text-transform: uppercase;
   letter-spacing: 1px;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   border-bottom: 2px solid var(--pip-green);
 }
 
@@ -616,7 +616,7 @@ tr:hover {
 }
 
 .info-item .value {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }
 
 .info-item .value.mono {
@@ -730,7 +730,7 @@ tr:hover {
   flex-direction: column;
   gap: 0.15rem;
   margin-left: 1rem;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .detail-item {
@@ -818,7 +818,7 @@ tr:hover {
 
 .chart-controls label {
   color: var(--pip-green-dim);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   text-transform: uppercase;
 }
 
@@ -827,13 +827,13 @@ tr:hover {
   border: 1px solid var(--pip-border-dim);
   background: var(--pip-bg-dark);
   color: var(--pip-green);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   font-family: var(--pip-font);
 }
 
 .refresh-btn {
   padding: 0.25rem 0.5rem;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
 }
 
 .chart-container {
@@ -848,7 +848,7 @@ tr:hover {
   padding: 0.5rem;
   border: 1px solid var(--pip-red);
   margin-bottom: 0.75rem;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 /* Chart Symbol Selector */
@@ -878,7 +878,7 @@ tr:hover {
   border: 1px solid var(--pip-border-dim);
   background: var(--pip-bg-dark);
   color: var(--pip-green);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-family: var(--pip-font);
 }
 
@@ -907,7 +907,7 @@ tr:hover {
   padding: 0.4rem 0.6rem;
   cursor: pointer;
   border-bottom: 1px solid var(--pip-border-dim);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .symbol-search-item:hover, .symbol-option:hover {
@@ -926,7 +926,7 @@ tr:hover {
 
 .symbol-name {
   color: var(--pip-green-dim);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
 }
 
 /* Live Price Indicator */
@@ -975,7 +975,7 @@ tr:hover {
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   text-transform: uppercase;
 }
 
@@ -1022,13 +1022,13 @@ tr:hover {
 
 .risk-limit-label {
   color: var(--pip-green-dim);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
 }
 
 .risk-limit-values {
   color: var(--pip-green);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .risk-limit-bar {
@@ -1081,12 +1081,12 @@ tr:hover {
 
 .risk-static-label {
   color: var(--pip-green-dim);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .risk-static-value {
   color: var(--pip-green);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 /* Risk Edit Mode */
@@ -1110,7 +1110,7 @@ tr:hover {
 
 .risk-edit-label {
   color: var(--pip-green-dim);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   text-transform: uppercase;
   margin-bottom: 0.25rem;
 }
@@ -1132,7 +1132,7 @@ tr:hover {
   background: var(--pip-bg-dark);
   color: var(--pip-green);
   font-family: var(--pip-font);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }
 
 .risk-edit-input:focus {
@@ -1156,7 +1156,7 @@ tr:hover {
 
 .filter-group label {
   color: var(--pip-green-dim);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   text-transform: uppercase;
 }
 
@@ -1167,7 +1167,7 @@ tr:hover {
   background: var(--pip-bg-dark);
   color: var(--pip-green);
   font-family: var(--pip-font);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   min-width: 120px;
 }
 
@@ -1183,7 +1183,7 @@ tr:hover {
 
 .pagination-info {
   color: var(--pip-green-dim);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 /* ═══ CANCEL FEEDBACK ═══ */
@@ -1221,13 +1221,13 @@ tr:hover {
 
 .loading-indicator {
   color: var(--pip-amber);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   animation: pip-blink 0.5s infinite;
 }
 
 .error-message {
   color: var(--pip-red);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .submit-error {
@@ -1249,7 +1249,7 @@ tr:hover {
 
 .strategy-name, .strategy-id {
   font-family: var(--pip-font);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   color: var(--pip-green-dim);
 }
 
@@ -1278,7 +1278,7 @@ tr:hover {
 
 .trigger-ranges h4 {
   color: var(--pip-green-dim);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   margin-bottom: 0.5rem;
   text-transform: uppercase;
 }
@@ -1296,7 +1296,7 @@ tr:hover {
 
 .trigger-range-item p {
   color: var(--pip-green-dim);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   margin-top: 0.2rem;
 }
 
@@ -1358,7 +1358,7 @@ tr:hover {
 
 .tooltip-description {
   color: var(--pip-green-dim);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   margin-bottom: 0.5rem;
 }
 
@@ -1375,7 +1375,7 @@ tr:hover {
 .tooltip-section ul {
   margin: 0.25rem 0 0 1rem;
   padding: 0;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
 }
 
 .tooltip-diagram {
