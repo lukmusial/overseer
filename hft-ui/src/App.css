@@ -758,8 +758,13 @@ tr:hover {
 .candlestick-chart, .chart-panel {
   background: var(--pip-bg);
   border: 2px solid var(--pip-green);
-  padding: 0.75rem;
+  padding: 1rem;
   position: relative;
+}
+
+/* Override card h2 for chart-panel to account for its structure */
+.chart-panel.card h2 {
+  margin: -1rem -1rem 0.75rem -1rem;
 }
 
 .chart-header {
@@ -1191,10 +1196,18 @@ tr:hover {
 }
 
 /* ═══ CANCEL FEEDBACK ═══ */
-.actions-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+td.actions-cell {
+  white-space: nowrap;
+}
+
+td.actions-cell > * {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.4rem;
+}
+
+td.actions-cell > *:last-child {
+  margin-right: 0;
 }
 
 .cancel-feedback {
