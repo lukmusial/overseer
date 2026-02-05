@@ -86,36 +86,51 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    // Pip-Boy theme colors
+    const pipGreen = '#18dc18';
+    const pipGreenDim = '#18c018';
+    const pipGreenDark = '#0a800a';
+    const pipBg = '#0a0a0a';
+    const pipRed = '#f04848';
+
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: 400,
       layout: {
-        background: { color: '#1a1a2e' },
-        textColor: '#d1d4dc',
+        background: { color: pipBg },
+        textColor: pipGreenDim,
       },
       grid: {
-        vertLines: { color: '#2B2B43' },
-        horzLines: { color: '#2B2B43' },
+        vertLines: { color: pipGreenDark },
+        horzLines: { color: pipGreenDark },
       },
       crosshair: {
         mode: 1,
+        vertLine: {
+          color: pipGreenDim,
+          labelBackgroundColor: pipGreenDark,
+        },
+        horzLine: {
+          color: pipGreenDim,
+          labelBackgroundColor: pipGreenDark,
+        },
       },
       rightPriceScale: {
-        borderColor: '#2B2B43',
+        borderColor: pipGreenDark,
       },
       timeScale: {
-        borderColor: '#2B2B43',
+        borderColor: pipGreenDark,
         timeVisible: true,
         secondsVisible: false,
       },
     });
 
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a',
-      downColor: '#ef5350',
+      upColor: pipGreen,
+      downColor: pipRed,
       borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
+      wickUpColor: pipGreen,
+      wickDownColor: pipRed,
     });
 
     // Create markers plugin
@@ -213,10 +228,14 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       ? chartData.orders
       : chartData.orders.filter(o => o.strategyId === selectedStrategy);
 
+    // Pip-Boy theme colors for markers
+    const pipGreen = '#18dc18';
+    const pipRed = '#f04848';
+
     const markers: SeriesMarker<Time>[] = filteredOrders.map((order: OrderMarker) => ({
       time: order.time as Time,
       position: order.side === 'BUY' ? 'belowBar' as const : 'aboveBar' as const,
-      color: order.side === 'BUY' ? '#26a69a' : '#ef5350',
+      color: order.side === 'BUY' ? pipGreen : pipRed,
       shape: order.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
       text: `${order.side} ${order.quantity} @ ${order.price.toFixed(2)}`,
     }));
@@ -237,7 +256,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       if (range.buyTriggerLow !== null) {
         candlestickSeriesRef.current?.createPriceLine({
           price: range.buyTriggerLow,
-          color: '#26a69a',
+          color: pipGreen,
           lineWidth: 1,
           lineStyle: 2, // Dashed
           axisLabelVisible: true,
@@ -247,7 +266,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       if (range.buyTriggerHigh !== null) {
         candlestickSeriesRef.current?.createPriceLine({
           price: range.buyTriggerHigh,
-          color: '#26a69a',
+          color: pipGreen,
           lineWidth: 1,
           lineStyle: 2,
           axisLabelVisible: true,
@@ -257,7 +276,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       if (range.sellTriggerLow !== null) {
         candlestickSeriesRef.current?.createPriceLine({
           price: range.sellTriggerLow,
-          color: '#ef5350',
+          color: pipRed,
           lineWidth: 1,
           lineStyle: 2,
           axisLabelVisible: true,
@@ -267,7 +286,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       if (range.sellTriggerHigh !== null) {
         candlestickSeriesRef.current?.createPriceLine({
           price: range.sellTriggerHigh,
-          color: '#ef5350',
+          color: pipRed,
           lineWidth: 1,
           lineStyle: 2,
           axisLabelVisible: true,
