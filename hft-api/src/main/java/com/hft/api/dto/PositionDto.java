@@ -18,16 +18,12 @@ public record PositionDto(
         boolean isFlat
 ) {
     public static PositionDto from(Position position) {
-        // Calculate market price from market value and quantity
-        long marketPrice = position.getQuantity() != 0
-                ? position.getMarketValue() / position.getQuantity()
-                : 0;
         return new PositionDto(
                 position.getSymbol() != null ? position.getSymbol().getTicker() : null,
                 position.getSymbol() != null ? position.getSymbol().getExchange().name() : null,
                 position.getQuantity(),
                 position.getAverageEntryPrice(),
-                marketPrice,
+                position.getCurrentPrice(),  // Use actual current price in native scale
                 position.getMarketValue(),
                 position.getRealizedPnl(),
                 position.getUnrealizedPnl(),

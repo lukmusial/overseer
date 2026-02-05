@@ -45,7 +45,7 @@ export function PositionList({ positions }: Props) {
                 </td>
                 <td>${formatPrice(pos.averageEntryPrice, scale)}</td>
                 <td>${formatPrice(pos.marketPrice, scale)}</td>
-                <td>${formatPrice(pos.marketValue, scale)}</td>
+                <td>${formatPrice(pos.marketValue, 100)}</td>
                 <td className={pos.unrealizedPnl >= 0 ? 'profit' : 'loss'}>
                   {formatPnl(pos.unrealizedPnl, scale)}
                 </td>
