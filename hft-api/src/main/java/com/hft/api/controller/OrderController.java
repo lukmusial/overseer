@@ -36,6 +36,21 @@ public class OrderController {
         return ResponseEntity.ok(tradingService.getAllOrders());
     }
 
+    @GetMapping("/recent")
+    public ResponseEntity<List<OrderDto>> getRecentOrders(@RequestParam(defaultValue = "50") int limit) {
+        return ResponseEntity.ok(tradingService.getRecentOrders(limit));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<OrderDto>> searchOrders(
+            @RequestParam(required = false) String strategyId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String symbol,
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
+        return ResponseEntity.ok(tradingService.searchOrders(strategyId, status, symbol, limit, offset));
+    }
+
     @GetMapping("/{clientOrderId}")
     public ResponseEntity<OrderDto> getOrder(@PathVariable long clientOrderId) {
         return tradingService.getOrder(clientOrderId)

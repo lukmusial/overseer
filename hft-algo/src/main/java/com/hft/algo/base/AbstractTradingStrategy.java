@@ -40,6 +40,9 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
 
     // Execution tracking
     protected final AtomicLong ordersSubmitted = new AtomicLong(0);
+    protected final AtomicLong filledOrders = new AtomicLong(0);
+    protected final AtomicLong cancelledOrders = new AtomicLong(0);
+    protected final AtomicLong rejectedOrders = new AtomicLong(0);
     protected volatile long startTimeNanos;
 
     protected AbstractTradingStrategy(Set<Symbol> symbols, StrategyParameters parameters) {
@@ -131,6 +134,41 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         return maxDrawdown.get();
     }
 
+    /**
+     * Returns the number of orders submitted by this strategy.
+     */
+    public long getOrdersSubmitted() {
+        return ordersSubmitted.get();
+    }
+
+    /**
+     * Returns the number of filled orders.
+     */
+    public long getFilledOrders() {
+        return filledOrders.get();
+    }
+
+    /**
+     * Returns the number of cancelled orders.
+     */
+    public long getCancelledOrders() {
+        return cancelledOrders.get();
+    }
+
+    /**
+     * Returns the number of rejected orders.
+     */
+    public long getRejectedOrders() {
+        return rejectedOrders.get();
+    }
+
+    /**
+     * Returns the start time in nanoseconds.
+     */
+    public long getStartTimeNanos() {
+        return startTimeNanos;
+    }
+
     @Override
     public StrategyParameters getParameters() {
         return parameters;
@@ -219,6 +257,9 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         if (!symbols.contains(symbol)) {
             return;
         }
+
+        // Increment filled order counter
+        filledOrders.incrementAndGet();
 
         long fillQty = fill.getQuantity();
         long fillPrice = fill.getPrice();

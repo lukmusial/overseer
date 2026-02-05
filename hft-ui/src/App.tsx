@@ -6,6 +6,7 @@ import { StrategyList } from './components/StrategyList';
 import { StrategyForm } from './components/StrategyForm';
 import { StrategyInspector } from './components/StrategyInspector';
 import { OrderList } from './components/OrderList';
+import { OrderHistory } from './components/OrderHistory';
 import { PositionList } from './components/PositionList';
 import { ExchangeStatusPanel } from './components/ExchangeStatusPanel';
 import { ChartPanel } from './components/ChartPanel';
@@ -19,6 +20,8 @@ import type {
 } from './types/api';
 import './App.css';
 
+const MAX_ORDERS_DISPLAY = 50;
+
 export default function App() {
   const [engineStatus, setEngineStatus] = useState<EngineStatusType | null>(null);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
@@ -28,6 +31,7 @@ export default function App() {
   const [wsConnected, setWsConnected] = useState(false);
   const [inspectedStrategy, setInspectedStrategy] = useState<Strategy | null>(null);
   const [symbolRefreshKey, setSymbolRefreshKey] = useState(0);
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
 
   const api = useApi();
   const { connected, subscribe } = useWebSocket({
@@ -42,7 +46,7 @@ export default function App() {
         const [status, strats, ords, pos] = await Promise.all([
           api.getEngineStatus(),
           api.getStrategies(),
-          api.getOrders(),
+          api.getRecentOrders(MAX_ORDERS_DISPLAY),
           api.getPositions(),
         ]);
         setEngineStatus(status);
@@ -90,7 +94,9 @@ export default function App() {
           updated[idx] = order;
           return updated;
         }
-        return [order, ...prev];
+        // Add new order at the front and cap at max
+        const newOrders = [order, ...prev];
+        return newOrders.slice(0, MAX_ORDERS_DISPLAY);
       });
     });
     const unsubPositions = subscribe<Position>('/topic/positions', (position) => {
@@ -205,6 +211,17 @@ export default function App() {
     }
   }, [api]);
 
+  if (showOrderHistory) {
+    return (
+      <div className="app">
+        <OrderHistory
+          strategies={strategies}
+          onBack={() => setShowOrderHistory(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <header>
@@ -234,7 +251,13 @@ export default function App() {
               onInspect={handleInspectStrategy}
             />
             <PositionList positions={positions} />
-            <OrderList orders={orders} onCancel={handleCancelOrder} />
+            <OrderList
+              orders={orders}
+              onCancel={handleCancelOrder}
+              maxOrders={MAX_ORDERS_DISPLAY}
+              showViewAll={orders.length >= MAX_ORDERS_DISPLAY}
+              onViewAll={() => setShowOrderHistory(true)}
+            />
           </div>
         </div>
       </main>

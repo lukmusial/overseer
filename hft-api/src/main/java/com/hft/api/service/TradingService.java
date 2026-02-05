@@ -24,6 +24,7 @@ import jakarta.annotation.PreDestroy;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class TradingService {
@@ -185,6 +186,63 @@ public class TradingService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Returns the most recent N orders regardless of status, sorted by creation time descending.
+     */
+    public List<OrderDto> getRecentOrders(int limit) {
+        List<Order> allOrders = new ArrayList<>(tradingEngine.getOrderManager().getOrders());
+        allOrders.sort((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()));
+        return allOrders.stream()
+                .limit(limit)
+                .map(OrderDto::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Searches orders with optional filters for strategy, status, and symbol.
+     */
+    public List<OrderDto> searchOrders(String strategyId, String status, String symbol, int limit, int offset) {
+        Stream<Order> stream = tradingEngine.getOrderManager().getOrders().stream();
+
+        if (strategyId != null && !strategyId.isEmpty()) {
+            stream = stream.filter(o -> strategyId.equals(o.getStrategyId()));
+        }
+        if (status != null && !status.isEmpty()) {
+            stream = stream.filter(o -> status.equals(o.getStatus().name()));
+        }
+        if (symbol != null && !symbol.isEmpty()) {
+            final String symbolLower = symbol.toLowerCase();
+            stream = stream.filter(o -> o.getSymbol() != null &&
+                    o.getSymbol().getTicker().toLowerCase().contains(symbolLower));
+        }
+
+        return stream
+                .sorted((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()))
+                .skip(offset)
+                .limit(limit)
+                .map(OrderDto::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Dispatches a fill event to the strategy that owns the order.
+     */
+    public void dispatchFillToStrategy(Order order) {
+        if (order.getStrategyId() == null) {
+            return;
+        }
+
+        TradingStrategy strategy = activeStrategies.get(order.getStrategyId());
+        if (strategy != null) {
+            Trade trade = new Trade();
+            trade.setSymbol(order.getSymbol());
+            trade.setSide(order.getSide());
+            trade.setQuantity(order.getFilledQuantity());
+            trade.setPrice(order.getAverageFilledPrice());
+            strategy.onFill(trade);
+        }
+    }
+
     public Optional<OrderDto> getOrder(long clientOrderId) {
         Order order = tradingEngine.getOrderManager().getOrder(clientOrderId);
         return order != null ? Optional.of(OrderDto.from(order)) : Optional.empty();
@@ -294,12 +352,27 @@ public class TradingService {
                 .map(Symbol::getTicker)
                 .collect(Collectors.toList());
 
-        StrategyDto.StrategyStatsDto stats = new StrategyDto.StrategyStatsDto(
-                0, 0, 0, 0, 0, 0,
-                strategy.getRealizedPnl(),
-                strategy.getUnrealizedPnl(),
-                strategy.getMaxDrawdown()
-        );
+        StrategyDto.StrategyStatsDto stats;
+        if (strategy instanceof AbstractTradingStrategy abs) {
+            stats = new StrategyDto.StrategyStatsDto(
+                    abs.getStartTimeNanos(),
+                    0,
+                    abs.getOrdersSubmitted(),
+                    abs.getFilledOrders(),
+                    abs.getCancelledOrders(),
+                    abs.getRejectedOrders(),
+                    abs.getRealizedPnl(),
+                    abs.getUnrealizedPnl(),
+                    abs.getMaxDrawdown()
+            );
+        } else {
+            stats = new StrategyDto.StrategyStatsDto(
+                    0, 0, 0, 0, 0, 0,
+                    strategy.getRealizedPnl(),
+                    strategy.getUnrealizedPnl(),
+                    strategy.getMaxDrawdown()
+            );
+        }
 
         // Get display name (custom name if set, otherwise type name)
         String displayName = strategy.getName();

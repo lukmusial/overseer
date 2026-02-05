@@ -35,12 +35,14 @@ const DEFAULT_PARAMS: Record<StrategyType, Record<string, unknown>> = {
     targetQuantity: 1000,
     durationMinutes: 60,
     maxParticipationRate: 0.25,
+    side: 'BUY',
   },
   twap: {
     targetQuantity: 1000,
     durationMinutes: 60,
     sliceIntervalSeconds: 60,
     maxParticipationRate: 0.25,
+    side: 'BUY',
   },
 };
 
@@ -320,11 +322,21 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
         {Object.entries(parameters).map(([key, value]) => (
           <div key={key} className="form-group">
             <label>{key}:</label>
-            <input
-              type="text"
-              value={String(value)}
-              onChange={(e) => handleParamChange(key, e.target.value)}
-            />
+            {key === 'side' ? (
+              <select
+                value={String(value)}
+                onChange={(e) => handleParamChange(key, e.target.value)}
+              >
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={String(value)}
+                onChange={(e) => handleParamChange(key, e.target.value)}
+              />
+            )}
           </div>
         ))}
         <button

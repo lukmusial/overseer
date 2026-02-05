@@ -52,6 +52,26 @@ export function useApi() {
     return fetchJson<Order[]>(`${API_BASE}/orders/active`);
   }, []);
 
+  const getRecentOrders = useCallback(async (limit = 50): Promise<Order[]> => {
+    return fetchJson<Order[]>(`${API_BASE}/orders/recent?limit=${limit}`);
+  }, []);
+
+  const searchOrders = useCallback(async (
+    strategyId?: string,
+    status?: string,
+    symbol?: string,
+    limit = 100,
+    offset = 0
+  ): Promise<Order[]> => {
+    const params = new URLSearchParams();
+    if (strategyId) params.append('strategyId', strategyId);
+    if (status) params.append('status', status);
+    if (symbol) params.append('symbol', symbol);
+    params.append('limit', String(limit));
+    params.append('offset', String(offset));
+    return fetchJson<Order[]>(`${API_BASE}/orders/search?${params}`);
+  }, []);
+
   const submitOrder = useCallback(async (order: CreateOrderRequest): Promise<Order> => {
     return fetchJson<Order>(`${API_BASE}/orders`, {
       method: 'POST',
@@ -129,6 +149,8 @@ export function useApi() {
     stopEngine,
     getOrders,
     getActiveOrders,
+    getRecentOrders,
+    searchOrders,
     submitOrder,
     cancelOrder,
     getPositions,

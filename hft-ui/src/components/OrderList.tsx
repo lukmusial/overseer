@@ -3,13 +3,16 @@ import type { Order } from '../types/api';
 interface Props {
   orders: Order[];
   onCancel: (orderId: number) => void;
+  maxOrders?: number;
+  showViewAll?: boolean;
+  onViewAll?: () => void;
 }
 
 function formatPrice(price: number, scale: number = 100): string {
   return (price / scale).toFixed(2);
 }
 
-export function OrderList({ orders, onCancel }: Props) {
+export function OrderList({ orders, onCancel, maxOrders, showViewAll, onViewAll }: Props) {
   if (orders.length === 0) {
     return (
       <div className="card">
@@ -22,13 +25,24 @@ export function OrderList({ orders, onCancel }: Props) {
   const canCancel = (status: string) =>
     ['PENDING', 'SUBMITTED', 'ACCEPTED', 'PARTIALLY_FILLED'].includes(status);
 
+  const displayOrders = maxOrders ? orders.slice(0, maxOrders) : orders;
+  const hasMore = maxOrders && orders.length > maxOrders;
+
   return (
     <div className="card">
-      <h2>Orders</h2>
+      <div className="card-header">
+        <h2>Orders</h2>
+        {(showViewAll || hasMore) && onViewAll && (
+          <button className="btn-link" onClick={onViewAll}>
+            View all orders →
+          </button>
+        )}
+      </div>
       <table>
         <thead>
           <tr>
             <th>ID</th>
+            <th>Strategy</th>
             <th>Symbol</th>
             <th>Side</th>
             <th>Type</th>
@@ -40,9 +54,10 @@ export function OrderList({ orders, onCancel }: Props) {
           </tr>
         </thead>
         <tbody>
-          {orders.map((order) => (
+          {displayOrders.map((order) => (
             <tr key={order.clientOrderId}>
               <td>{order.clientOrderId}</td>
+              <td className="strategy-id">{order.strategyId || '-'}</td>
               <td>{order.symbol}</td>
               <td className={order.side === 'BUY' ? 'buy' : 'sell'}>{order.side}</td>
               <td>{order.type}</td>
