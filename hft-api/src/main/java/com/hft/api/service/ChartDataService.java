@@ -271,13 +271,16 @@ public class ChartDataService {
         List<CandleDto> candles = new ArrayList<>();
         Random random = new Random(symbol.hashCode()); // Deterministic for same symbol
 
-        Instant now = Instant.now();
+        long nowSeconds = Instant.now().getEpochSecond();
         long intervalSeconds = getIntervalSeconds(interval);
+
+        // Align to interval boundary (floor to nearest interval)
+        long alignedNow = (nowSeconds / intervalSeconds) * intervalSeconds;
 
         double currentPrice = basePrice;
 
         for (int i = periods - 1; i >= 0; i--) {
-            long time = now.minus(i * intervalSeconds, ChronoUnit.SECONDS).getEpochSecond();
+            long time = alignedNow - (i * intervalSeconds);
 
             // Generate OHLC with realistic patterns
             double change = (random.nextGaussian() * intervalVolatility);
