@@ -1,17 +1,8 @@
 import type { Position } from '../types/api';
+import { formatPrice, formatPnl } from '../utils/format';
 
 interface Props {
   positions: Position[];
-}
-
-function formatPrice(price: number, scale: number = 100): string {
-  return (price / scale).toFixed(2);
-}
-
-function formatPnl(pnl: number, scale: number = 100): string {
-  const value = pnl / scale;
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}$${value.toFixed(2)}`;
 }
 
 export function PositionList({ positions }: Props) {
@@ -43,24 +34,27 @@ export function PositionList({ positions }: Props) {
           </tr>
         </thead>
         <tbody>
-          {openPositions.map((pos) => (
-            <tr key={`${pos.symbol}-${pos.exchange}`}>
-              <td>{pos.symbol}</td>
-              <td>{pos.exchange}</td>
-              <td className={pos.isLong ? 'long' : 'short'}>
-                {pos.isLong ? '+' : ''}{pos.quantity}
-              </td>
-              <td>${formatPrice(pos.averageEntryPrice)}</td>
-              <td>${formatPrice(pos.marketPrice)}</td>
-              <td>${formatPrice(pos.marketValue)}</td>
-              <td className={pos.unrealizedPnl >= 0 ? 'profit' : 'loss'}>
-                {formatPnl(pos.unrealizedPnl)}
-              </td>
-              <td className={pos.realizedPnl >= 0 ? 'profit' : 'loss'}>
-                {formatPnl(pos.realizedPnl)}
-              </td>
-            </tr>
-          ))}
+          {openPositions.map((pos) => {
+            const scale = pos.priceScale || 100;
+            return (
+              <tr key={`${pos.symbol}-${pos.exchange}`}>
+                <td>{pos.symbol}</td>
+                <td>{pos.exchange}</td>
+                <td className={pos.isLong ? 'long' : 'short'}>
+                  {pos.isLong ? '+' : ''}{pos.quantity}
+                </td>
+                <td>${formatPrice(pos.averageEntryPrice, scale)}</td>
+                <td>${formatPrice(pos.marketPrice, scale)}</td>
+                <td>${formatPrice(pos.marketValue, scale)}</td>
+                <td className={pos.unrealizedPnl >= 0 ? 'profit' : 'loss'}>
+                  {formatPnl(pos.unrealizedPnl, scale)}
+                </td>
+                <td className={pos.realizedPnl >= 0 ? 'profit' : 'loss'}>
+                  {formatPnl(pos.realizedPnl, scale)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

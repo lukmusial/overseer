@@ -15,6 +15,7 @@ public record StrategyDto(
         @NotNull List<String> symbols,
         Map<String, Object> parameters,
         double progress,
+        int priceScale,
         StrategyStatsDto stats
 ) {
     public record StrategyStatsDto(

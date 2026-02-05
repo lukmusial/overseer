@@ -5,6 +5,7 @@ import com.hft.api.dto.OrderDto;
 import com.hft.api.dto.PositionDto;
 import com.hft.api.service.TradingService;
 import com.hft.core.model.Order;
+import com.hft.core.model.OrderStatus;
 import com.hft.core.model.Position;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -45,6 +46,11 @@ public class TradingWebSocketHandler {
     private void onOrderUpdate(Order order) {
         OrderDto dto = OrderDto.from(order);
         messagingTemplate.convertAndSend("/topic/orders", dto);
+
+        // Dispatch fill to strategy so it can update its stats
+        if (order.getStatus() == OrderStatus.FILLED || order.getStatus() == OrderStatus.PARTIALLY_FILLED) {
+            tradingService.dispatchFillToStrategy(order);
+        }
     }
 
     /**

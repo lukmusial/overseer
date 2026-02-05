@@ -1,13 +1,9 @@
 import type { Strategy } from '../types/api';
+import { formatPnl } from '../utils/format';
 
 interface Props {
   strategy: Strategy;
   onClose: () => void;
-}
-
-function formatPnl(value: number): string {
-  const formatted = (Math.abs(value) / 100).toFixed(2);
-  return value >= 0 ? `+$${formatted}` : `-$${formatted}`;
 }
 
 function formatValue(value: unknown): string {
@@ -92,18 +88,18 @@ export function StrategyInspector({ strategy, onClose }: Props) {
                 <div className="info-item">
                   <span className="label">Realized P&L:</span>
                   <span className={`value ${strategy.stats.realizedPnl >= 0 ? 'profit' : 'loss'}`}>
-                    {formatPnl(strategy.stats.realizedPnl)}
+                    {formatPnl(strategy.stats.realizedPnl, strategy.priceScale)}
                   </span>
                 </div>
                 <div className="info-item">
                   <span className="label">Unrealized P&L:</span>
                   <span className={`value ${strategy.stats.unrealizedPnl >= 0 ? 'profit' : 'loss'}`}>
-                    {formatPnl(strategy.stats.unrealizedPnl)}
+                    {formatPnl(strategy.stats.unrealizedPnl, strategy.priceScale)}
                   </span>
                 </div>
                 <div className="info-item">
                   <span className="label">Max Drawdown:</span>
-                  <span className="value loss">{formatPnl(-strategy.stats.maxDrawdown)}</span>
+                  <span className="value loss">{formatPnl(-strategy.stats.maxDrawdown, strategy.priceScale)}</span>
                 </div>
               </div>
             </section>

@@ -134,7 +134,7 @@ class StrategyControllerTest {
                 "strat-1", "Test Momentum", "momentum",
                 state, List.of("AAPL"),
                 Map.of("shortPeriod", 10),
-                0.0, stats
+                0.0, 100, stats
         );
     }
 }

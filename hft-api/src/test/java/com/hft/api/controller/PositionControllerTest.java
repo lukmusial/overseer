@@ -30,7 +30,7 @@ class PositionControllerTest {
                 "AAPL", "ALPACA",
                 100, 15000, 15500, 1550000,
                 5000, 50000, 2000,
-                true, false, false
+                100, true, false, false
         );
         when(tradingService.getAllPositions()).thenReturn(List.of(position));
 
@@ -47,7 +47,7 @@ class PositionControllerTest {
                 "AAPL", "ALPACA",
                 100, 15000, 15500, 1550000,
                 0, 50000, 0,
-                true, false, false
+                100, true, false, false
         );
         when(tradingService.getActivePositions()).thenReturn(List.of(openPosition));
 
@@ -62,7 +62,7 @@ class PositionControllerTest {
                 "AAPL", "ALPACA",
                 100, 15000, 15500, 1550000,
                 5000, 50000, 2000,
-                true, false, false
+                100, true, false, false
         );
         when(tradingService.getPosition("AAPL", "ALPACA")).thenReturn(Optional.of(position));
 

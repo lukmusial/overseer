@@ -380,6 +380,12 @@ public class TradingService {
             displayName = abstractStrategy.getDisplayName();
         }
 
+        // Determine priceScale from exchange (Binance=8 decimals, others=2)
+        int priceScale = strategy.getSymbols().stream()
+                .findFirst()
+                .map(s -> s.getExchange() == Exchange.BINANCE ? 100_000_000 : 100)
+                .orElse(100);
+
         return new StrategyDto(
                 strategy.getId(),
                 displayName,
@@ -388,6 +394,7 @@ public class TradingService {
                 symbolList,
                 strategy.getParameters().toMap(),
                 strategy.getProgress(),
+                priceScale,
                 stats
         );
     }

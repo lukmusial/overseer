@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApi } from '../hooks/useApi';
+import { formatPrice } from '../utils/format';
 import type { Order, Strategy } from '../types/api';
 
 interface Props {
   strategies: Strategy[];
-  onBack: () => void;
+  onBack?: () => void;  // Optional - navigation handled by app header
 }
 
 const ORDER_STATUSES = [
@@ -18,11 +19,7 @@ const ORDER_STATUSES = [
   'EXPIRED',
 ];
 
-function formatPrice(price: number, scale: number = 100): string {
-  return (price / scale).toFixed(2);
-}
-
-export function OrderHistory({ strategies, onBack }: Props) {
+export function OrderHistory({ strategies }: Props) {
   const api = useApi();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
@@ -90,12 +87,9 @@ export function OrderHistory({ strategies, onBack }: Props) {
   };
 
   return (
-    <div className="order-history">
+    <main className="order-history">
       <div className="order-history-header">
-        <button className="btn-link" onClick={onBack}>
-          ← Back to Dashboard
-        </button>
-        <h1>Order History</h1>
+        <h2>Order History</h2>
       </div>
 
       <div className="card">
@@ -213,6 +207,6 @@ export function OrderHistory({ strategies, onBack }: Props) {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }

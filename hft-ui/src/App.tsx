@@ -211,25 +211,34 @@ export default function App() {
     }
   }, [api]);
 
-  if (showOrderHistory) {
-    return (
-      <div className="app">
-        <OrderHistory
-          strategies={strategies}
-          onBack={() => setShowOrderHistory(false)}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="app">
       <header>
-        <h1>HFT Trading Dashboard</h1>
+        <div className="header-left">
+          <h1>HFT Trading Dashboard</h1>
+          <nav className="main-nav">
+            <button
+              className={`nav-link ${!showOrderHistory ? 'active' : ''}`}
+              onClick={() => setShowOrderHistory(false)}
+            >
+              Dashboard
+            </button>
+            <button
+              className={`nav-link ${showOrderHistory ? 'active' : ''}`}
+              onClick={() => setShowOrderHistory(true)}
+            >
+              Order History
+            </button>
+          </nav>
+        </div>
         <div className={`connection-status ${wsConnected ? 'connected' : 'disconnected'}`}>
           {wsConnected ? 'WebSocket Connected' : 'WebSocket Disconnected'}
         </div>
       </header>
+
+      {showOrderHistory ? (
+        <OrderHistory strategies={strategies} onBack={() => setShowOrderHistory(false)} />
+      ) : (
       <main>
         <div className="grid">
           <div className="col-left">
@@ -261,6 +270,7 @@ export default function App() {
           </div>
         </div>
       </main>
+      )}
 
       {inspectedStrategy && (
         <StrategyInspector

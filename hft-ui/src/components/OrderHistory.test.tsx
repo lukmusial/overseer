@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { OrderHistory } from './OrderHistory';
 import type { Order, Strategy } from '../types/api';
 
@@ -21,6 +21,7 @@ const mockStrategies: Strategy[] = [
     symbols: ['BTCUSDT'],
     parameters: {},
     progress: 0,
+    priceScale: 100,
     stats: null,
   },
 ];
@@ -49,22 +50,19 @@ const mockOrders: Order[] = [
 ];
 
 describe('OrderHistory', () => {
-  const mockOnBack = vi.fn();
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchOrders.mockResolvedValue(mockOrders);
   });
 
-  it('renders the page header with back button', async () => {
-    render(<OrderHistory strategies={mockStrategies} onBack={mockOnBack} />);
+  it('renders the page header', async () => {
+    render(<OrderHistory strategies={mockStrategies} />);
 
     expect(screen.getByText('Order History')).toBeInTheDocument();
-    expect(screen.getByText('← Back to Dashboard')).toBeInTheDocument();
   });
 
   it('renders filter controls', async () => {
-    render(<OrderHistory strategies={mockStrategies} onBack={mockOnBack} />);
+    render(<OrderHistory strategies={mockStrategies} />);
 
     expect(screen.getByText('Strategy:')).toBeInTheDocument();
     expect(screen.getByText('Status:')).toBeInTheDocument();
@@ -73,16 +71,8 @@ describe('OrderHistory', () => {
     expect(screen.getByRole('button', { name: /reset/i })).toBeInTheDocument();
   });
 
-  it('calls onBack when back button is clicked', async () => {
-    render(<OrderHistory strategies={mockStrategies} onBack={mockOnBack} />);
-
-    fireEvent.click(screen.getByText('← Back to Dashboard'));
-
-    expect(mockOnBack).toHaveBeenCalled();
-  });
-
   it('loads orders on mount', async () => {
-    render(<OrderHistory strategies={mockStrategies} onBack={mockOnBack} />);
+    render(<OrderHistory strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(mockSearchOrders).toHaveBeenCalled();
@@ -90,7 +80,7 @@ describe('OrderHistory', () => {
   });
 
   it('displays strategy column in order table', async () => {
-    render(<OrderHistory strategies={mockStrategies} onBack={mockOnBack} />);
+    render(<OrderHistory strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(screen.getByText('Strategy')).toBeInTheDocument();
@@ -98,7 +88,7 @@ describe('OrderHistory', () => {
   });
 
   it('has all order statuses in filter dropdown', async () => {
-    render(<OrderHistory strategies={mockStrategies} onBack={mockOnBack} />);
+    render(<OrderHistory strategies={mockStrategies} />);
 
     // Check for status options in dropdown
     expect(screen.getByRole('option', { name: 'All Statuses' })).toBeInTheDocument();
@@ -108,7 +98,7 @@ describe('OrderHistory', () => {
   });
 
   it('has strategies in strategy filter dropdown', async () => {
-    render(<OrderHistory strategies={mockStrategies} onBack={mockOnBack} />);
+    render(<OrderHistory strategies={mockStrategies} />);
 
     const strategySelect = screen.getAllByRole('combobox')[0];
     expect(strategySelect).toBeInTheDocument();

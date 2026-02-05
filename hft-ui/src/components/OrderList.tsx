@@ -1,4 +1,5 @@
 import type { Order } from '../types/api';
+import { formatPrice } from '../utils/format';
 
 interface Props {
   orders: Order[];
@@ -6,10 +7,6 @@ interface Props {
   maxOrders?: number;
   showViewAll?: boolean;
   onViewAll?: () => void;
-}
-
-function formatPrice(price: number, scale: number = 100): string {
-  return (price / scale).toFixed(2);
 }
 
 export function OrderList({ orders, onCancel, maxOrders, showViewAll, onViewAll }: Props) {

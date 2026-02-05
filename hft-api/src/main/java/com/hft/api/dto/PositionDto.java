@@ -12,6 +12,7 @@ public record PositionDto(
         long realizedPnl,
         long unrealizedPnl,
         long maxDrawdown,
+        int priceScale,
         boolean isLong,
         boolean isShort,
         boolean isFlat
@@ -31,6 +32,7 @@ public record PositionDto(
                 position.getRealizedPnl(),
                 position.getUnrealizedPnl(),
                 position.getMaxDrawdown(),
+                position.getPriceScale(),
                 position.isLong(),
                 position.isShort(),
                 position.isFlat()

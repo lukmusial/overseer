@@ -46,6 +46,7 @@ export interface Position {
   realizedPnl: number;
   unrealizedPnl: number;
   maxDrawdown: number;
+  priceScale: number;
   isLong: boolean;
   isShort: boolean;
   isFlat: boolean;
@@ -73,6 +74,7 @@ export interface Strategy {
   symbols: string[];
   parameters: Record<string, unknown>;
   progress: number;
+  priceScale: number;
   stats: StrategyStats | null;
 }
 
