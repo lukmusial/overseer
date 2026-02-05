@@ -7,9 +7,10 @@ interface ChartPanelProps {
   exchanges: ExchangeStatus[];
   strategies: Strategy[];
   symbolRefreshKey?: number;
+  subscribe?: <T>(destination: string, callback: (data: T) => void) => () => void;
 }
 
-export function ChartPanel({ exchanges, strategies, symbolRefreshKey }: ChartPanelProps) {
+export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe }: ChartPanelProps) {
   const [selectedExchange, setSelectedExchange] = useState<string>('');
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [symbols, setSymbols] = useState<TradingSymbol[]>([]);
@@ -170,6 +171,7 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey }: ChartPan
           symbol={selectedSymbol}
           strategies={strategies}
           refreshKey={symbolRefreshKey}
+          subscribe={subscribe}
         />
       ) : (
         <div className="empty-message">

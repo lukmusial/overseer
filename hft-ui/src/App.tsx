@@ -10,6 +10,7 @@ import { OrderHistory } from './components/OrderHistory';
 import { PositionList } from './components/PositionList';
 import { ExchangeStatusPanel } from './components/ExchangeStatusPanel';
 import { ChartPanel } from './components/ChartPanel';
+import { RiskLimitsPanel } from './components/RiskLimitsPanel';
 import type {
   EngineStatus as EngineStatusType,
   Order,
@@ -17,6 +18,7 @@ import type {
   Strategy,
   CreateStrategyRequest,
   ExchangeStatus as ExchangeStatusType,
+  RiskLimits,
 } from './types/api';
 import './App.css';
 
@@ -32,6 +34,8 @@ export default function App() {
   const [inspectedStrategy, setInspectedStrategy] = useState<Strategy | null>(null);
   const [symbolRefreshKey, setSymbolRefreshKey] = useState(0);
   const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [showRiskLimits, setShowRiskLimits] = useState(false);
+  const [riskLimits, setRiskLimits] = useState<RiskLimits | null>(null);
 
   const api = useApi();
   const { connected, subscribe } = useWebSocket({
@@ -64,16 +68,30 @@ export default function App() {
       } catch (error) {
         console.log('Exchange status endpoint not available');
       }
+
+      // Load risk limits
+      try {
+        const limits = await api.getRiskLimits();
+        setRiskLimits(limits);
+      } catch (error) {
+        console.log('Risk limits endpoint not available');
+      }
     };
     loadData();
   }, []);
 
-  // Poll exchange status every 5 seconds
+  // Poll exchange status and risk limits every 5 seconds
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const exchangeStatus = await api.getExchangeStatus();
         setExchanges(exchangeStatus);
+      } catch {
+        // Silently ignore - endpoint may not exist
+      }
+      try {
+        const limits = await api.getRiskLimits();
+        setRiskLimits(limits);
       } catch {
         // Silently ignore - endpoint may not exist
       }
@@ -203,12 +221,8 @@ export default function App() {
   }, [api]);
 
   // Order operations
-  const handleCancelOrder = useCallback(async (orderId: number) => {
-    try {
-      await api.cancelOrder(orderId);
-    } catch (error) {
-      console.error('Failed to cancel order:', error);
-    }
+  const handleCancelOrder = useCallback(async (orderId: number): Promise<void> => {
+    await api.cancelOrder(orderId);
   }, [api]);
 
   return (
@@ -218,16 +232,22 @@ export default function App() {
           <h1>HFT Trading Dashboard</h1>
           <nav className="main-nav">
             <button
-              className={`nav-link ${!showOrderHistory ? 'active' : ''}`}
-              onClick={() => setShowOrderHistory(false)}
+              className={`nav-link ${!showOrderHistory && !showRiskLimits ? 'active' : ''}`}
+              onClick={() => { setShowOrderHistory(false); setShowRiskLimits(false); }}
             >
               Dashboard
             </button>
             <button
               className={`nav-link ${showOrderHistory ? 'active' : ''}`}
-              onClick={() => setShowOrderHistory(true)}
+              onClick={() => { setShowOrderHistory(true); setShowRiskLimits(false); }}
             >
               Order History
+            </button>
+            <button
+              className={`nav-link ${showRiskLimits ? 'active' : ''}`}
+              onClick={() => { setShowRiskLimits(true); setShowOrderHistory(false); }}
+            >
+              Risk Limits
             </button>
           </nav>
         </div>
@@ -236,7 +256,9 @@ export default function App() {
         </div>
       </header>
 
-      {showOrderHistory ? (
+      {showRiskLimits ? (
+        <RiskLimitsPanel riskLimits={riskLimits} onBack={() => setShowRiskLimits(false)} onUpdate={setRiskLimits} />
+      ) : showOrderHistory ? (
         <OrderHistory strategies={strategies} onBack={() => setShowOrderHistory(false)} />
       ) : (
       <main>
@@ -251,7 +273,7 @@ export default function App() {
             <StrategyForm onSubmit={handleCreateStrategy} symbolRefreshKey={symbolRefreshKey} />
           </div>
           <div className="col-right">
-            <ChartPanel exchanges={exchanges} strategies={strategies} symbolRefreshKey={symbolRefreshKey} />
+            <ChartPanel exchanges={exchanges} strategies={strategies} symbolRefreshKey={symbolRefreshKey} subscribe={subscribe} />
             <StrategyList
               strategies={strategies}
               onStart={handleStartStrategy}

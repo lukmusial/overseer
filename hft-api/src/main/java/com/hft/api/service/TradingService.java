@@ -8,15 +8,18 @@ import com.hft.algo.strategy.MeanReversionStrategy;
 import com.hft.algo.strategy.MomentumStrategy;
 import com.hft.algo.strategy.TwapStrategy;
 import com.hft.algo.strategy.VwapStrategy;
+import com.hft.api.config.RiskLimitsProperties;
 import com.hft.api.dto.*;
 import com.hft.core.model.*;
 import com.hft.engine.TradingEngine;
 import com.hft.engine.service.PositionManager;
+import com.hft.engine.service.RiskManager;
 import com.hft.persistence.PersistenceManager;
 import com.hft.persistence.StrategyRepository;
 import com.hft.persistence.StrategyRepository.StrategyDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -35,17 +38,28 @@ public class TradingService {
     private final PersistenceManager persistenceManager;
     private final Map<String, TradingStrategy> activeStrategies = new ConcurrentHashMap<>();
 
-    public TradingService() {
-        this(PersistenceManager.chronicle());
+    /**
+     * Spring-managed constructor with risk limits from configuration.
+     */
+    @Autowired
+    public TradingService(RiskLimitsProperties riskLimitsProperties) {
+        this(PersistenceManager.chronicle(), riskLimitsProperties.toRiskLimits());
     }
 
     /**
-     * Constructor for testing - allows injecting a custom persistence manager.
+     * Constructor for testing - allows injecting custom persistence and risk limits.
      */
-    public TradingService(PersistenceManager persistenceManager) {
-        this.tradingEngine = new TradingEngine();
+    public TradingService(PersistenceManager persistenceManager, RiskManager.RiskLimits riskLimits) {
+        this.tradingEngine = new TradingEngine(riskLimits);
         this.algorithmContext = new TradingEngineAlgorithmContext(tradingEngine);
         this.persistenceManager = persistenceManager;
+    }
+
+    /**
+     * Constructor for testing with default risk limits.
+     */
+    public TradingService(PersistenceManager persistenceManager) {
+        this(persistenceManager, RiskManager.RiskLimits.defaults());
     }
 
     @PostConstruct
@@ -423,6 +437,25 @@ public class TradingService {
     }
 
     // Risk operations
+
+    /**
+     * Returns current risk limits configuration and usage.
+     */
+    public RiskLimitsDto getRiskLimits() {
+        RiskManager rm = tradingEngine.getRiskManager();
+        long totalPnlCents = tradingEngine.getPositionManager().getTotalPnlCents();
+        long netExposure = tradingEngine.getPositionManager().getNetExposure();
+        return RiskLimitsDto.from(rm, totalPnlCents, netExposure);
+    }
+
+    /**
+     * Updates risk limits dynamically.
+     */
+    public RiskLimitsDto updateRiskLimits(RiskManager.RiskLimits newLimits) {
+        tradingEngine.getRiskManager().setLimits(newLimits);
+        log.info("Risk limits updated via API");
+        return getRiskLimits();
+    }
 
     public void enableTrading() {
         tradingEngine.getRiskManager().enableTrading();

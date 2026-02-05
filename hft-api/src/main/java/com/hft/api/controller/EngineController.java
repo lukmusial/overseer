@@ -1,7 +1,10 @@
 package com.hft.api.controller;
 
 import com.hft.api.dto.EngineStatusDto;
+import com.hft.api.dto.RiskLimitsDto;
+import com.hft.api.dto.UpdateRiskLimitsRequest;
 import com.hft.api.service.TradingService;
+import com.hft.engine.service.RiskManager;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +23,27 @@ public class EngineController {
     @GetMapping("/status")
     public ResponseEntity<EngineStatusDto> getStatus() {
         return ResponseEntity.ok(tradingService.getEngineStatus());
+    }
+
+    @GetMapping("/risk-limits")
+    public ResponseEntity<RiskLimitsDto> getRiskLimits() {
+        return ResponseEntity.ok(tradingService.getRiskLimits());
+    }
+
+    @PutMapping("/risk-limits")
+    public ResponseEntity<RiskLimitsDto> updateRiskLimits(@RequestBody UpdateRiskLimitsRequest request) {
+        RiskManager.RiskLimits newLimits = new RiskManager.RiskLimits(
+                request.maxOrderSize(),
+                request.maxOrderNotional(),
+                request.maxPositionSize(),
+                request.maxOrdersPerDay(),
+                request.maxDailyNotional(),
+                request.maxDailyLoss(),
+                request.maxDrawdownPerPosition(),
+                request.maxUnrealizedLossPerPosition(),
+                request.maxNetExposure()
+        );
+        return ResponseEntity.ok(tradingService.updateRiskLimits(newLimits));
     }
 
     @PostMapping("/start")

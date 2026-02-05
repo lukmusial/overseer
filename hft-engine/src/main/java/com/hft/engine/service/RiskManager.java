@@ -15,7 +15,7 @@ public class RiskManager {
     private static final Logger log = LoggerFactory.getLogger(RiskManager.class);
 
     private final PositionManager positionManager;
-    private final RiskLimits limits;
+    private volatile RiskLimits limits;
 
     // Per-symbol tracking
     private final Map<Symbol, SymbolRiskState> symbolRiskStates;
@@ -189,6 +189,14 @@ public class RiskManager {
 
     public RiskLimits getLimits() {
         return limits;
+    }
+
+    /**
+     * Updates risk limits dynamically.
+     */
+    public void setLimits(RiskLimits newLimits) {
+        this.limits = newLimits;
+        log.info("Risk limits updated: {}", newLimits);
     }
 
     /**

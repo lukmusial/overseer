@@ -1,10 +1,11 @@
+import { useState, useCallback } from 'react';
 import type { Order, Strategy } from '../types/api';
 import { formatPrice } from '../utils/format';
 
 interface Props {
   orders: Order[];
   strategies: Strategy[];
-  onCancel: (orderId: number) => void;
+  onCancel: (orderId: number) => Promise<void>;
   maxOrders?: number;
   showViewAll?: boolean;
   onViewAll?: () => void;
@@ -16,7 +17,37 @@ function getStrategyName(strategyId: string | null | undefined, strategies: Stra
   return strategy ? strategy.name : strategyId;
 }
 
+type CancelState = 'idle' | 'cancelling' | 'success' | 'error';
+
 export function OrderList({ orders, strategies, onCancel, maxOrders, showViewAll, onViewAll }: Props) {
+  const [cancelStates, setCancelStates] = useState<Record<number, CancelState>>({});
+
+  const handleCancel = useCallback(async (orderId: number) => {
+    setCancelStates(prev => ({ ...prev, [orderId]: 'cancelling' }));
+    try {
+      await onCancel(orderId);
+      setCancelStates(prev => ({ ...prev, [orderId]: 'success' }));
+      // Clear success state after 2 seconds
+      setTimeout(() => {
+        setCancelStates(prev => {
+          const next = { ...prev };
+          delete next[orderId];
+          return next;
+        });
+      }, 2000);
+    } catch {
+      setCancelStates(prev => ({ ...prev, [orderId]: 'error' }));
+      // Clear error state after 3 seconds
+      setTimeout(() => {
+        setCancelStates(prev => {
+          const next = { ...prev };
+          delete next[orderId];
+          return next;
+        });
+      }, 3000);
+    }
+  }, [onCancel]);
+
   if (orders.length === 0) {
     return (
       <div className="card">
@@ -31,6 +62,50 @@ export function OrderList({ orders, strategies, onCancel, maxOrders, showViewAll
 
   const displayOrders = maxOrders ? orders.slice(0, maxOrders) : orders;
   const hasMore = maxOrders && orders.length > maxOrders;
+
+  const getCancelButtonContent = (orderId: number, status: string) => {
+    const cancelState = cancelStates[orderId];
+
+    // If order status changed to cancelled/filled, don't show button
+    if (!canCancel(status)) {
+      if (cancelState === 'success') {
+        return <span className="cancel-feedback success">Cancelled</span>;
+      }
+      return null;
+    }
+
+    switch (cancelState) {
+      case 'cancelling':
+        return (
+          <button className="btn-small btn-secondary" disabled>
+            Cancelling...
+          </button>
+        );
+      case 'success':
+        return <span className="cancel-feedback success">Cancelled</span>;
+      case 'error':
+        return (
+          <>
+            <span className="cancel-feedback error">Failed</span>
+            <button
+              onClick={() => handleCancel(orderId)}
+              className="btn-small btn-danger"
+            >
+              Retry
+            </button>
+          </>
+        );
+      default:
+        return (
+          <button
+            onClick={() => handleCancel(orderId)}
+            className="btn-small btn-danger"
+          >
+            Cancel
+          </button>
+        );
+    }
+  };
 
   return (
     <div className="card">
@@ -77,15 +152,8 @@ export function OrderList({ orders, strategies, onCancel, maxOrders, showViewAll
               <td className="reject-reason" title={order.rejectReason || undefined}>
                 {order.rejectReason || '-'}
               </td>
-              <td>
-                {canCancel(order.status) && (
-                  <button
-                    onClick={() => onCancel(order.clientOrderId)}
-                    className="btn-small btn-danger"
-                  >
-                    Cancel
-                  </button>
-                )}
+              <td className="actions-cell">
+                {getCancelButtonContent(order.clientOrderId, order.status)}
               </td>
             </tr>
           ))}

@@ -173,3 +173,37 @@ export interface ChartData {
   orders: OrderMarker[];
   triggerRanges: TriggerRange[];
 }
+
+export interface Quote {
+  symbol: string;
+  exchange: string;
+  bidPrice: number;
+  askPrice: number;
+  bidSize: number;
+  askSize: number;
+  midPrice: number;
+  spread: number;
+  timestamp: number;
+}
+
+export interface RiskLimits {
+  limits: {
+    maxOrderSize: number;
+    maxOrderNotional: number;
+    maxPositionSize: number;
+    maxOrdersPerDay: number;
+    maxDailyNotional: number;
+    maxDailyLoss: number;
+    maxDrawdownPerPosition: number;
+    maxUnrealizedLossPerPosition: number;
+    maxNetExposure: number;
+  };
+  usage: {
+    ordersSubmittedToday: number;
+    notionalTradedToday: number;
+    currentDailyPnl: number;
+    currentNetExposure: number;
+  };
+  tradingEnabled: boolean;
+  disabledReason: string | null;
+}

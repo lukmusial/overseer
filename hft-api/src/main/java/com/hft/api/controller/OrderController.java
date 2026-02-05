@@ -66,4 +66,14 @@ public class OrderController {
         tradingService.cancelOrder(clientOrderId, symbol, exchange);
         return ResponseEntity.ok(Map.of("status", "cancel_requested"));
     }
+
+    @PostMapping("/{clientOrderId}/cancel")
+    public ResponseEntity<Map<String, String>> cancelOrderById(@PathVariable long clientOrderId) {
+        return tradingService.getOrder(clientOrderId)
+                .map(order -> {
+                    tradingService.cancelOrder(clientOrderId, order.symbol(), order.exchange());
+                    return ResponseEntity.ok(Map.of("status", "cancel_requested", "orderId", String.valueOf(clientOrderId)));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

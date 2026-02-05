@@ -63,6 +63,9 @@ public class OrderHandler implements EventHandler<TradingEvent> {
                 event.getPrice()
         );
 
+        // Preserve the original clientOrderId from the event
+        order.setClientOrderId(event.getClientOrderId());
+
         // Copy price scale from event (critical for correct price display)
         order.setPriceScale(event.getPriceScale());
 

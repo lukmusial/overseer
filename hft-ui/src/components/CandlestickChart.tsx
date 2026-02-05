@@ -1,23 +1,44 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, CandlestickSeries, IChartApi, ISeriesApi, CandlestickData, Time, createSeriesMarkers, ISeriesMarkersPluginApi, SeriesMarker } from 'lightweight-charts';
 import { useApi } from '../hooks/useApi';
-import type { ChartData, TriggerRange, OrderMarker, Strategy } from '../types/api';
+import type { ChartData, TriggerRange, OrderMarker, Strategy, Quote } from '../types/api';
 
 interface CandlestickChartProps {
   exchange: string;
   symbol: string;
   strategies?: Strategy[];
   refreshKey?: number;
+  subscribe?: <T>(destination: string, callback: (data: T) => void) => () => void;
 }
 
 const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'];
 const PERIOD_OPTIONS = [50, 100, 200, 500];
 
-export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey }: CandlestickChartProps) {
+// Get interval in milliseconds
+function getIntervalMs(interval: string): number {
+  const match = interval.match(/^(\d+)([mhd])$/);
+  if (!match) return 60000; // default 1 minute
+  const value = parseInt(match[1]);
+  const unit = match[2];
+  switch (unit) {
+    case 'm': return value * 60 * 1000;
+    case 'h': return value * 60 * 60 * 1000;
+    case 'd': return value * 24 * 60 * 60 * 1000;
+    default: return 60000;
+  }
+}
+
+// Get candle start time for a given timestamp
+function getCandleTime(timestamp: number, intervalMs: number): number {
+  return Math.floor(timestamp / intervalMs) * intervalMs / 1000; // lightweight-charts uses seconds
+}
+
+export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey, subscribe }: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const currentCandleRef = useRef<CandlestickData<Time> | null>(null);
 
   const [interval, setInterval] = useState('5m');
   const [periods, setPeriods] = useState(100);
@@ -25,6 +46,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<string>('all');
+  const [lastQuote, setLastQuote] = useState<Quote | null>(null);
 
   const { getChartData } = useApi();
 
@@ -38,6 +60,17 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     try {
       const data = await getChartData(exchange, symbol, interval, periods);
       setChartData(data);
+      // Set current candle reference to the last candle
+      if (data.candles.length > 0) {
+        const lastCandle = data.candles[data.candles.length - 1];
+        currentCandleRef.current = {
+          time: lastCandle.time as Time,
+          open: lastCandle.open,
+          high: lastCandle.high,
+          low: lastCandle.low,
+          close: lastCandle.close,
+        };
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch chart data');
     } finally {
@@ -110,6 +143,47 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Subscribe to real-time quote updates
+  useEffect(() => {
+    if (!subscribe || !exchange || !symbol) return;
+
+    const unsubscribe = subscribe<Quote>(`/topic/quotes/${exchange}/${symbol}`, (quote) => {
+      setLastQuote(quote);
+
+      // Update the chart with the new quote
+      if (!candlestickSeriesRef.current || !currentCandleRef.current) return;
+
+      const intervalMs = getIntervalMs(interval);
+      const newCandleTime = getCandleTime(quote.timestamp, intervalMs);
+      const currentCandleTime = currentCandleRef.current.time as number;
+
+      if (newCandleTime > currentCandleTime) {
+        // New candle period - create new candle
+        const newCandle: CandlestickData<Time> = {
+          time: newCandleTime as Time,
+          open: quote.midPrice,
+          high: quote.midPrice,
+          low: quote.midPrice,
+          close: quote.midPrice,
+        };
+        currentCandleRef.current = newCandle;
+        candlestickSeriesRef.current.update(newCandle);
+      } else {
+        // Update current candle
+        const updated: CandlestickData<Time> = {
+          ...currentCandleRef.current,
+          high: Math.max(currentCandleRef.current.high, quote.midPrice),
+          low: Math.min(currentCandleRef.current.low, quote.midPrice),
+          close: quote.midPrice,
+        };
+        currentCandleRef.current = updated;
+        candlestickSeriesRef.current.update(updated);
+      }
+    });
+
+    return unsubscribe;
+  }, [subscribe, exchange, symbol, interval]);
 
   // Update chart when data changes
   useEffect(() => {
@@ -223,6 +297,12 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
           {dataSourceLabel && (
             <span className={`data-source-badge ${dataSourceClass}`}>
               {dataSourceLabel}
+            </span>
+          )}
+          {lastQuote && (
+            <span className="live-price">
+              ${lastQuote.midPrice.toFixed(2)}
+              <span className="live-indicator" title="Real-time updates active" />
             </span>
           )}
         </h3>

@@ -9,6 +9,7 @@ import type {
   ExchangeStatus,
   TradingSymbol,
   ChartData,
+  RiskLimits,
 } from '../types/api';
 
 const API_BASE = '/api';
@@ -55,6 +56,17 @@ export function useApi() {
     await fetch(`${API_BASE}/engine/stop`, { method: 'POST' });
   }, []);
 
+  const getRiskLimits = useCallback(async (): Promise<RiskLimits> => {
+    return fetchJson<RiskLimits>(`${API_BASE}/engine/risk-limits`);
+  }, []);
+
+  const updateRiskLimits = useCallback(async (limits: RiskLimits['limits']): Promise<RiskLimits> => {
+    return fetchJson<RiskLimits>(`${API_BASE}/engine/risk-limits`, {
+      method: 'PUT',
+      body: JSON.stringify(limits),
+    });
+  }, []);
+
   // Order operations
   const getOrders = useCallback(async (): Promise<Order[]> => {
     return fetchJson<Order[]>(`${API_BASE}/orders`);
@@ -92,7 +104,11 @@ export function useApi() {
   }, []);
 
   const cancelOrder = useCallback(async (orderId: number): Promise<void> => {
-    await fetch(`${API_BASE}/orders/${orderId}/cancel`, { method: 'POST' });
+    const response = await fetch(`${API_BASE}/orders/${orderId}/cancel`, { method: 'POST' });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Failed to cancel order: ${response.status}`);
+    }
   }, []);
 
   // Position operations
@@ -159,6 +175,8 @@ export function useApi() {
     getEngineStatus,
     startEngine,
     stopEngine,
+    getRiskLimits,
+    updateRiskLimits,
     getOrders,
     getActiveOrders,
     getRecentOrders,
