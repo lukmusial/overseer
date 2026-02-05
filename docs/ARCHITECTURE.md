@@ -184,6 +184,86 @@ graph LR
 
 ---
 
+## Price Scale Handling
+
+The system supports multiple exchanges with different price precision requirements. All prices are stored as `long` integers using a `priceScale` factor to maintain precision without floating-point errors.
+
+### Exchange-Specific Price Scales
+
+| Exchange | Price Scale | Decimal Places | Example |
+|----------|-------------|----------------|---------|
+| Alpaca (Stocks) | 100 | 2 | $150.00 = 15000L |
+| Binance (Crypto) | 100,000,000 | 8 | 0.00001234 BTC = 1234L |
+
+### Price Scale Flow
+
+```mermaid
+sequenceDiagram
+    participant EX as Exchange Adapter
+    participant Q as Quote
+    participant TE as TradingEvent
+    participant O as Order
+    participant T as Trade
+    participant P as Position
+
+    Note over EX,P: Price Scale Propagation
+
+    EX->>Q: Create Quote with priceScale
+    Q->>TE: populateQuoteUpdate(quote)
+    Note over TE: Copies priceScale from Quote
+
+    TE->>O: OrderHandler sets priceScale
+    Note over O: Order carries priceScale
+
+    O->>T: Fill creates Trade
+    Note over T: Trade inherits priceScale
+
+    T->>P: applyTrade(trade)
+    Note over P: Position updates priceScale from Trade
+```
+
+### P&L Calculation with Different Scales
+
+Positions maintain their native price scale for accurate P&L calculations:
+
+```
+UnrealizedPnL = (currentMarketPrice - averageEntryPrice) × quantity
+```
+
+Both `currentMarketPrice` and `averageEntryPrice` must use the same scale for correct calculation.
+
+### Risk Limit Normalization
+
+Risk limits are stored in **cents (scale 100)** for consistency. When checking limits, P&L values are normalized:
+
+```mermaid
+graph LR
+    subgraph "Position P&L (Native Scale)"
+        AP[Alpaca Position<br/>P&L: 500000<br/>Scale: 100<br/>= $5,000]
+        BP[Binance Position<br/>P&L: 200000000000<br/>Scale: 100000000<br/>= $2,000]
+    end
+
+    subgraph "Normalization"
+        NORM[Convert to Cents<br/>P&L × 100 / priceScale]
+    end
+
+    subgraph "Risk Check (Cents)"
+        TOTAL[Total P&L: 700000 cents<br/>= $7,000]
+        LIMIT[Daily Loss Limit<br/>10000000 cents<br/>= $100,000]
+    end
+
+    AP --> NORM
+    BP --> NORM
+    NORM --> TOTAL
+    TOTAL --> LIMIT
+```
+
+**Key Methods:**
+- `PositionManager.getTotalPnlCents()` - Returns P&L normalized to cents
+- `RiskManager.checkPreTradeRisk()` - Compares normalized P&L against limits
+
+---
+
 ## Component Interactions
 
 ### Event-Driven Architecture
@@ -236,6 +316,7 @@ classDiagram
         +Order order
         +Quote quote
         +Trade trade
+        +int priceScale
         +populateNewOrder(Order)
         +populateOrderAccepted(Order)
         +populateOrderFilled(Order, qty, price)
@@ -925,6 +1006,8 @@ stateDiagram-v2
 
 ### Risk Limits Configuration
 
+**Important:** All monetary limits are stored in **cents (scale 100)** for consistent comparison across exchanges with different price scales. See [Price Scale Handling](#price-scale-handling) for details on how P&L values are normalized before comparison.
+
 ```mermaid
 classDiagram
     class RiskLimits {
@@ -1183,15 +1266,16 @@ sequenceDiagram
 This HFT trading system provides:
 
 1. **Ultra-Low Latency**: LMAX Disruptor with 64K ring buffer, zero-allocation object pooling
-2. **Comprehensive Risk Management**: Pluggable rules, circuit breaker, daily limits
-3. **Multi-Exchange Support**: Alpaca (stocks) and Binance (crypto) adapters
+2. **Comprehensive Risk Management**: Pluggable rules, circuit breaker, daily limits with normalized P&L comparison
+3. **Multi-Exchange Support**: Alpaca (stocks, 2 decimal places) and Binance (crypto, 8 decimal places) with unified price scale handling
 4. **Advanced Algorithms**: VWAP, TWAP execution; Momentum, Mean Reversion strategies
 5. **Complete Audit Trail**: Chronicle Queue based zero-GC persistence
-6. **Real-Time Position Tracking**: P&L, exposure, and drawdown calculations
+6. **Real-Time Position Tracking**: P&L, exposure, and drawdown calculations across different price scales
 7. **Event-Driven Architecture**: Clean separation of concerns with hexagonal design
 
 The architecture balances:
 - **Performance**: Nanosecond latency, lock-free structures
 - **Safety**: Pre-trade risk checks, circuit breakers
 - **Flexibility**: Pluggable components, multiple exchange support
+- **Accuracy**: Integer arithmetic with configurable price scales prevents floating-point errors
 - **Compliance**: Complete audit logging, position tracking
