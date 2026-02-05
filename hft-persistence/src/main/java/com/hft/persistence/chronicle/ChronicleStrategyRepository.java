@@ -42,6 +42,8 @@ public class ChronicleStrategyRepository implements StrategyRepository {
     }
 
     private void rebuildIndex() {
+        int totalRecords = 0;
+        int deleteRecords = 0;
         try (ExcerptTailer tailer = queue.createTailer()) {
             while (true) {
                 // Create a fresh wire per document to avoid state leakage
@@ -50,16 +52,23 @@ public class ChronicleStrategyRepository implements StrategyRepository {
                 if (!tailer.readDocument(w -> w.read("strategy").marshallable(wire))) {
                     break;
                 }
+                totalRecords++;
                 if (wire.isDeleted()) {
-                    strategiesById.remove(wire.getId());
+                    deleteRecords++;
+                    String removedId = wire.getId();
+                    strategiesById.remove(removedId);
+                    log.debug("Replay: delete strategy {}", removedId);
                 } else {
                     StrategyDefinition def = wire.toDefinition();
                     if (def != null) {
                         strategiesById.put(def.id(), def);
+                        log.debug("Replay: save strategy {} ({})", def.id(), def.name());
                     }
                 }
             }
         }
+        log.info("Replayed {} records ({} deletes), {} strategies active",
+                totalRecords, deleteRecords, strategiesById.size());
     }
 
     @Override
@@ -85,7 +94,7 @@ public class ChronicleStrategyRepository implements StrategyRepository {
         StrategyWire wire = StrategyWire.deleted(id);
         appenderLocal.get().writeDocument(w -> w.write("strategy").marshallable(wire));
         strategiesById.remove(id);
-        log.debug("Deleted strategy: {}", id);
+        log.info("Deleted strategy: {} (deleted flag: {})", id, wire.isDeleted());
     }
 
     @Override

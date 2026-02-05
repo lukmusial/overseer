@@ -56,6 +56,12 @@ public class StrategyController {
         return ResponseEntity.ok(Map.of("status", "deleted", "id", id));
     }
 
+    @DeleteMapping
+    public ResponseEntity<Map<String, Object>> deleteAllStrategies() {
+        int count = tradingService.deleteAllStrategies();
+        return ResponseEntity.ok(Map.of("status", "deleted", "count", count));
+    }
+
     @GetMapping("/types")
     public ResponseEntity<List<Map<String, Object>>> getStrategyTypes() {
         return ResponseEntity.ok(List.of(

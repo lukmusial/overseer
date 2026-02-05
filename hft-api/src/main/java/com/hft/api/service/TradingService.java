@@ -347,6 +347,18 @@ public class TradingService {
         log.info("Deleted strategy: {}", id);
     }
 
+    /**
+     * Deletes all strategies. Returns the count of deleted strategies.
+     */
+    public int deleteAllStrategies() {
+        List<String> ids = new ArrayList<>(activeStrategies.keySet());
+        for (String id : ids) {
+            deleteStrategy(id);
+        }
+        log.info("Deleted all {} strategies", ids.size());
+        return ids.size();
+    }
+
     private StrategyDto toStrategyDto(TradingStrategy strategy) {
         List<String> symbolList = strategy.getSymbols().stream()
                 .map(Symbol::getTicker)
