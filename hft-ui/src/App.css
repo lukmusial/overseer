@@ -1310,6 +1310,7 @@ td.actions-cell > *:last-child {
 .chart-body {
   display: flex;
   gap: 0;
+  overflow: hidden;
 }
 
 .chart-body .chart-container {

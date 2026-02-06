@@ -195,6 +195,18 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     };
   }, []);
 
+  // Resize chart when thresholds panel toggles
+  useEffect(() => {
+    if (chartRef.current && chartContainerRef.current) {
+      // Allow DOM to reflow before measuring new width
+      requestAnimationFrame(() => {
+        if (chartRef.current && chartContainerRef.current) {
+          chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+        }
+      });
+    }
+  }, [showThresholds]);
+
   // Fetch data when parameters change
   useEffect(() => {
     fetchData();
