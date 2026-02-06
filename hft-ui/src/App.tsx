@@ -36,8 +36,12 @@ export default function App() {
   const [showOrderHistory, setShowOrderHistory] = useState(false);
   const [showRiskLimits, setShowRiskLimits] = useState(false);
   const [riskLimits, setRiskLimits] = useState<RiskLimits | null>(null);
-  const [chartExchange, setChartExchange] = useState('');
-  const [chartSymbol, setChartSymbol] = useState('');
+  const [chartExchange, setChartExchange] = useState(() => localStorage.getItem('chartExchange') || '');
+  const [chartSymbol, setChartSymbol] = useState(() => localStorage.getItem('chartSymbol') || '');
+
+  // Persist chart selection to localStorage
+  useEffect(() => { localStorage.setItem('chartExchange', chartExchange); }, [chartExchange]);
+  useEffect(() => { localStorage.setItem('chartSymbol', chartSymbol); }, [chartSymbol]);
 
   const api = useApi();
   const { connected, subscribe } = useWebSocket({

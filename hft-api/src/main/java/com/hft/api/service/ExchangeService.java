@@ -11,11 +11,13 @@ import com.hft.exchange.alpaca.AlpacaConfig;
 import com.hft.exchange.alpaca.AlpacaHttpClient;
 import com.hft.exchange.alpaca.AlpacaMarketDataPort;
 import com.hft.exchange.alpaca.AlpacaWebSocketClient;
+import com.hft.exchange.alpaca.dto.AlpacaAccount;
 import com.hft.exchange.alpaca.dto.AlpacaAsset;
 import com.hft.exchange.binance.BinanceConfig;
 import com.hft.exchange.binance.BinanceHttpClient;
 import com.hft.exchange.binance.BinanceMarketDataPort;
 import com.hft.exchange.binance.BinanceWebSocketClient;
+import com.hft.exchange.binance.dto.BinanceAccount;
 import com.hft.exchange.binance.dto.BinanceExchangeInfo;
 import com.hft.exchange.binance.dto.BinanceSymbol;
 import org.slf4j.Logger;
@@ -124,30 +126,44 @@ public class ExchangeService {
                 );
                 alpacaClient = new AlpacaHttpClient(config);
 
-                // Create WebSocket client and MarketDataPort for real-time data
-                AlpacaWebSocketClient wsClient = new AlpacaWebSocketClient(config);
-                AlpacaMarketDataPort mdPort = new AlpacaMarketDataPort(alpacaClient, wsClient);
-                mdPort.addQuoteListener(quote -> {
-                    tradingService.getTradingEngine().onQuoteUpdate(quote);
-                    tradingService.dispatchQuoteToStrategies(quote);
-                    long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
-                    stubMarketDataService.updatePrice(
-                            quote.getSymbol().getExchange().name(),
-                            quote.getSymbol().getTicker(),
-                            priceCents);
-                    QuoteDto dto = QuoteDto.from(quote);
-                    String exch = quote.getSymbol().getExchange().name();
-                    String ticker = quote.getSymbol().getTicker();
-                    messagingTemplate.convertAndSend("/topic/quotes/" + exch + "/" + ticker, dto);
-                    messagingTemplate.convertAndSend("/topic/quotes", dto);
-                });
-                wsClient.connect().thenRun(() -> subscribeActiveSymbols("ALPACA", mdPort));
-                this.alpacaWsClient = wsClient;
-                this.alpacaMarketDataPort = mdPort;
+                // Verify credentials with a lightweight API call
+                String alpacaLabel = "Alpaca Markets (" + (alpaca.isPaperTrading() ? "Paper" : "Live") + ")";
+                boolean authenticated = false;
+                String authError = null;
+                try {
+                    alpacaClient.get("/v2/account", AlpacaAccount.class).get(10, TimeUnit.SECONDS);
+                    authenticated = true;
+                    log.info("Alpaca authentication verified");
+                } catch (Exception e) {
+                    authError = "Authentication failed: " + extractErrorMessage(e);
+                    log.warn("Alpaca authentication failed: {}", authError);
+                }
 
-                connections.put("ALPACA", new ExchangeConnection("ALPACA",
-                    "Alpaca Markets (" + (alpaca.isPaperTrading() ? "Paper" : "Live") + ")",
-                    mode, true, true, null));
+                if (authenticated) {
+                    // Create WebSocket client and MarketDataPort for real-time data
+                    AlpacaWebSocketClient wsClient = new AlpacaWebSocketClient(config);
+                    AlpacaMarketDataPort mdPort = new AlpacaMarketDataPort(alpacaClient, wsClient);
+                    mdPort.addQuoteListener(quote -> {
+                        tradingService.getTradingEngine().onQuoteUpdate(quote);
+                        tradingService.dispatchQuoteToStrategies(quote);
+                        long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
+                        stubMarketDataService.updatePrice(
+                                quote.getSymbol().getExchange().name(),
+                                quote.getSymbol().getTicker(),
+                                priceCents);
+                        QuoteDto dto = QuoteDto.from(quote);
+                        String exch = quote.getSymbol().getExchange().name();
+                        String ticker = quote.getSymbol().getTicker();
+                        messagingTemplate.convertAndSend("/topic/quotes/" + exch + "/" + ticker, dto);
+                        messagingTemplate.convertAndSend("/topic/quotes", dto);
+                    });
+                    wsClient.connect().thenRun(() -> subscribeActiveSymbols("ALPACA", mdPort));
+                    this.alpacaWsClient = wsClient;
+                    this.alpacaMarketDataPort = mdPort;
+                }
+
+                connections.put("ALPACA", new ExchangeConnection("ALPACA", alpacaLabel,
+                    mode, authenticated, authenticated, authError));
             }
         }
     }
@@ -163,43 +179,57 @@ public class ExchangeService {
             tradingService.getTradingEngine().registerExchange(Exchange.BINANCE, new StubOrderPort());
             log.info("Binance running in STUB mode - simulated connection");
         } else {
-            // Binance exchangeInfo is a public endpoint, create client even without credentials
-            BinanceConfig config = new BinanceConfig(
-                    binance.getApiKey().isEmpty() ? "dummy" : binance.getApiKey(),
-                    binance.getSecretKey().isEmpty() ? "dummy" : binance.getSecretKey(),
-                    binance.isTestnet()
-            );
-            binanceClient = new BinanceHttpClient(config);
-
-            // Create WebSocket client and MarketDataPort for real-time data
-            BinanceWebSocketClient wsClient = new BinanceWebSocketClient(config);
-            BinanceMarketDataPort mdPort = new BinanceMarketDataPort(binanceClient, wsClient);
-            mdPort.addQuoteListener(quote -> {
-                tradingService.getTradingEngine().onQuoteUpdate(quote);
-                tradingService.dispatchQuoteToStrategies(quote);
-                long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
-                stubMarketDataService.updatePrice(
-                        quote.getSymbol().getExchange().name(),
-                        quote.getSymbol().getTicker(),
-                        priceCents);
-                QuoteDto dto = QuoteDto.from(quote);
-                String exch = quote.getSymbol().getExchange().name();
-                String ticker = quote.getSymbol().getTicker();
-                messagingTemplate.convertAndSend("/topic/quotes/" + exch + "/" + ticker, dto);
-                messagingTemplate.convertAndSend("/topic/quotes", dto);
-            });
-            wsClient.connect().thenRun(() -> subscribeActiveSymbols("BINANCE", mdPort));
-            this.binanceWsClient = wsClient;
-            this.binanceMarketDataPort = mdPort;
+            String binanceLabel = "Binance (" + (binance.isTestnet() ? "Testnet" : "Live") + ")";
 
             if (binance.getApiKey().isEmpty() || binance.getSecretKey().isEmpty()) {
-                connections.put("BINANCE", new ExchangeConnection("BINANCE",
-                    "Binance (" + (binance.isTestnet() ? "Testnet" : "Live") + ")",
+                // No credentials — create client with dummy keys for public endpoints only
+                BinanceConfig config = new BinanceConfig("dummy", "dummy", binance.isTestnet());
+                binanceClient = new BinanceHttpClient(config);
+                connections.put("BINANCE", new ExchangeConnection("BINANCE", binanceLabel,
                     mode, true, false, "API credentials not configured (read-only)"));
             } else {
-                connections.put("BINANCE", new ExchangeConnection("BINANCE",
-                    "Binance (" + (binance.isTestnet() ? "Testnet" : "Live") + ")",
-                    mode, true, true, null));
+                BinanceConfig config = new BinanceConfig(
+                        binance.getApiKey(), binance.getSecretKey(), binance.isTestnet());
+                binanceClient = new BinanceHttpClient(config);
+
+                // Verify credentials with a lightweight signed API call
+                boolean authenticated = false;
+                String authError = null;
+                try {
+                    binanceClient.signedGet("/api/v3/account", new java.util.LinkedHashMap<>(), BinanceAccount.class)
+                            .get(10, TimeUnit.SECONDS);
+                    authenticated = true;
+                    log.info("Binance authentication verified");
+                } catch (Exception e) {
+                    authError = "Authentication failed: " + extractErrorMessage(e);
+                    log.warn("Binance authentication failed: {}", authError);
+                }
+
+                if (authenticated) {
+                    // Create WebSocket client and MarketDataPort for real-time data
+                    BinanceWebSocketClient wsClient = new BinanceWebSocketClient(config);
+                    BinanceMarketDataPort mdPort = new BinanceMarketDataPort(binanceClient, wsClient);
+                    mdPort.addQuoteListener(quote -> {
+                        tradingService.getTradingEngine().onQuoteUpdate(quote);
+                        tradingService.dispatchQuoteToStrategies(quote);
+                        long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
+                        stubMarketDataService.updatePrice(
+                                quote.getSymbol().getExchange().name(),
+                                quote.getSymbol().getTicker(),
+                                priceCents);
+                        QuoteDto dto = QuoteDto.from(quote);
+                        String exch = quote.getSymbol().getExchange().name();
+                        String ticker = quote.getSymbol().getTicker();
+                        messagingTemplate.convertAndSend("/topic/quotes/" + exch + "/" + ticker, dto);
+                        messagingTemplate.convertAndSend("/topic/quotes", dto);
+                    });
+                    wsClient.connect().thenRun(() -> subscribeActiveSymbols("BINANCE", mdPort));
+                    this.binanceWsClient = wsClient;
+                    this.binanceMarketDataPort = mdPort;
+                }
+
+                connections.put("BINANCE", new ExchangeConnection("BINANCE", binanceLabel,
+                    mode, authenticated, authenticated, authError));
             }
         }
     }
@@ -555,6 +585,12 @@ public class ExchangeService {
      */
     public BinanceHttpClient getBinanceClient() {
         return binanceClient;
+    }
+
+    private String extractErrorMessage(Exception e) {
+        Throwable cause = e.getCause() != null ? e.getCause() : e;
+        String msg = cause.getMessage();
+        return msg != null ? msg : cause.getClass().getSimpleName();
     }
 
     @PreDestroy
