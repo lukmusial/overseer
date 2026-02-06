@@ -24,6 +24,7 @@ vi.mock('lightweight-charts', () => ({
     timeScale: vi.fn(() => ({
       fitContent: mockFitContent,
     })),
+    subscribeCrosshairMove: vi.fn(),
     applyOptions: mockApplyOptions,
     remove: mockRemove,
   })),

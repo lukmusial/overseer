@@ -851,6 +851,26 @@ tr:hover {
   background: var(--pip-bg-dark);
 }
 
+.order-tooltip {
+  display: none;
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(10, 10, 10, 0.92);
+  border: 1px solid #4a90d9;
+  color: #4a90d9;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+  font-family: var(--pip-font, 'Share Tech Mono', monospace);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.order-tooltip-status {
+  color: var(--pip-green-dim, #18c018);
+  font-size: 0.7rem;
+}
+
 .chart-error {
   background: rgba(255, 51, 51, 0.1);
   color: var(--pip-red);

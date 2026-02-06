@@ -39,10 +39,12 @@ function getCandleTime(timestampMs: number, intervalMs: number): number {
 
 export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey, subscribe }: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const currentCandleRef = useRef<CandlestickData<Time> | null>(null);
+  const ordersByTimeRef = useRef<Map<number, OrderMarker[]>>(new Map());
 
   const [interval, setInterval] = useState('5m');
   const [periods, setPeriods] = useState(100);
@@ -139,6 +141,39 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     chartRef.current = chart;
     candlestickSeriesRef.current = candlestickSeries;
     markersPluginRef.current = markersPlugin;
+
+    // Show tooltip on crosshair hover over order markers
+    chart.subscribeCrosshairMove((param) => {
+      const tooltip = tooltipRef.current;
+      if (!tooltip) return;
+
+      if (!param.time || !param.point) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const orders = ordersByTimeRef.current.get(param.time as number);
+      if (!orders || orders.length === 0) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      tooltip.innerHTML = orders.map(o =>
+        `<div>${o.side} ${o.quantity} @ ${o.price.toFixed(2)}<br><span class="order-tooltip-status">${o.status}</span></div>`
+      ).join('');
+      tooltip.style.display = 'block';
+
+      const containerRect = chartContainerRef.current?.getBoundingClientRect();
+      if (containerRect) {
+        const tooltipWidth = tooltip.offsetWidth;
+        let left = param.point.x + 12;
+        if (left + tooltipWidth > containerRect.width) {
+          left = param.point.x - tooltipWidth - 12;
+        }
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${param.point.y - 12}px`;
+      }
+    });
 
     // Handle resize
     const handleResize = () => {
@@ -258,12 +293,21 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       ? chartData.orders
       : chartData.orders.filter(o => o.strategyId === selectedStrategy);
 
+    // Build time -> orders lookup for tooltip
+    const ordersByTime = new Map<number, OrderMarker[]>();
+    filteredOrders.forEach((order: OrderMarker) => {
+      const existing = ordersByTime.get(order.time) || [];
+      existing.push(order);
+      ordersByTime.set(order.time, existing);
+    });
+    ordersByTimeRef.current = ordersByTime;
+
     const markers: SeriesMarker<Time>[] = filteredOrders.map((order: OrderMarker) => ({
       time: order.time as Time,
       position: 'inBar' as const,
       color: '#4a90d9',
       shape: 'circle' as const,
-      text: `${order.side} ${order.quantity} @ ${order.price.toFixed(2)}`,
+      text: '',
     }));
 
     if (markersPluginRef.current) {
@@ -395,7 +439,10 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
 
       {error && <div className="chart-error">{error}</div>}
 
-      <div ref={chartContainerRef} className="chart-container" />
+      <div className="chart-container" style={{ position: 'relative' }}>
+        <div ref={chartContainerRef} />
+        <div ref={tooltipRef} className="order-tooltip" />
+      </div>
 
       {chartData && chartData.triggerRanges.length > 0 && (
         <div className="trigger-ranges">
