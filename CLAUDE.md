@@ -222,11 +222,11 @@ hft-client/
 ├── hft-exchange-binance/# Binance adapter
 ├── hft-risk/           # Risk management module
 ├── hft-engine/         # Order matching, event processing (Disruptor)
-├── hft-persistence/    # Chronicle-based persistence
-├── hft-api/            # Spring Boot REST/WebSocket API
+├── hft-persistence/    # Chronicle Queue persistence (orders, trades, positions, strategies, audit)
+├── hft-api/            # Spring Boot REST/WebSocket API, exchange connectivity, strategy management
 ├── hft-app/            # Main application assembly
 ├── hft-bdd/            # Cucumber BDD tests & JMH benchmarks
-└── hft-ui/             # React frontend (Vitest + React Testing Library)
+└── hft-ui/             # React + TypeScript dashboard (Vite, Lightweight Charts, STOMP WebSocket)
 ```
 
 ## Architecture (Hexagonal/Ports & Adapters)
@@ -235,6 +235,18 @@ The system follows hexagonal architecture:
 - **Domain Core** (`hft-core`): Business logic and models
 - **Ports** (`hft-core/port`): Interfaces for external dependencies
 - **Adapters** (`hft-exchange-*`): Exchange implementations
+- **Persistence** (`hft-persistence`): Chronicle Queue stores for orders, trades, positions, strategies, and audit events
+- **API** (`hft-api`): REST/WebSocket API, exchange connectivity with credential verification, strategy lifecycle
+- **UI** (`hft-ui`): React dashboard with real-time WebSocket updates and interactive charts
+
+### Startup Restoration
+On startup, `TradingService.init()` restores persisted state in order:
+1. Positions (from `ChroniclePositionSnapshotStore` — non-flat positions only)
+2. Orders (from `ChronicleOrderRepository`)
+3. Strategies (from `ChronicleStrategyRepository` — recreates algorithm instances)
+
+### Exchange Connectivity
+`ExchangeService` manages connections with runtime mode switching (stub/sandbox/live). Credentials are verified via API calls (`/v2/account` for Alpaca, `/api/v3/account` for Binance) before reporting authenticated status. WebSocket connections and MarketDataPorts are only established after successful verification.
 
 ## Key Design Principles
 
@@ -303,7 +315,8 @@ Step definitions in `hft-bdd/src/test/java/com/hft/bdd/steps/`
 
 Key scenarios:
 - Order lifecycle management
-- Position tracking
+- Position tracking and persistence across restarts
+- Strategy creation and restoration
 - Performance metrics validation
 
 ### Performance Benchmarks (JMH)

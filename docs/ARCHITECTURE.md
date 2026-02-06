@@ -67,7 +67,7 @@ graph TB
 
         subgraph "Persistence (hft-persistence)"
             PER[PersistenceManager]
-            CQ[(Chronicle Queue)]
+            CQ[(Chronicle Queue<br/>Orders, Trades, Positions,<br/>Strategies, Audit)]
         end
     end
 
@@ -177,9 +177,10 @@ graph LR
 | `hft-exchange-api` | Exchange port interface definitions |
 | `hft-exchange-alpaca` | Alpaca REST/WebSocket adapter |
 | `hft-exchange-binance` | Binance REST/WebSocket adapter |
-| `hft-persistence` | Chronicle Queue based persistence |
-| `hft-api` | Spring Boot REST and WebSocket API |
+| `hft-persistence` | Chronicle Queue persistence (orders, trades, positions, strategies, audit) |
+| `hft-api` | Spring Boot REST/WebSocket API, exchange connectivity, strategy management |
 | `hft-app` | Application assembly and configuration |
+| `hft-ui` | React + TypeScript dashboard (Vite, Lightweight Charts, STOMP WebSocket) |
 | `hft-bdd` | Cucumber BDD tests and JMH benchmarks |
 
 ---
@@ -506,6 +507,51 @@ sequenceDiagram
     RE->>RE: Increment ordersApproved
     RE-->>TE: Approved
 ```
+
+---
+
+## Exchange Connectivity
+
+### Mode Switching and Credential Verification
+
+The `ExchangeService` manages connections to exchanges with runtime mode switching (sandbox/testnet/live). Credentials are verified with actual API calls before reporting connected status.
+
+```mermaid
+sequenceDiagram
+    participant UI as Dashboard
+    participant API as ExchangeService
+    participant EX as Exchange API
+
+    UI->>API: switchMode(exchange, "live")
+    API->>API: Cleanup existing connections<br/>(close WebSocket, clear MarketDataPort)
+
+    API->>API: Load credentials for mode
+
+    alt Credentials present
+        API->>EX: Verify credentials<br/>Alpaca: GET /v2/account<br/>Binance: GET /api/v3/account (signed)
+
+        alt Verification succeeds
+            API->>API: Create WebSocket client
+            API->>API: Create MarketDataPort
+            API->>API: Subscribe to active symbols
+            API-->>UI: connected: true, authenticated: true
+        else Verification fails
+            API-->>UI: connected: false, authenticated: false<br/>error: "Authentication failed: ..."
+        end
+    else No credentials
+        API-->>UI: connected: false, authenticated: false<br/>error: "No API credentials configured"
+    end
+```
+
+### Exchange Modes
+
+| Mode | Alpaca | Binance |
+|------|--------|---------|
+| **Sandbox** | Paper trading API with simulated fills | Testnet with simulated order book |
+| **Live** | Real market data and execution | Real market data and execution |
+| **Stub** | In-process simulated exchange (no network) | In-process simulated exchange (no network) |
+
+Each exchange maintains an `ExchangeConnection` with: HTTP client, WebSocket client, MarketDataPort, OrderPort, connected/authenticated flags, and error message.
 
 ---
 
@@ -1065,31 +1111,43 @@ graph TB
     subgraph "Chronicle Queue Stores"
         TJ[ChronicleTradeJournal]
         OR[ChronicleOrderRepository]
+        PS[ChroniclePositionSnapshotStore]
+        SR[ChronicleStrategyRepository]
         AL[ChronicleAuditLog]
     end
 
     subgraph "Wire Format (Serialization)"
         TW[TradeWire]
         OW[OrderWire]
+        PW[PositionSnapshotWire]
+        SW[StrategyWire]
         AW[AuditEventWire]
     end
 
     subgraph "Memory-Mapped Files"
         TF[(trades/<br/>20260119F.cq4)]
         OF[(orders/<br/>20260119F.cq4)]
+        PF[(positions/<br/>20260119F.cq4)]
+        SF[(strategies/<br/>20260119F.cq4)]
         AF[(audit/<br/>20260119F.cq4)]
     end
 
     PM --> TJ
     PM --> OR
+    PM --> PS
+    PM --> SR
     PM --> AL
 
     TJ --> TW
     OR --> OW
+    PS --> PW
+    SR --> SW
     AL --> AW
 
     TW --> TF
     OW --> OF
+    PW --> PF
+    SW --> SF
     AW --> AF
 
     subgraph "Features"
@@ -1100,13 +1158,34 @@ graph TB
     end
 ```
 
+### Store Implementations
+
+Each Chronicle store follows the same pattern: writes go to a Chronicle Queue (memory-mapped file) for durability, while in-memory indices (ConcurrentHashMap) provide O(1) lookups. On startup, `rebuildIndex()` replays the queue to reconstruct in-memory state.
+
+| Store | Queue Directory | In-Memory Indices | Key Operations |
+|-------|----------------|-------------------|----------------|
+| `ChronicleOrderRepository` | `orders/` | byClientId, byExchangeId, recentOrders (Deque) | save, findByClientOrderId, getActiveOrders, replay |
+| `ChronicleTradeJournal` | `trades/` | recentTrades (Deque), tradeCount | record, getTradesForDate, getRecentTrades |
+| `ChroniclePositionSnapshotStore` | `positions/` | latestBySymbol, snapshotsBySymbol, eodSnapshots | saveSnapshot, getLatestSnapshot, getAllLatestSnapshots |
+| `ChronicleStrategyRepository` | `strategies/` | strategiesById | save, findById, findAll, delete (logical) |
+| `ChronicleAuditLog` | `audit/` | recentEvents (Deque) | log, getEventsForDate, getRecentEvents |
+
+`PersistenceManager` provides three factory methods:
+- `inMemory()` — All in-memory implementations (for testing)
+- `fileBased(Path)` — File-based trade journal/audit + Chronicle positions
+- `chronicle(Path)` — All Chronicle Queue implementations (production)
+
 ### Persistence Flow
 
 ```mermaid
 sequenceDiagram
     participant TE as TradingEngine
+    participant TS as TradingService
     participant PM as PersistenceManager
     participant TJ as TradeJournal
+    participant OR as OrderRepository
+    participant PS as PositionStore
+    participant SR as StrategyRepository
     participant AL as AuditLog
     participant CQ as Chronicle Queue
 
@@ -1115,20 +1194,69 @@ sequenceDiagram
     PM->>AL: log(ORDER_SUBMITTED, details)
     AL->>CQ: writeDocument(AuditEventWire)
 
+    Note over TE,CQ: Order State Change
+    TS->>OR: save(order)
+    OR->>CQ: writeDocument(OrderWire)
+
     Note over TE,CQ: Order Fill
     TE->>PM: recordTrade(trade)
     PM->>TJ: record(trade)
     TJ->>CQ: writeDocument(TradeWire)
     PM->>AL: log(ORDER_FILLED, details)
-    AL->>CQ: writeDocument(AuditEventWire)
 
-    Note over TE,CQ: Query (e.g., for replay)
-    TE->>PM: getTradeJournal()
-    PM-->>TE: tradeJournal
-    TE->>TJ: getTradesForDate(20260119)
-    TJ->>CQ: createTailer()
-    CQ-->>TJ: Iterate documents
-    TJ-->>TE: List<Trade>
+    Note over TE,CQ: Position Update (via listener)
+    TS->>PS: saveSnapshot(position, timestampNanos)
+    PS->>CQ: writeDocument(PositionSnapshotWire)
+
+    Note over TE,CQ: Strategy Created
+    TS->>SR: save(strategyDefinition)
+    SR->>CQ: writeDocument(StrategyWire)
+```
+
+### Startup Restoration Flow
+
+On application startup, `TradingService.init()` restores persisted state from Chronicle Queue stores in order:
+
+```mermaid
+sequenceDiagram
+    participant TS as TradingService
+    participant PS as PositionSnapshotStore
+    participant PM as PositionManager
+    participant OR as OrderRepository
+    participant OM as OrderManager
+    participant SR as StrategyRepository
+    participant SM as StrategyManager
+
+    Note over TS,SM: @PostConstruct init()
+
+    rect rgb(240, 248, 255)
+        Note over TS,PM: 1. Restore Positions
+        TS->>PS: getAllLatestSnapshots()
+        PS-->>TS: Map<Symbol, PositionSnapshot>
+        loop Each non-flat position (qty != 0)
+            TS->>PM: restorePosition(symbol, qty, avgPrice, ...)
+            PM->>PM: Populate Position fields via setters
+        end
+    end
+
+    rect rgb(248, 255, 240)
+        Note over TS,OM: 2. Restore Orders
+        TS->>OR: findAll()
+        OR-->>TS: Collection<Order>
+        loop Each order
+            TS->>OM: trackOrder(order)
+        end
+    end
+
+    rect rgb(255, 248, 240)
+        Note over TS,SM: 3. Restore Strategies
+        TS->>SR: findAll()
+        SR-->>TS: List<StrategyDefinition>
+        loop Each strategy definition
+            TS->>TS: createStrategyFromDefinition(type, params)
+            TS->>SM: Register strategy instance
+        end
+    end
 ```
 
 ### Audit Event Types
@@ -1167,6 +1295,77 @@ graph LR
         end
     end
 ```
+
+---
+
+## Frontend (hft-ui)
+
+### React Application Architecture
+
+The frontend is a React + TypeScript SPA bundled with Vite, served as static assets from Spring Boot.
+
+```mermaid
+graph TB
+    subgraph "React Application (hft-ui)"
+        subgraph "Pages"
+            DASH[Dashboard]
+            OH[Order History]
+            RL[Risk Limits]
+        end
+
+        subgraph "Dashboard Components"
+            ES[EngineStatus<br/>Start/Stop controls]
+            ESP[ExchangeStatusPanel<br/>Mode switching]
+            SF[StrategyForm<br/>Create strategy]
+            SL[StrategyList<br/>Manage strategies]
+            SI[StrategyInspector<br/>Strategy details modal]
+            CP[ChartPanel<br/>Symbol selector]
+            CC[CandlestickChart<br/>Lightweight Charts]
+            PL[PositionList<br/>Current positions]
+            OL[OrderList<br/>Recent orders]
+        end
+
+        subgraph "Hooks"
+            UA[useApi<br/>REST client]
+            UWS[useWebSocket<br/>STOMP client]
+        end
+    end
+
+    subgraph "Backend"
+        REST[REST API<br/>:8080/api/*]
+        WS[WebSocket<br/>STOMP /ws]
+    end
+
+    UA --> REST
+    UWS --> WS
+
+    DASH --> ES
+    DASH --> ESP
+    DASH --> SF
+    DASH --> SL
+    DASH --> CP
+    CP --> CC
+    DASH --> PL
+    DASH --> OL
+```
+
+### Real-Time Data Flow
+
+The UI receives live updates via WebSocket STOMP subscriptions:
+
+| Topic | Data | Used By |
+|-------|------|---------|
+| `/topic/engine/status` | EngineStatus | EngineStatus component |
+| `/topic/orders` | Order updates | OrderList (upsert by clientOrderId) |
+| `/topic/positions` | Position updates | PositionList (upsert by symbol+exchange) |
+| `/topic/strategies` | Strategy updates | StrategyList (upsert by id) |
+| `/topic/quotes/{exchange}/{ticker}` | Live quotes | CandlestickChart (real-time candle updates) |
+
+### State Persistence
+
+- **Chart selection** (exchange + symbol) persisted to `localStorage` across browser sessions
+- **Exchange status** and **risk limits** polled every 5 seconds
+- Initial data loaded via REST on mount, then kept current via WebSocket
 
 ---
 
@@ -1267,15 +1466,17 @@ This HFT trading system provides:
 
 1. **Ultra-Low Latency**: LMAX Disruptor with 64K ring buffer, zero-allocation object pooling
 2. **Comprehensive Risk Management**: Pluggable rules, circuit breaker, daily limits with normalized P&L comparison
-3. **Multi-Exchange Support**: Alpaca (stocks, 2 decimal places) and Binance (crypto, 8 decimal places) with unified price scale handling
+3. **Multi-Exchange Support**: Alpaca (stocks, 2 decimal places) and Binance (crypto, 8 decimal places) with unified price scale handling and credential verification
 4. **Advanced Algorithms**: VWAP, TWAP execution; Momentum, Mean Reversion strategies
-5. **Complete Audit Trail**: Chronicle Queue based zero-GC persistence
-6. **Real-Time Position Tracking**: P&L, exposure, and drawdown calculations across different price scales
-7. **Event-Driven Architecture**: Clean separation of concerns with hexagonal design
+5. **Full Persistence**: Chronicle Queue stores for orders, trades, positions, strategies, and audit events with automatic startup restoration
+6. **Real-Time Dashboard**: React UI with WebSocket-driven live updates, interactive candlestick charts, and strategy management
+7. **Real-Time Position Tracking**: P&L, exposure, and drawdown calculations across different price scales, persisted across restarts
+8. **Event-Driven Architecture**: Clean separation of concerns with hexagonal design
 
 The architecture balances:
 - **Performance**: Nanosecond latency, lock-free structures
 - **Safety**: Pre-trade risk checks, circuit breakers
-- **Flexibility**: Pluggable components, multiple exchange support
+- **Durability**: All state persisted to Chronicle Queue, restored on startup
+- **Flexibility**: Pluggable components, multiple exchange support with runtime mode switching
 - **Accuracy**: Integer arithmetic with configurable price scales prevents floating-point errors
 - **Compliance**: Complete audit logging, position tracking
