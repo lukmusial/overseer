@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, CandlestickSeries, IChartApi, ISeriesApi, CandlestickData, Time, createSeriesMarkers, ISeriesMarkersPluginApi, SeriesMarker } from 'lightweight-charts';
+import { createChart, CandlestickSeries, IChartApi, ISeriesApi, CandlestickData, Time, createSeriesMarkers, ISeriesMarkersPluginApi, SeriesMarker, IPriceLine } from 'lightweight-charts';
 import { useApi } from '../hooks/useApi';
 import type { ChartData, TriggerRange, OrderMarker, Strategy, Quote, Order } from '../types/api';
 
@@ -45,6 +45,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const currentCandleRef = useRef<CandlestickData<Time> | null>(null);
   const ordersByTimeRef = useRef<Map<number, OrderMarker[]>>(new Map());
+  const priceLinesRef = useRef<IPriceLine[]>([]);
 
   const [interval, setInterval] = useState('5m');
   const [periods, setPeriods] = useState(100);
@@ -325,8 +326,13 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       markersPluginRef.current.setMarkers(markers);
     }
 
-    // Draw trigger ranges as price lines (only when thresholds visible)
+    // Remove previous price lines before redrawing
     const chart = chartRef.current;
+    const series = candlestickSeriesRef.current;
+    priceLinesRef.current.forEach(line => series?.removePriceLine(line));
+    priceLinesRef.current = [];
+
+    // Draw trigger ranges as price lines (only when thresholds visible)
     const pipGreen = '#18dc18';
     const pipRed = '#f04848';
 
@@ -335,48 +341,50 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
         ? chartData.triggerRanges
         : chartData.triggerRanges.filter(r => r.strategyId === selectedStrategy);
 
+      const newLines: IPriceLine[] = [];
       filteredRanges.forEach((range: TriggerRange) => {
-        if (range.buyTriggerLow !== null) {
-          candlestickSeriesRef.current?.createPriceLine({
+        if (range.buyTriggerLow !== null && series) {
+          newLines.push(series.createPriceLine({
             price: range.buyTriggerLow,
             color: pipGreen,
             lineWidth: 1,
             lineStyle: 2, // Dashed
             axisLabelVisible: true,
             title: `Buy Low (${range.strategyName})`,
-          });
+          }));
         }
-        if (range.buyTriggerHigh !== null) {
-          candlestickSeriesRef.current?.createPriceLine({
+        if (range.buyTriggerHigh !== null && series) {
+          newLines.push(series.createPriceLine({
             price: range.buyTriggerHigh,
             color: pipGreen,
             lineWidth: 1,
             lineStyle: 2,
             axisLabelVisible: true,
             title: `Buy High (${range.strategyName})`,
-          });
+          }));
         }
-        if (range.sellTriggerLow !== null) {
-          candlestickSeriesRef.current?.createPriceLine({
+        if (range.sellTriggerLow !== null && series) {
+          newLines.push(series.createPriceLine({
             price: range.sellTriggerLow,
             color: pipRed,
             lineWidth: 1,
             lineStyle: 2,
             axisLabelVisible: true,
             title: `Sell Low (${range.strategyName})`,
-          });
+          }));
         }
-        if (range.sellTriggerHigh !== null) {
-          candlestickSeriesRef.current?.createPriceLine({
+        if (range.sellTriggerHigh !== null && series) {
+          newLines.push(series.createPriceLine({
             price: range.sellTriggerHigh,
             color: pipRed,
             lineWidth: 1,
             lineStyle: 2,
             axisLabelVisible: true,
             title: `Sell High (${range.strategyName})`,
-          });
+          }));
         }
       });
+      priceLinesRef.current = newLines;
     }
 
     // Fit content

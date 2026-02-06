@@ -9,7 +9,9 @@ vi.mock('../hooks/useApi');
 
 // Mock lightweight-charts
 const mockSetData = vi.fn();
-const mockCreatePriceLine = vi.fn();
+const mockRemovePriceLine = vi.fn();
+let priceLineCounter = 0;
+const mockCreatePriceLine = vi.fn(() => ({ id: ++priceLineCounter }));
 const mockSetMarkers = vi.fn();
 const mockFitContent = vi.fn();
 const mockApplyOptions = vi.fn();
@@ -20,6 +22,7 @@ vi.mock('lightweight-charts', () => ({
     addSeries: vi.fn(() => ({
       setData: mockSetData,
       createPriceLine: mockCreatePriceLine,
+      removePriceLine: mockRemovePriceLine,
     })),
     timeScale: vi.fn(() => ({
       fitContent: mockFitContent,
@@ -108,6 +111,7 @@ describe('CandlestickChart', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    priceLineCounter = 0;
     mockGetChartData.mockResolvedValue(mockChartData);
 
     vi.mocked(useApiModule.useApi).mockReturnValue({
@@ -272,12 +276,16 @@ describe('CandlestickChart', () => {
     expect(toggle).toHaveClass('active');
   });
 
-  it('hides thresholds panel and price lines when toggled off', async () => {
+  it('hides thresholds panel and removes price lines when toggled off', async () => {
     render(<CandlestickChart exchange="ALPACA" symbol="AAPL" />);
 
     await waitFor(() => {
       expect(screen.getByText('$148.00')).toBeInTheDocument();
     });
+
+    // Price lines were created
+    const linesCreated = mockCreatePriceLine.mock.calls.length;
+    expect(linesCreated).toBeGreaterThan(0);
 
     // Toggle thresholds off
     const toggle = screen.getByRole('button', { name: /Thresholds/i });
@@ -288,6 +296,9 @@ describe('CandlestickChart', () => {
     // Panel price values should be gone
     expect(screen.queryByText('$148.00')).not.toBeInTheDocument();
     expect(toggle).not.toHaveClass('active');
+
+    // Previous price lines should have been removed
+    expect(mockRemovePriceLine).toHaveBeenCalledTimes(linesCreated);
 
     // Strategy descriptions below chart should still be visible
     expect(screen.getByText('Strategy Trigger Ranges')).toBeInTheDocument();
