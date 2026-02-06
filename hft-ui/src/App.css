@@ -900,7 +900,8 @@ tr:hover {
 }
 
 /* Symbol Autocomplete */
-.symbol-search-container {
+.symbol-search-container,
+.symbol-autocomplete {
   position: relative;
 }
 
@@ -942,7 +943,8 @@ tr:hover {
   font-size: 0.85rem;
 }
 
-.symbol-search-item:hover, .symbol-option:hover {
+.symbol-search-item:hover, .symbol-option:hover,
+.symbol-search-item.highlighted, .symbol-option.highlighted {
   background: var(--pip-green-subtle);
 }
 
@@ -1293,20 +1295,26 @@ td.actions-cell > *:last-child {
   color: var(--pip-green-dim);
 }
 
-/* Card Header */
+/* Card Header - replaces .card h2 styling when a flex row is needed */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--pip-border-dim);
+  margin: -0.75rem -1rem 0.75rem -1rem;
+  padding: 0.6rem 1rem;
+  background: var(--pip-bg);
+  border-bottom: 2px solid var(--pip-green);
+  box-shadow:
+    0 2px 0 var(--pip-border-dim),
+    0 0 15px var(--pip-green-glow);
 }
 
 .card-header h2 {
   margin: 0;
   padding: 0;
   border: none;
+  box-shadow: none;
+  background: none;
 }
 
 /* Chart Body - flex wrapper for chart + thresholds panel */

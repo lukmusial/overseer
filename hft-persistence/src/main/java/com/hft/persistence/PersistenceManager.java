@@ -6,6 +6,7 @@ import com.hft.core.model.Symbol;
 import com.hft.core.model.Trade;
 import com.hft.persistence.chronicle.ChronicleAuditLog;
 import com.hft.persistence.chronicle.ChronicleOrderRepository;
+import com.hft.persistence.chronicle.ChroniclePositionSnapshotStore;
 import com.hft.persistence.chronicle.ChronicleStrategyRepository;
 import com.hft.persistence.chronicle.ChronicleTradeJournal;
 import com.hft.persistence.impl.FileAuditLog;
@@ -64,7 +65,7 @@ public class PersistenceManager implements AutoCloseable {
         return new PersistenceManager(
                 new FileTradeJournal(baseDir.resolve("trades")),
                 new InMemoryOrderRepository(), // Orders typically session-scoped
-                new InMemoryPositionSnapshotStore(),
+                new ChroniclePositionSnapshotStore(baseDir),
                 new InMemoryStrategyRepository(), // Strategies use in-memory for file-based mode
                 new FileAuditLog(baseDir.resolve("audit"))
         );
@@ -92,7 +93,7 @@ public class PersistenceManager implements AutoCloseable {
         return new PersistenceManager(
                 new ChronicleTradeJournal(baseDir),
                 new ChronicleOrderRepository(baseDir),
-                new InMemoryPositionSnapshotStore(), // Position snapshots kept in memory
+                new ChroniclePositionSnapshotStore(baseDir),
                 new ChronicleStrategyRepository(baseDir),
                 new ChronicleAuditLog(baseDir)
         );

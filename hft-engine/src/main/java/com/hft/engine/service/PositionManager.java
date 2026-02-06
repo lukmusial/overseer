@@ -226,6 +226,30 @@ public class PositionManager {
     }
 
     /**
+     * Restores a position from persisted snapshot data.
+     * Used at startup to rebuild in-memory position state.
+     */
+    public void restorePosition(Symbol symbol, long quantity, long avgEntryPrice,
+                                long totalCost, long realizedPnl, long marketValue,
+                                long currentPrice, int priceScale, long openedAt) {
+        Position position = getOrCreatePosition(symbol);
+        position.setQuantity(quantity);
+        position.setAverageEntryPrice(avgEntryPrice);
+        position.setTotalCost(totalCost);
+        position.setRealizedPnl(realizedPnl);
+        position.setMarketValue(marketValue);
+        position.setCurrentPrice(currentPrice);
+        if (priceScale > 0) {
+            position.setPriceScale(priceScale);
+        }
+        position.setOpenedAt(openedAt);
+        if (currentPrice > 0) {
+            position.updateMarketValue(currentPrice);
+        }
+        log.info("Restored position: {} qty={} avgEntry={}", symbol, quantity, avgEntryPrice);
+    }
+
+    /**
      * Clears all positions (for testing/reset).
      */
     public void clear() {

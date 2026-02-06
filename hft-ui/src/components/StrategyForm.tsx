@@ -63,6 +63,17 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0 && listRef.current) {
+      const item = listRef.current.children[highlightedIndex] as HTMLElement;
+      if (item) {
+        item.scrollIntoView?.({ block: 'nearest' });
+      }
+    }
+  }, [highlightedIndex]);
 
   // Fetch symbols when exchange changes
   useEffect(() => {
@@ -155,14 +166,24 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showDropdown || filteredSymbols.length === 0) return;
+    if (e.key === 'Escape') {
+      setShowDropdown(false);
+      return;
+    }
+
+    if (filteredSymbols.length === 0) return;
 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex((prev) =>
-          prev < filteredSymbols.length - 1 ? prev + 1 : prev
-        );
+        if (!showDropdown) {
+          setShowDropdown(true);
+          setHighlightedIndex(0);
+        } else {
+          setHighlightedIndex((prev) =>
+            prev < Math.min(filteredSymbols.length, 10) - 1 ? prev + 1 : prev
+          );
+        }
         break;
       case 'ArrowUp':
         e.preventDefault();
@@ -173,9 +194,6 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
         if (highlightedIndex >= 0 && highlightedIndex < filteredSymbols.length) {
           handleSymbolSelect(filteredSymbols[highlightedIndex]);
         }
-        break;
-      case 'Escape':
-        setShowDropdown(false);
         break;
     }
   };
@@ -307,7 +325,7 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
                 </div>
               )}
               {showDropdown && filteredSymbols.length > 0 && (
-                <ul className="symbol-dropdown">
+                <ul className="symbol-dropdown" ref={listRef}>
                   {filteredSymbols.slice(0, 10).map((sym, index) => (
                     <li
                       key={sym.symbol}

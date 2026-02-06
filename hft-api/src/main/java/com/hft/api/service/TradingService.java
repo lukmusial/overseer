@@ -15,6 +15,7 @@ import com.hft.engine.TradingEngine;
 import com.hft.engine.service.PositionManager;
 import com.hft.engine.service.RiskManager;
 import com.hft.persistence.PersistenceManager;
+import com.hft.persistence.PositionSnapshotStore;
 import com.hft.persistence.StrategyRepository;
 import com.hft.persistence.StrategyRepository.StrategyDefinition;
 import org.slf4j.Logger;
@@ -54,6 +55,7 @@ public class TradingService {
         this.algorithmContext = new TradingEngineAlgorithmContext(tradingEngine);
         this.persistenceManager = persistenceManager;
         registerOrderPersistenceListener();
+        registerPositionPersistenceListener();
     }
 
     /**
@@ -65,6 +67,7 @@ public class TradingService {
 
     @PostConstruct
     public void init() {
+        loadPersistedPositions();
         loadPersistedOrders();
         loadPersistedStrategies();
     }
@@ -84,6 +87,41 @@ public class TradingService {
                 log.error("Failed to persist order {}: {}", order.getClientOrderId(), e.getMessage());
             }
         });
+    }
+
+    private void registerPositionPersistenceListener() {
+        tradingEngine.getPositionManager().addPositionListener(position -> {
+            try {
+                persistenceManager.getPositionStore().saveSnapshot(position, System.nanoTime());
+            } catch (Exception e) {
+                log.error("Failed to persist position {}: {}", position.getSymbol(), e.getMessage());
+            }
+        });
+    }
+
+    private void loadPersistedPositions() {
+        Map<Symbol, PositionSnapshotStore.PositionSnapshot> snapshots =
+                persistenceManager.getPositionStore().getAllLatestSnapshots();
+        if (snapshots.isEmpty()) {
+            return;
+        }
+        log.info("Restoring {} persisted positions", snapshots.size());
+        for (Map.Entry<Symbol, PositionSnapshotStore.PositionSnapshot> entry : snapshots.entrySet()) {
+            PositionSnapshotStore.PositionSnapshot snapshot = entry.getValue();
+            if (snapshot.quantity() != 0) {
+                tradingEngine.getPositionManager().restorePosition(
+                        entry.getKey(),
+                        snapshot.quantity(),
+                        snapshot.averageEntryPrice(),
+                        snapshot.totalCost(),
+                        snapshot.realizedPnl(),
+                        snapshot.marketValue(),
+                        snapshot.currentPrice(),
+                        snapshot.priceScale(),
+                        snapshot.openedAt()
+                );
+            }
+        }
     }
 
     private void loadPersistedOrders() {

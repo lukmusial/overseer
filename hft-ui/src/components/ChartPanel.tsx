@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { CandlestickChart } from './CandlestickChart';
 import { useApi } from '../hooks/useApi';
 import type { Strategy, TradingSymbol, ExchangeStatus } from '../types/api';
@@ -19,7 +19,9 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe,
   const [loading, setLoading] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState('');
   const [symbolDropdownOpen, setSymbolDropdownOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const { getSymbols } = useApi();
 
@@ -72,6 +74,16 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe,
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0 && listRef.current) {
+      const item = listRef.current.children[highlightedIndex] as HTMLElement;
+      if (item) {
+        item.scrollIntoView?.({ block: 'nearest' });
+      }
+    }
+  }, [highlightedIndex]);
+
   // Filter symbols based on search text
   const filteredSymbols = useMemo(() => {
     if (!symbolSearch.trim()) return symbols;
@@ -96,15 +108,17 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe,
     setSymbols([]);
   };
 
-  const handleSymbolSelect = (symbol: TradingSymbol) => {
+  const handleSymbolSelect = useCallback((symbol: TradingSymbol) => {
     onSymbolChange(symbol.symbol);
     setSymbolSearch(symbol.symbol + ' - ' + symbol.name);
     setSymbolDropdownOpen(false);
-  };
+    setHighlightedIndex(-1);
+  }, [onSymbolChange]);
 
   const handleSearchChange = (value: string) => {
     setSymbolSearch(value);
     setSymbolDropdownOpen(true);
+    setHighlightedIndex(-1);
   };
 
   const handleSearchFocus = () => {
@@ -112,7 +126,42 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe,
       setSymbolSearch('');
     }
     setSymbolDropdownOpen(true);
+    setHighlightedIndex(-1);
   };
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setSymbolDropdownOpen(false);
+      return;
+    }
+
+    const visibleSymbols = filteredSymbols.slice(0, 50);
+    if (visibleSymbols.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (!symbolDropdownOpen) {
+          setSymbolDropdownOpen(true);
+          setHighlightedIndex(0);
+        } else {
+          setHighlightedIndex((prev) =>
+            prev < visibleSymbols.length - 1 ? prev + 1 : prev
+          );
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < visibleSymbols.length) {
+          handleSymbolSelect(visibleSymbols[highlightedIndex]);
+        }
+        break;
+    }
+  }, [filteredSymbols, symbolDropdownOpen, highlightedIndex, handleSymbolSelect]);
 
   return (
     <div className="card chart-panel">
@@ -143,19 +192,21 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe,
                 value={loading ? 'Loading...' : symbolSearch}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onFocus={handleSearchFocus}
+                onKeyDown={handleSearchKeyDown}
                 placeholder="Search symbols..."
                 disabled={loading || symbols.length === 0}
               />
               {symbolDropdownOpen && !loading && filteredSymbols.length > 0 && (
-                <ul className="symbol-search-dropdown">
-                  {filteredSymbols.slice(0, 50).map((s) => (
+                <ul className="symbol-search-dropdown" ref={listRef}>
+                  {filteredSymbols.slice(0, 50).map((s, index) => (
                     <li
                       key={s.symbol}
-                      className={`symbol-search-item${s.symbol === selectedSymbol ? ' selected' : ''}`}
+                      className={`symbol-search-item${s.symbol === selectedSymbol ? ' selected' : ''}${index === highlightedIndex ? ' highlighted' : ''}`}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         handleSymbolSelect(s);
                       }}
+                      onMouseEnter={() => setHighlightedIndex(index)}
                     >
                       <span className="symbol-ticker">{s.symbol}</span>
                       <span className="symbol-name">{s.name}</span>
