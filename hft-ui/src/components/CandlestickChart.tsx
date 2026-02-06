@@ -293,12 +293,22 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       ? chartData.orders
       : chartData.orders.filter(o => o.strategyId === selectedStrategy);
 
-    // Build time -> orders lookup for tooltip
+    // Build time -> orders lookup for tooltip, keyed by candle time
+    // The crosshair reports the candle time, so we snap each order to its nearest candle
+    const candleTimes = chartData.candles.map(c => c.time);
     const ordersByTime = new Map<number, OrderMarker[]>();
     filteredOrders.forEach((order: OrderMarker) => {
-      const existing = ordersByTime.get(order.time) || [];
+      // Find the closest candle time <= order time
+      let snappedTime = order.time;
+      for (let i = candleTimes.length - 1; i >= 0; i--) {
+        if (candleTimes[i] <= order.time) {
+          snappedTime = candleTimes[i];
+          break;
+        }
+      }
+      const existing = ordersByTime.get(snappedTime) || [];
       existing.push(order);
-      ordersByTime.set(order.time, existing);
+      ordersByTime.set(snappedTime, existing);
     });
     ordersByTimeRef.current = ordersByTime;
 

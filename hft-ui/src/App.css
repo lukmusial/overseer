@@ -854,7 +854,7 @@ tr:hover {
 .order-tooltip {
   display: none;
   position: absolute;
-  z-index: 10;
+  z-index: 100;
   pointer-events: none;
   background: rgba(10, 10, 10, 0.92);
   border: 1px solid #4a90d9;
