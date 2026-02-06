@@ -272,12 +272,77 @@ class PositionManagerTest {
         assertEquals(100000L, snapshot.totalPnl());
     }
 
+    @Test
+    void getTotalPnlCents_shouldNormalizeAcrossDifferentPriceScales() {
+        // AAPL: stock with priceScale=100 (cents)
+        // Buy 100 shares @ $150.00 (15000 in scale 100), sell @ $160.00 (16000)
+        // Realized P&L = (16000 - 15000) * 100 = 100,000 (in scale 100 = $1,000.00)
+        Symbol aapl = new Symbol("AAPL", Exchange.ALPACA);
+        positionManager.applyTrade(createTrade(aapl, OrderSide.BUY, 100, 15000L, 100));
+        positionManager.applyTrade(createTrade(aapl, OrderSide.SELL, 100, 16000L, 100));
+
+        // BTCUSDT: crypto with priceScale=100_000_000 (satoshi-like)
+        // Buy 1 BTC @ $50,000.00 (5_000_000_000_000L in scale 100_000_000), sell @ $51,000.00
+        // Realized P&L = (5_100_000_000_000 - 5_000_000_000_000) * 1 = 100_000_000_000 (in scale 100_000_000 = $1,000.00)
+        Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
+        positionManager.applyTrade(createTrade(btc, OrderSide.BUY, 1, 5_000_000_000_000L, 100_000_000));
+        positionManager.applyTrade(createTrade(btc, OrderSide.SELL, 1, 5_100_000_000_000L, 100_000_000));
+
+        // Both positions are flat with realized P&L
+        Position aaplPos = positionManager.getPosition(aapl);
+        Position btcPos = positionManager.getPosition(btc);
+        assertTrue(aaplPos.isFlat());
+        assertTrue(btcPos.isFlat());
+
+        // Raw P&L values are in different scales — not directly comparable
+        long aaplRawPnl = aaplPos.getRealizedPnl();
+        long btcRawPnl = btcPos.getRealizedPnl();
+        assertEquals(100_000L, aaplRawPnl);               // $1,000 in scale 100
+        assertEquals(100_000_000_000L, btcRawPnl);         // $1,000 in scale 100_000_000
+
+        // getTotalPnlCents() should normalize both to cents (scale 100)
+        // AAPL: 100,000 * 100 / 100 = 100,000 cents ($1,000)
+        // BTC:  100,000,000,000 * 100 / 100,000,000 = 100,000 cents ($1,000)
+        long totalPnlCents = positionManager.getTotalPnlCents();
+        assertEquals(200_000L, totalPnlCents, "Total P&L should be $2,000 in cents");
+
+        long totalRealizedCents = positionManager.getTotalRealizedPnlCents();
+        assertEquals(200_000L, totalRealizedCents, "Total realized P&L should be $2,000 in cents");
+
+        long totalUnrealizedCents = positionManager.getTotalUnrealizedPnlCents();
+        assertEquals(0L, totalUnrealizedCents, "No unrealized P&L for flat positions");
+    }
+
+    @Test
+    void getTotalUnrealizedPnlCents_shouldNormalizeAcrossDifferentPriceScales() {
+        // AAPL: stock with priceScale=100, buy and hold
+        Symbol aapl = new Symbol("AAPL", Exchange.ALPACA);
+        positionManager.applyTrade(createTrade(aapl, OrderSide.BUY, 100, 15000L, 100));
+        positionManager.updateMarketValue(aapl, 16000L); // +$10/share * 100 = $1,000 unrealized
+
+        // BTCUSDT: crypto with priceScale=100_000_000, buy and hold
+        Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
+        positionManager.applyTrade(createTrade(btc, OrderSide.BUY, 1, 5_000_000_000_000L, 100_000_000));
+        positionManager.updateMarketValue(btc, 5_100_000_000_000L); // +$1,000 unrealized
+
+        long totalUnrealizedCents = positionManager.getTotalUnrealizedPnlCents();
+        assertEquals(200_000L, totalUnrealizedCents, "Total unrealized P&L should be $2,000 in cents");
+
+        long totalPnlCents = positionManager.getTotalPnlCents();
+        assertEquals(200_000L, totalPnlCents, "Total P&L should be $2,000 in cents");
+    }
+
     private Trade createTrade(Symbol symbol, OrderSide side, long quantity, long price) {
+        return createTrade(symbol, side, quantity, price, 100);
+    }
+
+    private Trade createTrade(Symbol symbol, OrderSide side, long quantity, long price, int priceScale) {
         Trade trade = new Trade();
         trade.setSymbol(symbol);
         trade.setSide(side);
         trade.setQuantity(quantity);
         trade.setPrice(price);
+        trade.setPriceScale(priceScale);
         trade.setExecutedAt(System.nanoTime());
         return trade;
     }

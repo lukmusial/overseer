@@ -193,4 +193,44 @@ class TradingServiceTest {
         assertEquals(persistedCount, ordersAfterRestart.size(),
                 "Orders should survive restart");
     }
+
+    @Test
+    void toOrderDto_shouldResolveStrategyName() {
+        // Create a strategy
+        CreateStrategyRequest request = new CreateStrategyRequest(
+                "My Momentum", "momentum", List.of("AAPL"), "ALPACA",
+                Map.of("shortPeriod", 10, "longPeriod", 30)
+        );
+        StrategyDto created = tradingService.createStrategy(request);
+
+        // Create an order referencing this strategy
+        Order order = new Order()
+                .symbol(new Symbol("AAPL", Exchange.ALPACA))
+                .side(OrderSide.BUY)
+                .type(OrderType.LIMIT)
+                .price(15000)
+                .quantity(100)
+                .strategyId(created.id());
+
+        OrderDto dto = tradingService.toOrderDto(order);
+
+        assertEquals("My Momentum", dto.strategyName());
+        assertEquals(created.id(), dto.strategyId());
+    }
+
+    @Test
+    void toOrderDto_shouldReturnNullNameForUnknownStrategy() {
+        Order order = new Order()
+                .symbol(new Symbol("AAPL", Exchange.ALPACA))
+                .side(OrderSide.BUY)
+                .type(OrderType.LIMIT)
+                .price(15000)
+                .quantity(100)
+                .strategyId("nonexistent-id");
+
+        OrderDto dto = tradingService.toOrderDto(order);
+
+        assertNull(dto.strategyName());
+        assertEquals("nonexistent-id", dto.strategyId());
+    }
 }
