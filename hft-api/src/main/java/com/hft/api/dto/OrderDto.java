@@ -25,6 +25,7 @@ public record OrderDto(
         OrderStatus status,
         String rejectReason,
         String strategyId,
+        String strategyName,
         long createdAt,
         long updatedAt
 ) {
@@ -39,7 +40,7 @@ public record OrderDto(
         return epochNanos / 1_000_000;
     }
 
-    public static OrderDto from(com.hft.core.model.Order order) {
+    public static OrderDto from(com.hft.core.model.Order order, String strategyName) {
         return new OrderDto(
                 order.getClientOrderId(),
                 order.getExchangeOrderId(),
@@ -57,8 +58,13 @@ public record OrderDto(
                 order.getStatus(),
                 order.getRejectReason(),
                 order.getStrategyId(),
+                strategyName,
                 toEpochMillis(order.getCreatedAt()),
                 toEpochMillis(order.getLastUpdatedAt())
         );
+    }
+
+    public static OrderDto from(com.hft.core.model.Order order) {
+        return from(order, null);
     }
 }

@@ -110,7 +110,7 @@ class OrderControllerTest {
                 id, null, "AAPL", "ALPACA",
                 OrderSide.BUY, OrderType.LIMIT, TimeInForce.DAY,
                 100, 15000L, 0L, 0L, 0L, 100,
-                status, null, null,
+                status, null, null, null,
                 System.nanoTime(), System.nanoTime()
         );
     }

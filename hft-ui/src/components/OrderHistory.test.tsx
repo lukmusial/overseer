@@ -44,6 +44,7 @@ const mockOrders: Order[] = [
     status: 'FILLED',
     rejectReason: null,
     strategyId: 'strat-1',
+    strategyName: 'Test Strategy',
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },

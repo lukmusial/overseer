@@ -32,6 +32,7 @@ export interface Order {
   status: OrderStatus;
   rejectReason: string | null;
   strategyId: string | null;
+  strategyName: string | null;
   createdAt: number;
   updatedAt: number;
 }

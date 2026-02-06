@@ -17,6 +17,7 @@ public class OrderWire extends SelfDescribingMarshallable {
     private String timeInForce;
     private long price;
     private long stopPrice;
+    private int priceScale;
     private long quantity;
     private long filledQuantity;
     private long averageFilledPrice;
@@ -42,6 +43,7 @@ public class OrderWire extends SelfDescribingMarshallable {
         wire.timeInForce = order.getTimeInForce() != null ? order.getTimeInForce().name() : null;
         wire.price = order.getPrice();
         wire.stopPrice = order.getStopPrice();
+        wire.priceScale = order.getPriceScale();
         wire.quantity = order.getQuantity();
         wire.filledQuantity = order.getFilledQuantity();
         wire.averageFilledPrice = order.getAverageFilledPrice();
@@ -66,6 +68,9 @@ public class OrderWire extends SelfDescribingMarshallable {
 
         order.setClientOrderId(clientOrderId);
         order.setStopPrice(stopPrice);
+        if (priceScale > 0) {
+            order.setPriceScale(priceScale);
+        }
 
         // Restore state based on status
         if (status != null) {

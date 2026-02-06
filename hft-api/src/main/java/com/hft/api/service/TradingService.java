@@ -178,6 +178,20 @@ public class TradingService {
         tradingEngine.resetDailyCounters();
     }
 
+    private String resolveStrategyName(String strategyId) {
+        if (strategyId == null) return null;
+        TradingStrategy strategy = activeStrategies.get(strategyId);
+        if (strategy == null) return null;
+        if (strategy instanceof AbstractTradingStrategy abs) {
+            return abs.getDisplayName();
+        }
+        return strategy.getName();
+    }
+
+    public OrderDto toOrderDto(Order order) {
+        return OrderDto.from(order, resolveStrategyName(order.getStrategyId()));
+    }
+
     // Order operations
 
     public OrderDto submitOrder(CreateOrderRequest request) {
@@ -205,7 +219,7 @@ public class TradingService {
             persistenceManager.saveOrder(order);
         }
 
-        return OrderDto.from(order);
+        return toOrderDto(order);
     }
 
     public void cancelOrder(long clientOrderId, String symbolTicker, String exchangeName) {
@@ -215,13 +229,13 @@ public class TradingService {
 
     public List<OrderDto> getActiveOrders() {
         return tradingEngine.getOrderManager().getActiveOrders().stream()
-                .map(OrderDto::from)
+                .map(this::toOrderDto)
                 .collect(Collectors.toList());
     }
 
     public List<OrderDto> getAllOrders() {
         return tradingEngine.getOrderManager().getOrders().stream()
-                .map(OrderDto::from)
+                .map(this::toOrderDto)
                 .collect(Collectors.toList());
     }
 
@@ -233,7 +247,7 @@ public class TradingService {
         allOrders.sort((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()));
         return allOrders.stream()
                 .limit(limit)
-                .map(OrderDto::from)
+                .map(this::toOrderDto)
                 .collect(Collectors.toList());
     }
 
@@ -259,7 +273,7 @@ public class TradingService {
                 .sorted((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()))
                 .skip(offset)
                 .limit(limit)
-                .map(OrderDto::from)
+                .map(this::toOrderDto)
                 .collect(Collectors.toList());
     }
 
@@ -284,7 +298,7 @@ public class TradingService {
 
     public Optional<OrderDto> getOrder(long clientOrderId) {
         Order order = tradingEngine.getOrderManager().getOrder(clientOrderId);
-        return order != null ? Optional.of(OrderDto.from(order)) : Optional.empty();
+        return order != null ? Optional.of(toOrderDto(order)) : Optional.empty();
     }
 
     // Position operations

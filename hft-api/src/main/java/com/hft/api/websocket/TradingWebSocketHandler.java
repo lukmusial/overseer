@@ -1,7 +1,7 @@
 package com.hft.api.websocket;
 
 import com.hft.api.dto.EngineStatusDto;
-import com.hft.api.dto.OrderDto;
+
 import com.hft.api.dto.PositionDto;
 import com.hft.api.dto.StrategyDto;
 import com.hft.api.service.TradingService;
@@ -58,7 +58,7 @@ public class TradingWebSocketHandler {
      * Broadcasts order updates in real-time.
      */
     private void onOrderUpdate(Order order) {
-        OrderDto dto = OrderDto.from(order);
+        var dto = tradingService.toOrderDto(order);
         messagingTemplate.convertAndSend("/topic/orders", dto);
 
         // Dispatch fill to strategy so it can update its stats

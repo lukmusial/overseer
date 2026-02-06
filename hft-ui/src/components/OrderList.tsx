@@ -11,10 +11,11 @@ interface Props {
   onViewAll?: () => void;
 }
 
-function getStrategyName(strategyId: string | null | undefined, strategies: Strategy[]): string {
-  if (!strategyId) return '-';
-  const strategy = strategies.find(s => s.id === strategyId);
-  return strategy ? strategy.name : strategyId;
+function getStrategyDisplay(order: Order, strategies: Strategy[]): string {
+  if (order.strategyName) return order.strategyName;
+  if (!order.strategyId) return '-';
+  const strategy = strategies.find(s => s.id === order.strategyId);
+  return strategy ? strategy.name : order.strategyId;
 }
 
 type CancelState = 'idle' | 'cancelling' | 'success' | 'error';
@@ -137,7 +138,7 @@ export function OrderList({ orders, strategies, onCancel, maxOrders, showViewAll
           {displayOrders.map((order) => (
             <tr key={order.clientOrderId}>
               <td>{order.clientOrderId}</td>
-              <td className="strategy-name">{getStrategyName(order.strategyId, strategies)}</td>
+              <td className="strategy-name">{getStrategyDisplay(order, strategies)}</td>
               <td>{order.symbol}</td>
               <td className={order.side === 'BUY' ? 'buy' : 'sell'}>{order.side}</td>
               <td>{order.type}</td>
