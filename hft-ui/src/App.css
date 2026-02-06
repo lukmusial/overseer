@@ -189,6 +189,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0;
 }
 
 /* ═══ CARD COMPONENT - Pip-Boy Panel Style ═══ */
@@ -760,6 +761,8 @@ tr:hover {
   border: 2px solid var(--pip-green);
   padding: 1rem;
   position: relative;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* Override card h2 for chart-panel to account for its structure */
