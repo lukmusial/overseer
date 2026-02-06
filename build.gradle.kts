@@ -41,7 +41,21 @@ subprojects {
     }
 
     tasks.withType<Test> {
-        useJUnitPlatform()
+        useJUnitPlatform {
+            excludeTags("integration")
+        }
+        jvmArgs(
+            "--enable-preview",
+            "-XX:+UseZGC",
+            "-XX:+ZGenerational"
+        )
+    }
+
+    // Dedicated task for running integration tests (e.g., Alpaca sandbox)
+    tasks.register<Test>("integrationTest") {
+        useJUnitPlatform {
+            includeTags("integration")
+        }
         jvmArgs(
             "--enable-preview",
             "-XX:+UseZGC",

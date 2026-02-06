@@ -346,13 +346,13 @@ describe('CandlestickChart', () => {
         expect.objectContaining({
           time: 1700000300,
           position: 'belowBar',
-          color: '#26a69a',
+          color: '#18dc18',
           shape: 'arrowUp',
         }),
         expect.objectContaining({
           time: 1700000600,
           position: 'aboveBar',
-          color: '#ef5350',
+          color: '#f04848',
           shape: 'arrowDown',
         }),
       ])
@@ -370,13 +370,13 @@ describe('CandlestickChart', () => {
     expect(mockCreatePriceLine).toHaveBeenCalledWith(
       expect.objectContaining({
         price: 148.0,
-        color: '#26a69a',
+        color: '#18dc18',
       })
     );
     expect(mockCreatePriceLine).toHaveBeenCalledWith(
       expect.objectContaining({
         price: 154.0,
-        color: '#ef5350',
+        color: '#f04848',
       })
     );
   });
