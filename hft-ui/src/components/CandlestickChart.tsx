@@ -53,6 +53,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   const [error, setError] = useState<string | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<string>('all');
   const [lastQuote, setLastQuote] = useState<Quote | null>(null);
+  const [showThresholds, setShowThresholds] = useState(true);
 
   const { getChartData } = useApi();
 
@@ -329,57 +330,59 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     const pipGreen = '#18dc18';
     const pipRed = '#f04848';
 
-    // Add trigger range price lines
-    const filteredRanges = selectedStrategy === 'all'
-      ? chartData.triggerRanges
-      : chartData.triggerRanges.filter(r => r.strategyId === selectedStrategy);
+    if (showThresholds) {
+      // Add trigger range price lines
+      const filteredRanges = selectedStrategy === 'all'
+        ? chartData.triggerRanges
+        : chartData.triggerRanges.filter(r => r.strategyId === selectedStrategy);
 
-    filteredRanges.forEach((range: TriggerRange) => {
-      if (range.buyTriggerLow !== null) {
-        candlestickSeriesRef.current?.createPriceLine({
-          price: range.buyTriggerLow,
-          color: pipGreen,
-          lineWidth: 1,
-          lineStyle: 2, // Dashed
-          axisLabelVisible: true,
-          title: `Buy Low (${range.strategyName})`,
-        });
-      }
-      if (range.buyTriggerHigh !== null) {
-        candlestickSeriesRef.current?.createPriceLine({
-          price: range.buyTriggerHigh,
-          color: pipGreen,
-          lineWidth: 1,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: `Buy High (${range.strategyName})`,
-        });
-      }
-      if (range.sellTriggerLow !== null) {
-        candlestickSeriesRef.current?.createPriceLine({
-          price: range.sellTriggerLow,
-          color: pipRed,
-          lineWidth: 1,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: `Sell Low (${range.strategyName})`,
-        });
-      }
-      if (range.sellTriggerHigh !== null) {
-        candlestickSeriesRef.current?.createPriceLine({
-          price: range.sellTriggerHigh,
-          color: pipRed,
-          lineWidth: 1,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: `Sell High (${range.strategyName})`,
-        });
-      }
-    });
+      filteredRanges.forEach((range: TriggerRange) => {
+        if (range.buyTriggerLow !== null) {
+          candlestickSeriesRef.current?.createPriceLine({
+            price: range.buyTriggerLow,
+            color: pipGreen,
+            lineWidth: 1,
+            lineStyle: 2, // Dashed
+            axisLabelVisible: true,
+            title: `Buy Low (${range.strategyName})`,
+          });
+        }
+        if (range.buyTriggerHigh !== null) {
+          candlestickSeriesRef.current?.createPriceLine({
+            price: range.buyTriggerHigh,
+            color: pipGreen,
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: `Buy High (${range.strategyName})`,
+          });
+        }
+        if (range.sellTriggerLow !== null) {
+          candlestickSeriesRef.current?.createPriceLine({
+            price: range.sellTriggerLow,
+            color: pipRed,
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: `Sell Low (${range.strategyName})`,
+          });
+        }
+        if (range.sellTriggerHigh !== null) {
+          candlestickSeriesRef.current?.createPriceLine({
+            price: range.sellTriggerHigh,
+            color: pipRed,
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: `Sell High (${range.strategyName})`,
+          });
+        }
+      });
+    }
 
     // Fit content
     chart.timeScale().fitContent();
-  }, [chartData, selectedStrategy]);
+  }, [chartData, selectedStrategy, showThresholds]);
 
   // Get strategies that have activity on this symbol
   const relevantStrategies = strategies.filter(s => s.symbols.includes(symbol));
@@ -444,28 +447,39 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
           <button onClick={fetchData} disabled={loading} className="refresh-btn">
             {loading ? 'Loading...' : 'Refresh'}
           </button>
+          <button
+            className={`threshold-toggle${showThresholds ? ' active' : ''}`}
+            onClick={() => setShowThresholds(prev => !prev)}
+          >
+            Thresholds
+          </button>
         </div>
       </div>
 
       {error && <div className="chart-error">{error}</div>}
 
-      <div className="chart-container" style={{ position: 'relative' }}>
-        <div ref={chartContainerRef} />
-        <div ref={tooltipRef} className="order-tooltip" />
-      </div>
-
-      {chartData && chartData.triggerRanges.length > 0 && (
-        <div className="trigger-ranges">
-          <h4>Strategy Trigger Ranges</h4>
-          {(selectedStrategy === 'all' ? chartData.triggerRanges : chartData.triggerRanges.filter(r => r.strategyId === selectedStrategy))
-            .map((range: TriggerRange) => (
-              <div key={range.strategyId} className="trigger-range-item">
-                <strong>{range.strategyName}</strong> ({range.type})
-                <p>{range.description}</p>
-              </div>
-            ))}
+      <div className="chart-body">
+        <div className="chart-container" style={{ position: 'relative' }}>
+          <div ref={chartContainerRef} />
+          <div ref={tooltipRef} className="order-tooltip" />
         </div>
-      )}
+
+        {showThresholds && chartData && chartData.triggerRanges.length > 0 && (
+          <div className="trigger-ranges-panel">
+            <div className="trigger-ranges-panel-header" onClick={() => setShowThresholds(false)}>
+              <h4>Strategy Trigger Ranges</h4>
+              <span className="panel-close">&times;</span>
+            </div>
+            {(selectedStrategy === 'all' ? chartData.triggerRanges : chartData.triggerRanges.filter(r => r.strategyId === selectedStrategy))
+              .map((range: TriggerRange) => (
+                <div key={range.strategyId} className="trigger-range-item">
+                  <strong>{range.strategyName}</strong> ({range.type})
+                  <p>{range.description}</p>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
