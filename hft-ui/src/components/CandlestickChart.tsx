@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, CandlestickSeries, IChartApi, ISeriesApi, CandlestickData, Time, createSeriesMarkers, ISeriesMarkersPluginApi, SeriesMarker } from 'lightweight-charts';
 import { useApi } from '../hooks/useApi';
-import type { ChartData, TriggerRange, OrderMarker, Strategy, Quote } from '../types/api';
+import type { ChartData, TriggerRange, OrderMarker, Strategy, Quote, Order } from '../types/api';
 
 interface CandlestickChartProps {
   exchange: string;
@@ -208,6 +208,36 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     return unsubscribe;
   }, [subscribe, exchange, symbol, interval]);
 
+  // Subscribe to real-time order updates
+  useEffect(() => {
+    if (!subscribe || !exchange || !symbol) return;
+
+    const unsubscribe = subscribe<Order>('/topic/orders', (order) => {
+      if (order.exchange !== exchange || order.symbol !== symbol) return;
+
+      const scale = order.priceScale > 0 ? order.priceScale : 100;
+      const price = (order.averageFilledPrice > 0 ? order.averageFilledPrice : order.price) / scale;
+      const timeSeconds = Math.floor(order.createdAt / 1000);
+
+      const marker: OrderMarker = {
+        time: timeSeconds,
+        price,
+        side: order.side,
+        quantity: order.quantity,
+        status: order.status,
+        strategyId: order.strategyId,
+        orderId: String(order.clientOrderId),
+      };
+
+      setChartData(prev => {
+        if (!prev) return prev;
+        return { ...prev, orders: [...prev.orders, marker] };
+      });
+    });
+
+    return unsubscribe;
+  }, [subscribe, exchange, symbol]);
+
   // Update chart when data changes
   useEffect(() => {
     if (!chartData || !candlestickSeriesRef.current || !chartRef.current) return;
@@ -228,15 +258,11 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       ? chartData.orders
       : chartData.orders.filter(o => o.strategyId === selectedStrategy);
 
-    // Pip-Boy theme colors for markers
-    const pipGreen = '#18dc18';
-    const pipRed = '#f04848';
-
     const markers: SeriesMarker<Time>[] = filteredOrders.map((order: OrderMarker) => ({
       time: order.time as Time,
-      position: order.side === 'BUY' ? 'belowBar' as const : 'aboveBar' as const,
-      color: order.side === 'BUY' ? pipGreen : pipRed,
-      shape: order.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
+      position: 'inBar' as const,
+      color: '#4a90d9',
+      shape: 'circle' as const,
       text: `${order.side} ${order.quantity} @ ${order.price.toFixed(2)}`,
     }));
 
@@ -246,6 +272,8 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
 
     // Draw trigger ranges as price lines
     const chart = chartRef.current;
+    const pipGreen = '#18dc18';
+    const pipRed = '#f04848';
 
     // Add trigger range price lines
     const filteredRanges = selectedStrategy === 'all'

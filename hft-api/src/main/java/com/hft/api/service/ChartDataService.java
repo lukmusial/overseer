@@ -322,9 +322,10 @@ public class ChartDataService {
                     timeSeconds = System.currentTimeMillis() / 1000;
                 }
 
+                int scale = order.getPriceScale() > 0 ? order.getPriceScale() : 100;
                 double price = order.getAverageFilledPrice() > 0
-                        ? order.getAverageFilledPrice() / 100.0
-                        : order.getPrice() / 100.0;
+                        ? order.getAverageFilledPrice() / (double) scale
+                        : order.getPrice() / (double) scale;
 
                 markers.add(new OrderMarkerDto(
                         timeSeconds,

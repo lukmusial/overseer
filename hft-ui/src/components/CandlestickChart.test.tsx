@@ -340,20 +340,20 @@ describe('CandlestickChart', () => {
       expect(mockSetMarkers).toHaveBeenCalled();
     });
 
-    // Should have markers for the 2 orders
+    // Should have markers for the 2 orders (blue circles on the candle)
     expect(mockSetMarkers).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           time: 1700000300,
-          position: 'belowBar',
-          color: '#18dc18',
-          shape: 'arrowUp',
+          position: 'inBar',
+          color: '#4a90d9',
+          shape: 'circle',
         }),
         expect.objectContaining({
           time: 1700000600,
-          position: 'aboveBar',
-          color: '#f04848',
-          shape: 'arrowDown',
+          position: 'inBar',
+          color: '#4a90d9',
+          shape: 'circle',
         }),
       ])
     );
@@ -415,6 +415,93 @@ describe('CandlestickChart', () => {
         ])
       );
     });
+  });
+
+  it('adds order markers in real-time via WebSocket subscription', async () => {
+    let orderCallback: ((order: unknown) => void) | null = null;
+    const mockUnsubscribe = vi.fn();
+    const mockSubscribe = vi.fn((destination: string, callback: (data: unknown) => void) => {
+      if (destination === '/topic/orders') {
+        orderCallback = callback;
+      }
+      return mockUnsubscribe;
+    });
+
+    render(<CandlestickChart exchange="ALPACA" symbol="AAPL" subscribe={mockSubscribe} />);
+
+    await waitFor(() => {
+      expect(mockGetChartData).toHaveBeenCalled();
+    });
+
+    // Verify subscription was made to /topic/orders
+    expect(mockSubscribe).toHaveBeenCalledWith('/topic/orders', expect.any(Function));
+
+    // Simulate receiving a new order via WebSocket
+    await act(async () => {
+      orderCallback!({
+        clientOrderId: 123,
+        symbol: 'AAPL',
+        exchange: 'ALPACA',
+        side: 'BUY',
+        quantity: 200,
+        price: 15300,
+        averageFilledPrice: 15300,
+        priceScale: 100,
+        status: 'FILLED',
+        strategyId: 'strat-1',
+        createdAt: 1700000900000,
+      });
+    });
+
+    // Should re-render markers with the new order appended
+    await waitFor(() => {
+      const lastCall = mockSetMarkers.mock.calls[mockSetMarkers.mock.calls.length - 1][0];
+      expect(lastCall).toHaveLength(3); // 2 original + 1 new
+      expect(lastCall[2]).toEqual(expect.objectContaining({
+        time: 1700000900,
+        position: 'inBar',
+        color: '#4a90d9',
+        shape: 'circle',
+      }));
+    });
+  });
+
+  it('ignores WebSocket orders for different symbol', async () => {
+    let orderCallback: ((order: unknown) => void) | null = null;
+    const mockSubscribe = vi.fn((destination: string, callback: (data: unknown) => void) => {
+      if (destination === '/topic/orders') {
+        orderCallback = callback;
+      }
+      return vi.fn();
+    });
+
+    render(<CandlestickChart exchange="ALPACA" symbol="AAPL" subscribe={mockSubscribe} />);
+
+    await waitFor(() => {
+      expect(mockSetMarkers).toHaveBeenCalled();
+    });
+
+    const callCountBefore = mockSetMarkers.mock.calls.length;
+
+    // Send order for different symbol
+    await act(async () => {
+      orderCallback!({
+        clientOrderId: 456,
+        symbol: 'GOOGL',
+        exchange: 'ALPACA',
+        side: 'BUY',
+        quantity: 50,
+        price: 19200,
+        averageFilledPrice: 0,
+        priceScale: 100,
+        status: 'FILLED',
+        strategyId: 'strat-2',
+        createdAt: 1700001000000,
+      });
+    });
+
+    // Markers should not have been called again
+    expect(mockSetMarkers.mock.calls.length).toBe(callCountBefore);
   });
 
   it('cleans up chart on unmount', async () => {
