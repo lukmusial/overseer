@@ -1,8 +1,24 @@
+import { useState } from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ChartPanel } from './ChartPanel';
 import * as useApiModule from '../hooks/useApi';
 import type { ExchangeStatus, Strategy, TradingSymbol } from '../types/api';
+
+// Wrapper that manages lifted state like App.tsx does
+function ChartPanelWrapper(props: Omit<React.ComponentProps<typeof ChartPanel>, 'selectedExchange' | 'selectedSymbol' | 'onExchangeChange' | 'onSymbolChange'>) {
+  const [exchange, setExchange] = useState('');
+  const [symbol, setSymbol] = useState('');
+  return (
+    <ChartPanel
+      {...props}
+      selectedExchange={exchange}
+      selectedSymbol={symbol}
+      onExchangeChange={setExchange}
+      onSymbolChange={setSymbol}
+    />
+  );
+}
 
 // Mock the useApi module
 vi.mock('../hooks/useApi');
@@ -151,13 +167,13 @@ describe('ChartPanel', () => {
   });
 
   it('renders the panel title', () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     expect(screen.getByText('Price Chart')).toBeInTheDocument();
   });
 
   it('renders exchange dropdown and symbol search input', () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     expect(screen.getByText('Exchange')).toBeInTheDocument();
     expect(screen.getByText('Symbol')).toBeInTheDocument();
@@ -165,7 +181,7 @@ describe('ChartPanel', () => {
   });
 
   it('auto-selects first exchange when exchanges load', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Alpaca Markets')).toBeInTheDocument();
@@ -173,7 +189,7 @@ describe('ChartPanel', () => {
   });
 
   it('fetches symbols when exchange is selected', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(mockGetSymbols).toHaveBeenCalledWith('ALPACA');
@@ -181,7 +197,7 @@ describe('ChartPanel', () => {
   });
 
   it('auto-selects first symbol and shows it in search input', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
@@ -190,7 +206,7 @@ describe('ChartPanel', () => {
   });
 
   it('shows dropdown when search input is focused', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(mockGetSymbols).toHaveBeenCalled();
@@ -215,7 +231,7 @@ describe('ChartPanel', () => {
   });
 
   it('filters symbols when typing in search input', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
@@ -236,7 +252,7 @@ describe('ChartPanel', () => {
   });
 
   it('selects symbol from dropdown and updates chart', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
@@ -263,7 +279,7 @@ describe('ChartPanel', () => {
   });
 
   it('fetches new symbols when exchange changes', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     // Wait for initial load
     await waitFor(() => {
@@ -282,7 +298,7 @@ describe('ChartPanel', () => {
   });
 
   it('resets search when exchange changes', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     // Wait for initial load
     await waitFor(() => {
@@ -305,7 +321,7 @@ describe('ChartPanel', () => {
   });
 
   it('renders CandlestickChart when exchange and symbol are selected', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('candlestick-chart')).toBeInTheDocument();
@@ -316,7 +332,7 @@ describe('ChartPanel', () => {
   });
 
   it('passes strategies to CandlestickChart', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('chart-strategies')).toHaveTextContent('1');
@@ -324,7 +340,7 @@ describe('ChartPanel', () => {
   });
 
   it('shows empty message when no exchange or symbol is selected', async () => {
-    render(<ChartPanel exchanges={[]} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={[]} strategies={mockStrategies} />);
 
     expect(screen.getByText('Select an exchange and symbol to view the chart')).toBeInTheDocument();
   });
@@ -333,7 +349,7 @@ describe('ChartPanel', () => {
     // Make getSymbols slow
     mockGetSymbols.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(mockAlpacaSymbols), 100)));
 
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     // Input should show Loading...
     const input = screen.getByPlaceholderText('Search symbols...') as HTMLInputElement;
@@ -348,7 +364,7 @@ describe('ChartPanel', () => {
     // Make getSymbols slow
     mockGetSymbols.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(mockAlpacaSymbols), 100)));
 
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     const input = screen.getByPlaceholderText('Search symbols...');
     expect(input).toBeDisabled();
@@ -362,7 +378,7 @@ describe('ChartPanel', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetSymbols.mockRejectedValue(new Error('Network error'));
 
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith('Failed to fetch symbols:', expect.any(Error));
@@ -372,7 +388,7 @@ describe('ChartPanel', () => {
   });
 
   it('lists all exchanges in dropdown', async () => {
-    render(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} />);
 
     const exchangeSelect = screen.getByDisplayValue('Alpaca Markets') as HTMLSelectElement;
     const options = Array.from(exchangeSelect.options).map(o => o.text);
@@ -382,7 +398,7 @@ describe('ChartPanel', () => {
   });
 
   it('does not fetch symbols when no exchange is selected', async () => {
-    render(<ChartPanel exchanges={[]} strategies={mockStrategies} />);
+    render(<ChartPanelWrapper exchanges={[]} strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(mockGetSymbols).not.toHaveBeenCalled();
@@ -391,7 +407,7 @@ describe('ChartPanel', () => {
 
   it('re-fetches symbols when symbolRefreshKey changes', async () => {
     const { rerender } = render(
-      <ChartPanel exchanges={mockExchanges} strategies={mockStrategies} symbolRefreshKey={0} />
+      <ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} symbolRefreshKey={0} />
     );
 
     await waitFor(() => {
@@ -400,11 +416,59 @@ describe('ChartPanel', () => {
 
     // Increment symbolRefreshKey
     await act(async () => {
-      rerender(<ChartPanel exchanges={mockExchanges} strategies={mockStrategies} symbolRefreshKey={1} />);
+      rerender(<ChartPanelWrapper exchanges={mockExchanges} strategies={mockStrategies} symbolRefreshKey={1} />);
     });
 
     await waitFor(() => {
       expect(mockGetSymbols).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('restores selection when remounted with existing state (tab switch)', async () => {
+    // Simulates App.tsx lifting state: exchange/symbol survive unmount
+    function TabSwitchScenario() {
+      const [exchange, setExchange] = useState('');
+      const [symbol, setSymbol] = useState('');
+      const [showChart, setShowChart] = useState(true);
+      return (
+        <>
+          <button onClick={() => setShowChart(!showChart)}>Toggle</button>
+          {showChart && (
+            <ChartPanel
+              exchanges={mockExchanges}
+              strategies={mockStrategies}
+              selectedExchange={exchange}
+              selectedSymbol={symbol}
+              onExchangeChange={setExchange}
+              onSymbolChange={setSymbol}
+            />
+          )}
+        </>
+      );
+    }
+
+    render(<TabSwitchScenario />);
+
+    // Wait for auto-selection
+    await waitFor(() => {
+      expect(screen.getByTestId('chart-symbol')).toHaveTextContent('AAPL');
+    });
+
+    // Unmount ChartPanel (simulates switching to another tab)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Toggle'));
+    });
+    expect(screen.queryByTestId('chart-symbol')).not.toBeInTheDocument();
+
+    // Remount ChartPanel (simulates switching back)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Toggle'));
+    });
+
+    // Chart should restore with the previously selected symbol
+    await waitFor(() => {
+      expect(screen.getByTestId('chart-symbol')).toHaveTextContent('AAPL');
+      expect(screen.getByTestId('chart-exchange')).toHaveTextContent('ALPACA');
     });
   });
 });

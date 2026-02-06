@@ -8,11 +8,13 @@ interface ChartPanelProps {
   strategies: Strategy[];
   symbolRefreshKey?: number;
   subscribe?: <T>(destination: string, callback: (data: T) => void) => () => void;
+  selectedExchange: string;
+  selectedSymbol: string;
+  onExchangeChange: (exchange: string) => void;
+  onSymbolChange: (symbol: string) => void;
 }
 
-export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe }: ChartPanelProps) {
-  const [selectedExchange, setSelectedExchange] = useState<string>('');
-  const [selectedSymbol, setSelectedSymbol] = useState<string>('');
+export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe, selectedExchange, selectedSymbol, onExchangeChange, onSymbolChange }: ChartPanelProps) {
   const [symbols, setSymbols] = useState<TradingSymbol[]>([]);
   const [loading, setLoading] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState('');
@@ -24,9 +26,9 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe 
   // Set default exchange when exchanges load
   useEffect(() => {
     if (exchanges.length > 0 && !selectedExchange) {
-      setSelectedExchange(exchanges[0].exchange);
+      onExchangeChange(exchanges[0].exchange);
     }
-  }, [exchanges, selectedExchange]);
+  }, [exchanges, selectedExchange, onExchangeChange]);
 
   // Fetch symbols when exchange changes or symbolRefreshKey changes
   useEffect(() => {
@@ -37,10 +39,16 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe 
       try {
         const data = await getSymbols(selectedExchange);
         setSymbols(data.sort((a, b) => a.symbol.localeCompare(b.symbol)));
-        // Auto-select first symbol if none selected
         if (data.length > 0 && !selectedSymbol) {
-          setSelectedSymbol(data[0].symbol);
+          // Auto-select first symbol if none selected
+          onSymbolChange(data[0].symbol);
           setSymbolSearch(data[0].symbol + ' - ' + data[0].name);
+        } else if (selectedSymbol) {
+          // Restore search text for existing selection (e.g., after tab switch)
+          const existing = data.find((s) => s.symbol === selectedSymbol);
+          if (existing) {
+            setSymbolSearch(existing.symbol + ' - ' + existing.name);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch symbols:', error);
@@ -82,14 +90,14 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe 
 
   // Reset symbol when exchange changes
   const handleExchangeChange = (exchange: string) => {
-    setSelectedExchange(exchange);
-    setSelectedSymbol('');
+    onExchangeChange(exchange);
+    onSymbolChange('');
     setSymbolSearch('');
     setSymbols([]);
   };
 
   const handleSymbolSelect = (symbol: TradingSymbol) => {
-    setSelectedSymbol(symbol.symbol);
+    onSymbolChange(symbol.symbol);
     setSymbolSearch(symbol.symbol + ' - ' + symbol.name);
     setSymbolDropdownOpen(false);
   };

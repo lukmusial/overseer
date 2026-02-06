@@ -36,6 +36,8 @@ export default function App() {
   const [showOrderHistory, setShowOrderHistory] = useState(false);
   const [showRiskLimits, setShowRiskLimits] = useState(false);
   const [riskLimits, setRiskLimits] = useState<RiskLimits | null>(null);
+  const [chartExchange, setChartExchange] = useState('');
+  const [chartSymbol, setChartSymbol] = useState('');
 
   const api = useApi();
   const { connected, subscribe } = useWebSocket({
@@ -273,7 +275,16 @@ export default function App() {
             <StrategyForm onSubmit={handleCreateStrategy} symbolRefreshKey={symbolRefreshKey} />
           </div>
           <div className="col-right">
-            <ChartPanel exchanges={exchanges} strategies={strategies} symbolRefreshKey={symbolRefreshKey} subscribe={subscribe} />
+            <ChartPanel
+              exchanges={exchanges}
+              strategies={strategies}
+              symbolRefreshKey={symbolRefreshKey}
+              subscribe={subscribe}
+              selectedExchange={chartExchange}
+              selectedSymbol={chartSymbol}
+              onExchangeChange={setChartExchange}
+              onSymbolChange={setChartSymbol}
+            />
             <StrategyList
               strategies={strategies}
               onStart={handleStartStrategy}
