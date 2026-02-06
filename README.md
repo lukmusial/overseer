@@ -2,6 +2,12 @@
 
 > **Educational Project** — This project was built for learning purposes to understand the industry patterns and technologies used in high-throughput trading systems. It explores low-latency architecture, exchange connectivity, trading strategy design, and real-time risk management. **It is not intended for production trading.**
 
+### Dashboard — Momentum and VWAP strategies running against Binance testnet BTCUSDT
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Order History — Full order log with filtering by strategy, exchange, and symbol
+![Order History](docs/screenshots/order-history.png)
+
 ## What Is This?
 
 Overseer is a modular trading client written in Java with a React dashboard. It connects to real exchange APIs (Alpaca for stocks, Binance for crypto) and provides a hands-on environment to learn about:
