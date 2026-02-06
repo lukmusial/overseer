@@ -1306,7 +1306,117 @@ td.actions-cell > *:last-child {
   border: none;
 }
 
-/* Trigger Ranges */
+/* Chart Body - flex wrapper for chart + thresholds panel */
+.chart-body {
+  display: flex;
+  gap: 0;
+}
+
+.chart-body .chart-container {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Threshold Toggle Button */
+.threshold-toggle {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.threshold-toggle.active {
+  background: var(--pip-green-subtle);
+  color: var(--pip-green-bright);
+  border-color: var(--pip-green);
+  text-shadow: 0 0 8px var(--pip-green);
+}
+
+/* Foldable Thresholds Panel (right of chart) */
+.thresholds-panel {
+  width: 180px;
+  flex-shrink: 0;
+  border: 1px solid var(--pip-border-dim);
+  border-left: none;
+  overflow-y: auto;
+  max-height: 402px;
+  padding: 0.5rem;
+  background: var(--pip-bg);
+}
+
+.thresholds-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--pip-border-dim);
+}
+
+.thresholds-panel-header h4 {
+  color: var(--pip-green-dim);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.panel-close {
+  color: var(--pip-green-dim);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.panel-close:hover {
+  color: var(--pip-red);
+}
+
+.threshold-group {
+  margin-bottom: 0.5rem;
+}
+
+.threshold-strategy-name {
+  color: var(--pip-green);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.threshold-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.8rem;
+  border-left: 2px solid;
+  margin-bottom: 0.15rem;
+  background: var(--pip-bg-light);
+}
+
+.threshold-line.buy {
+  border-left-color: var(--pip-green);
+}
+
+.threshold-line.sell {
+  border-left-color: var(--pip-red);
+}
+
+.threshold-label {
+  color: var(--pip-green-dim);
+  font-size: 0.75rem;
+}
+
+.threshold-value {
+  font-size: 0.8rem;
+}
+
+.threshold-line.buy .threshold-value {
+  color: var(--pip-green-bright);
+}
+
+.threshold-line.sell .threshold-value {
+  color: var(--pip-red);
+}
+
+/* Trigger Ranges (strategy descriptions below chart) */
 .trigger-ranges {
   margin-top: 0.75rem;
   padding-top: 0.75rem;

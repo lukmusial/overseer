@@ -53,6 +53,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   const [error, setError] = useState<string | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<string>('all');
   const [lastQuote, setLastQuote] = useState<Quote | null>(null);
+  const [showThresholds, setShowThresholds] = useState(true);
 
   const { getChartData } = useApi();
 
@@ -324,62 +325,63 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       markersPluginRef.current.setMarkers(markers);
     }
 
-    // Draw trigger ranges as price lines
+    // Draw trigger ranges as price lines (only when thresholds visible)
     const chart = chartRef.current;
     const pipGreen = '#18dc18';
     const pipRed = '#f04848';
 
-    // Add trigger range price lines
-    const filteredRanges = selectedStrategy === 'all'
-      ? chartData.triggerRanges
-      : chartData.triggerRanges.filter(r => r.strategyId === selectedStrategy);
+    if (showThresholds) {
+      const filteredRanges = selectedStrategy === 'all'
+        ? chartData.triggerRanges
+        : chartData.triggerRanges.filter(r => r.strategyId === selectedStrategy);
 
-    filteredRanges.forEach((range: TriggerRange) => {
-      if (range.buyTriggerLow !== null) {
-        candlestickSeriesRef.current?.createPriceLine({
-          price: range.buyTriggerLow,
-          color: pipGreen,
-          lineWidth: 1,
-          lineStyle: 2, // Dashed
-          axisLabelVisible: true,
-          title: `Buy Low (${range.strategyName})`,
-        });
-      }
-      if (range.buyTriggerHigh !== null) {
-        candlestickSeriesRef.current?.createPriceLine({
-          price: range.buyTriggerHigh,
-          color: pipGreen,
-          lineWidth: 1,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: `Buy High (${range.strategyName})`,
-        });
-      }
-      if (range.sellTriggerLow !== null) {
-        candlestickSeriesRef.current?.createPriceLine({
-          price: range.sellTriggerLow,
-          color: pipRed,
-          lineWidth: 1,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: `Sell Low (${range.strategyName})`,
-        });
-      }
-      if (range.sellTriggerHigh !== null) {
-        candlestickSeriesRef.current?.createPriceLine({
-          price: range.sellTriggerHigh,
-          color: pipRed,
-          lineWidth: 1,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: `Sell High (${range.strategyName})`,
-        });
-      }
-    });
+      filteredRanges.forEach((range: TriggerRange) => {
+        if (range.buyTriggerLow !== null) {
+          candlestickSeriesRef.current?.createPriceLine({
+            price: range.buyTriggerLow,
+            color: pipGreen,
+            lineWidth: 1,
+            lineStyle: 2, // Dashed
+            axisLabelVisible: true,
+            title: `Buy Low (${range.strategyName})`,
+          });
+        }
+        if (range.buyTriggerHigh !== null) {
+          candlestickSeriesRef.current?.createPriceLine({
+            price: range.buyTriggerHigh,
+            color: pipGreen,
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: `Buy High (${range.strategyName})`,
+          });
+        }
+        if (range.sellTriggerLow !== null) {
+          candlestickSeriesRef.current?.createPriceLine({
+            price: range.sellTriggerLow,
+            color: pipRed,
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: `Sell Low (${range.strategyName})`,
+          });
+        }
+        if (range.sellTriggerHigh !== null) {
+          candlestickSeriesRef.current?.createPriceLine({
+            price: range.sellTriggerHigh,
+            color: pipRed,
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: `Sell High (${range.strategyName})`,
+          });
+        }
+      });
+    }
 
     // Fit content
     chart.timeScale().fitContent();
-  }, [chartData, selectedStrategy]);
+  }, [chartData, selectedStrategy, showThresholds]);
 
   // Get strategies that have activity on this symbol
   const relevantStrategies = strategies.filter(s => s.symbols.includes(symbol));
@@ -444,14 +446,65 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
           <button onClick={fetchData} disabled={loading} className="refresh-btn">
             {loading ? 'Loading...' : 'Refresh'}
           </button>
+          <button
+            className={`threshold-toggle${showThresholds ? ' active' : ''}`}
+            onClick={() => setShowThresholds(prev => !prev)}
+          >
+            Thresholds
+          </button>
         </div>
       </div>
 
       {error && <div className="chart-error">{error}</div>}
 
-      <div className="chart-container" style={{ position: 'relative' }}>
-        <div ref={chartContainerRef} />
-        <div ref={tooltipRef} className="order-tooltip" />
+      <div className="chart-body">
+        <div className="chart-container" style={{ position: 'relative' }}>
+          <div ref={chartContainerRef} />
+          <div ref={tooltipRef} className="order-tooltip" />
+        </div>
+
+        {showThresholds && chartData && chartData.triggerRanges.length > 0 && (() => {
+          const filteredRanges = selectedStrategy === 'all'
+            ? chartData.triggerRanges
+            : chartData.triggerRanges.filter(r => r.strategyId === selectedStrategy);
+          return (
+            <div className="thresholds-panel">
+              <div className="thresholds-panel-header" onClick={() => setShowThresholds(false)}>
+                <h4>Thresholds</h4>
+                <span className="panel-close">&times;</span>
+              </div>
+              {filteredRanges.map((range: TriggerRange) => (
+                <div key={range.strategyId} className="threshold-group">
+                  <div className="threshold-strategy-name">{range.strategyName}</div>
+                  {range.buyTriggerLow !== null && (
+                    <div className="threshold-line buy">
+                      <span className="threshold-label">Buy Low</span>
+                      <span className="threshold-value">${range.buyTriggerLow.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {range.buyTriggerHigh !== null && (
+                    <div className="threshold-line buy">
+                      <span className="threshold-label">Buy High</span>
+                      <span className="threshold-value">${range.buyTriggerHigh.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {range.sellTriggerLow !== null && (
+                    <div className="threshold-line sell">
+                      <span className="threshold-label">Sell Low</span>
+                      <span className="threshold-value">${range.sellTriggerLow.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {range.sellTriggerHigh !== null && (
+                    <div className="threshold-line sell">
+                      <span className="threshold-label">Sell High</span>
+                      <span className="threshold-value">${range.sellTriggerHigh.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {chartData && chartData.triggerRanges.length > 0 && (

@@ -240,16 +240,76 @@ describe('CandlestickChart', () => {
     });
   });
 
-  it('displays trigger ranges section when data has trigger ranges', async () => {
+  it('displays trigger ranges description section below the chart', async () => {
     render(<CandlestickChart exchange="ALPACA" symbol="AAPL" />);
 
     await waitFor(() => {
       expect(screen.getByText('Strategy Trigger Ranges')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('My Momentum')).toBeInTheDocument();
+    // Strategy name appears in both the thresholds panel and descriptions
+    const momentumElements = screen.getAllByText('My Momentum');
+    expect(momentumElements.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('(momentum)')).toBeInTheDocument();
     expect(screen.getByText('Buy below 150, sell above 154')).toBeInTheDocument();
+  });
+
+  it('shows thresholds panel with price values by default', async () => {
+    render(<CandlestickChart exchange="ALPACA" symbol="AAPL" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Thresholds')).toBeInTheDocument();
+    });
+
+    // Should show threshold price values in the side panel
+    expect(screen.getByText('$148.00')).toBeInTheDocument();
+    expect(screen.getByText('$150.00')).toBeInTheDocument();
+    expect(screen.getByText('$154.00')).toBeInTheDocument();
+    expect(screen.getByText('$156.00')).toBeInTheDocument();
+
+    // Toggle button should be active
+    const toggle = screen.getByRole('button', { name: /Thresholds/i });
+    expect(toggle).toHaveClass('active');
+  });
+
+  it('hides thresholds panel and price lines when toggled off', async () => {
+    render(<CandlestickChart exchange="ALPACA" symbol="AAPL" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('$148.00')).toBeInTheDocument();
+    });
+
+    // Toggle thresholds off
+    const toggle = screen.getByRole('button', { name: /Thresholds/i });
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+
+    // Panel price values should be gone
+    expect(screen.queryByText('$148.00')).not.toBeInTheDocument();
+    expect(toggle).not.toHaveClass('active');
+
+    // Strategy descriptions below chart should still be visible
+    expect(screen.getByText('Strategy Trigger Ranges')).toBeInTheDocument();
+    expect(screen.getByText('Buy below 150, sell above 154')).toBeInTheDocument();
+  });
+
+  it('shows thresholds panel again when toggled back on', async () => {
+    render(<CandlestickChart exchange="ALPACA" symbol="AAPL" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('$148.00')).toBeInTheDocument();
+    });
+
+    const toggle = screen.getByRole('button', { name: /Thresholds/i });
+
+    // Toggle off then on
+    await act(async () => { fireEvent.click(toggle); });
+    expect(screen.queryByText('$148.00')).not.toBeInTheDocument();
+
+    await act(async () => { fireEvent.click(toggle); });
+    expect(screen.getByText('$148.00')).toBeInTheDocument();
+    expect(toggle).toHaveClass('active');
   });
 
   it('does not fetch data when exchange is empty', async () => {
