@@ -177,35 +177,26 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       }
     });
 
-    // Handle resize
-    const handleResize = () => {
-      if (chartContainerRef.current) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+    // Observe container size changes (window resize, panel toggle, etc.)
+    const container = chartContainerRef.current;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        if (width > 0) {
+          chart.applyOptions({ width });
+        }
       }
-    };
-
-    window.addEventListener('resize', handleResize);
+    });
+    resizeObserver.observe(container);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
       candlestickSeriesRef.current = null;
       markersPluginRef.current = null;
     };
   }, []);
-
-  // Resize chart when thresholds panel toggles
-  useEffect(() => {
-    if (chartRef.current && chartContainerRef.current) {
-      // Allow DOM to reflow before measuring new width
-      requestAnimationFrame(() => {
-        if (chartRef.current && chartContainerRef.current) {
-          chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
-        }
-      });
-    }
-  }, [showThresholds]);
 
   // Fetch data when parameters change
   useEffect(() => {
