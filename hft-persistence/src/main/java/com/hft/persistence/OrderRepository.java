@@ -45,6 +45,11 @@ public interface OrderRepository {
     List<Order> findByDate(int dateYYYYMMDD);
 
     /**
+     * Returns all orders in the repository.
+     */
+    List<Order> findAll();
+
+    /**
      * Gets the most recent N orders.
      */
     List<Order> getRecentOrders(int count);

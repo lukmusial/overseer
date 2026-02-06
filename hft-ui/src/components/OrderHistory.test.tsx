@@ -44,8 +44,8 @@ const mockOrders: Order[] = [
     status: 'FILLED',
     rejectReason: null,
     strategyId: 'strat-1',
-    createdAt: Date.now() * 1000000,
-    updatedAt: Date.now() * 1000000,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   },
 ];
 
@@ -79,11 +79,12 @@ describe('OrderHistory', () => {
     });
   });
 
-  it('displays strategy column in order table', async () => {
+  it('displays strategy and exchange columns in order table', async () => {
     render(<OrderHistory strategies={mockStrategies} />);
 
     await waitFor(() => {
       expect(screen.getByText('Strategy')).toBeInTheDocument();
+      expect(screen.getByText('Exchange')).toBeInTheDocument();
     });
   });
 

@@ -1,11 +1,11 @@
 package com.hft.api.service;
 
 import com.hft.algo.base.AlgorithmState;
+import com.hft.api.dto.CreateOrderRequest;
 import com.hft.api.dto.CreateStrategyRequest;
+import com.hft.api.dto.OrderDto;
 import com.hft.api.dto.StrategyDto;
-import com.hft.core.model.Exchange;
-import com.hft.core.model.Quote;
-import com.hft.core.model.Symbol;
+import com.hft.core.model.*;
 import com.hft.persistence.PersistenceManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,11 +18,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class TradingServiceTest {
 
     private TradingService tradingService;
+    private PersistenceManager persistenceManager;
 
     @BeforeEach
     void setUp() {
         // Use in-memory persistence for testing
-        tradingService = new TradingService(PersistenceManager.inMemory());
+        persistenceManager = PersistenceManager.inMemory();
+        tradingService = new TradingService(persistenceManager);
     }
 
     @Test
@@ -150,5 +152,45 @@ class TradingServiceTest {
             assertDoesNotThrow(() -> tradingService.startStrategy(created.id()),
                     "Strategy type " + type + " should start without throwing");
         }
+    }
+
+    @Test
+    void submitOrder_shouldPersistToRepository() {
+        // Don't start engine — order will be rejected synchronously and persisted
+        CreateOrderRequest request = new CreateOrderRequest(
+                "AAPL", "ALPACA", OrderSide.BUY, OrderType.MARKET,
+                null, 100, 0, 0, null
+        );
+
+        OrderDto submitted = tradingService.submitOrder(request);
+
+        assertEquals(OrderStatus.REJECTED, submitted.status());
+        long count = persistenceManager.getOrderRepository().count();
+        assertTrue(count > 0, "Rejected order should be persisted to repository");
+    }
+
+    @Test
+    void ordersPersistedAcrossRestart_shouldBeLoadedOnInit() {
+        // Submit an order (engine not running, will be rejected but persisted)
+        CreateOrderRequest request = new CreateOrderRequest(
+                "AAPL", "ALPACA", OrderSide.BUY, OrderType.MARKET,
+                null, 100, 0, 0, null
+        );
+
+        OrderDto submitted = tradingService.submitOrder(request);
+        assertNotNull(submitted);
+
+        // Verify the order is in persistence
+        long persistedCount = persistenceManager.getOrderRepository().count();
+        assertTrue(persistedCount > 0, "Should have persisted orders");
+
+        // Simulate restart: create a new TradingService with the SAME persistence
+        TradingService restartedService = new TradingService(persistenceManager);
+        restartedService.init();
+
+        // Orders should be loaded from persistence into the new service's OrderManager
+        List<OrderDto> ordersAfterRestart = restartedService.getAllOrders();
+        assertEquals(persistedCount, ordersAfterRestart.size(),
+                "Orders should survive restart");
     }
 }

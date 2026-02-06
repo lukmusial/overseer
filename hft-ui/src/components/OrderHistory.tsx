@@ -160,6 +160,7 @@ export function OrderHistory({ strategies }: Props) {
                   <th>ID</th>
                   <th>Strategy</th>
                   <th>Symbol</th>
+                  <th>Exchange</th>
                   <th>Side</th>
                   <th>Type</th>
                   <th>Qty</th>
@@ -176,6 +177,7 @@ export function OrderHistory({ strategies }: Props) {
                     <td>{order.clientOrderId}</td>
                     <td className="strategy-name">{getStrategyName(order.strategyId, strategies)}</td>
                     <td>{order.symbol}</td>
+                    <td>{order.exchange}</td>
                     <td className={order.side === 'BUY' ? 'buy' : 'sell'}>{order.side}</td>
                     <td>{order.type}</td>
                     <td>{order.quantity}</td>
@@ -189,7 +191,7 @@ export function OrderHistory({ strategies }: Props) {
                     <td className="reject-reason" title={order.rejectReason || undefined}>
                       {order.rejectReason || '-'}
                     </td>
-                    <td>{new Date(order.createdAt / 1000000).toLocaleString()}</td>
+                    <td>{order.createdAt > 0 ? new Date(order.createdAt).toLocaleString() : '-'}</td>
                   </tr>
                 ))}
               </tbody>

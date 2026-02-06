@@ -177,8 +177,10 @@ public class BinanceMarketDataPort implements MarketDataPort {
 
             quote.setPriceScale(PRICE_SCALE);
 
-            // Binance bookTicker doesn't have timestamp, use local time
-            quote.setTimestamp(receiveTime);
+            // Binance bookTicker doesn't include a timestamp field.
+            // Use epoch-based time for timestamp (needed for chart alignment)
+            // and nanoTime for receivedAt (latency tracking).
+            quote.setTimestamp(System.currentTimeMillis() * 1_000_000L);
             quote.setReceivedAt(receiveTime);
 
             notifyQuoteListeners(quote);
@@ -242,7 +244,7 @@ public class BinanceMarketDataPort implements MarketDataPort {
         quote.setAskPrice(parsePrice(ticker.getAskPrice()));
         quote.setBidSize(parseQuantity(ticker.getBidQty()));
         quote.setAskSize(parseQuantity(ticker.getAskQty()));
-        quote.setTimestamp(System.nanoTime());
+        quote.setTimestamp(System.currentTimeMillis() * 1_000_000L);
         quote.setReceivedAt(System.nanoTime());
         return quote;
     }

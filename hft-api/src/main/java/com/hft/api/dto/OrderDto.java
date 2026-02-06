@@ -28,6 +28,17 @@ public record OrderDto(
         long createdAt,
         long updatedAt
 ) {
+    /**
+     * Converts epoch nanos to epoch millis for frontend display.
+     * Detects stale nanoTime values (from before the epoch-nanos fix) and returns 0.
+     */
+    private static long toEpochMillis(long epochNanos) {
+        if (epochNanos <= 0) return 0;
+        // Epoch nanos for year 2000 ≈ 9.47e17; System.nanoTime() values are ≈ 1e12-1e13
+        if (epochNanos < 946_684_800_000_000_000L) return 0;
+        return epochNanos / 1_000_000;
+    }
+
     public static OrderDto from(com.hft.core.model.Order order) {
         return new OrderDto(
                 order.getClientOrderId(),
@@ -46,8 +57,8 @@ public record OrderDto(
                 order.getStatus(),
                 order.getRejectReason(),
                 order.getStrategyId(),
-                order.getCreatedAt(),
-                order.getLastUpdatedAt()
+                toEpochMillis(order.getCreatedAt()),
+                toEpochMillis(order.getLastUpdatedAt())
         );
     }
 }

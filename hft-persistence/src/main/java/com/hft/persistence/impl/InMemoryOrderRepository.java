@@ -89,6 +89,11 @@ public class InMemoryOrderRepository implements OrderRepository {
     }
 
     @Override
+    public List<Order> findAll() {
+        return new ArrayList<>(ordersByClientId.values());
+    }
+
+    @Override
     public List<Order> getRecentOrders(int count) {
         return recentOrders.stream()
                 .limit(count)

@@ -66,6 +66,12 @@ public class ChronicleOrderRepository implements OrderRepository {
                 }
             }
         }
+
+        // Populate recentOrders deque from rebuilt index (sorted by creation time, newest first)
+        ordersByClientId.values().stream()
+                .sorted(Comparator.comparingLong(Order::getCreatedAt).reversed())
+                .limit(maxRecentOrders)
+                .forEach(recentOrders::addLast);
     }
 
     @Override
@@ -124,6 +130,11 @@ public class ChronicleOrderRepository implements OrderRepository {
                 .filter(o -> o.getCreatedAt() >= startOfDay && o.getCreatedAt() < endOfDay)
                 .sorted(Comparator.comparingLong(Order::getCreatedAt))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Order> findAll() {
+        return new ArrayList<>(ordersByClientId.values());
     }
 
     @Override

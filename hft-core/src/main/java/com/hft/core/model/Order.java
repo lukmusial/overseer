@@ -53,10 +53,14 @@ public class Order implements Poolable {
     private long ackLatencyNanos;
     private long fillLatencyNanos;
 
+    // Monotonic time for latency tracking (not persisted, not displayed)
+    private transient long createdNano;
+
     public Order() {
         this.clientOrderId = ID_GENERATOR.incrementAndGet();
         this.status = OrderStatus.PENDING;
-        this.createdAt = System.nanoTime();
+        this.createdAt = System.currentTimeMillis() * 1_000_000L;
+        this.createdNano = System.nanoTime();
     }
 
     public void reset() {
@@ -75,7 +79,8 @@ public class Order implements Poolable {
         averageFilledPrice = 0;
         lastFilledPrice = 0;
         lastFilledQuantity = 0;
-        createdAt = System.nanoTime();
+        createdAt = System.currentTimeMillis() * 1_000_000L;
+        createdNano = System.nanoTime();
         submittedAt = 0;
         acceptedAt = 0;
         lastUpdatedAt = 0;
@@ -162,8 +167,8 @@ public class Order implements Poolable {
     public void markSubmitted() {
         this.status = OrderStatus.SUBMITTED;
         this.submittedAt = System.nanoTime();
-        this.submitLatencyNanos = submittedAt - createdAt;
-        this.lastUpdatedAt = submittedAt;
+        this.submitLatencyNanos = submittedAt - createdNano;
+        this.lastUpdatedAt = System.currentTimeMillis() * 1_000_000L;
     }
 
     public void markAccepted(String exchangeOrderId) {
@@ -171,7 +176,7 @@ public class Order implements Poolable {
         this.status = OrderStatus.ACCEPTED;
         this.acceptedAt = System.nanoTime();
         this.ackLatencyNanos = acceptedAt - submittedAt;
-        this.lastUpdatedAt = acceptedAt;
+        this.lastUpdatedAt = System.currentTimeMillis() * 1_000_000L;
     }
 
     public void markPartiallyFilled(long filledQty, long fillPrice) {
@@ -188,23 +193,23 @@ public class Order implements Poolable {
         }
 
         this.status = OrderStatus.PARTIALLY_FILLED;
-        this.lastUpdatedAt = System.nanoTime();
+        this.lastUpdatedAt = System.currentTimeMillis() * 1_000_000L;
     }
 
     public void markFilled(long filledQty, long fillPrice) {
         markPartiallyFilled(filledQty, fillPrice);
         this.status = OrderStatus.FILLED;
-        this.fillLatencyNanos = lastUpdatedAt - submittedAt;
+        this.fillLatencyNanos = System.nanoTime() - submittedAt;
     }
 
     public void markCancelled() {
         this.status = OrderStatus.CANCELLED;
-        this.lastUpdatedAt = System.nanoTime();
+        this.lastUpdatedAt = System.currentTimeMillis() * 1_000_000L;
     }
 
     public void markRejected() {
         this.status = OrderStatus.REJECTED;
-        this.lastUpdatedAt = System.nanoTime();
+        this.lastUpdatedAt = System.currentTimeMillis() * 1_000_000L;
     }
 
     // Getters
@@ -365,6 +370,14 @@ public class Order implements Poolable {
 
     public void setSubmittedAt(long submittedAt) {
         this.submittedAt = submittedAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setLastUpdatedAt(long lastUpdatedAt) {
+        this.lastUpdatedAt = lastUpdatedAt;
     }
 
     public void setAcceptedAt(long acceptedAt) {

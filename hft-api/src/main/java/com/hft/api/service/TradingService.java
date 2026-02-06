@@ -53,6 +53,7 @@ public class TradingService {
         this.tradingEngine = new TradingEngine(riskLimits);
         this.algorithmContext = new TradingEngineAlgorithmContext(tradingEngine);
         this.persistenceManager = persistenceManager;
+        registerOrderPersistenceListener();
     }
 
     /**
@@ -64,6 +65,7 @@ public class TradingService {
 
     @PostConstruct
     public void init() {
+        loadPersistedOrders();
         loadPersistedStrategies();
     }
 
@@ -72,6 +74,27 @@ public class TradingService {
         log.info("Shutting down TradingService, flushing persistence...");
         persistenceManager.flush();
         persistenceManager.close();
+    }
+
+    private void registerOrderPersistenceListener() {
+        tradingEngine.getOrderManager().addOrderListener(order -> {
+            try {
+                persistenceManager.saveOrder(order);
+            } catch (Exception e) {
+                log.error("Failed to persist order {}: {}", order.getClientOrderId(), e.getMessage());
+            }
+        });
+    }
+
+    private void loadPersistedOrders() {
+        List<Order> orders = persistenceManager.getOrderRepository().findAll();
+        if (orders.isEmpty()) {
+            return;
+        }
+        log.info("Loading {} persisted orders", orders.size());
+        for (Order order : orders) {
+            tradingEngine.getOrderManager().trackOrder(order);
+        }
     }
 
     private void loadPersistedStrategies() {
@@ -178,6 +201,8 @@ public class TradingService {
         if (rejection != null) {
             order.setStatus(OrderStatus.REJECTED);
             order.setRejectReason(rejection);
+            // Persist rejected orders that bypassed OrderManager (e.g., engine not running)
+            persistenceManager.saveOrder(order);
         }
 
         return OrderDto.from(order);

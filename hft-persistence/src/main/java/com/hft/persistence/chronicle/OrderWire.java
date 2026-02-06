@@ -64,6 +64,7 @@ public class OrderWire extends SelfDescribingMarshallable {
                 .quantity(quantity)
                 .strategyId(strategyId);
 
+        order.setClientOrderId(clientOrderId);
         order.setStopPrice(stopPrice);
 
         // Restore state based on status
@@ -90,6 +91,14 @@ public class OrderWire extends SelfDescribingMarshallable {
             if (orderStatus == OrderStatus.CANCELLED) {
                 order.markCancelled();
             }
+        }
+
+        // Restore persisted timestamps (overrides values set by mark* methods)
+        if (createdAt > 0) {
+            order.setCreatedAt(createdAt);
+        }
+        if (lastUpdatedAt > 0) {
+            order.setLastUpdatedAt(lastUpdatedAt);
         }
 
         return order;
