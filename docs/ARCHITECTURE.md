@@ -1512,6 +1512,52 @@ sequenceDiagram
     PnL->>PnL: Recalculate P&L
 ```
 
+### Backtesting Framework
+
+The `hft-bdd` module includes a backtesting engine that replays historical Binance kline data through strategies to evaluate performance.
+
+```mermaid
+sequenceDiagram
+    participant Binance as Binance API
+    participant Fetcher as HistoricalDataFetcher
+    participant Engine as BacktestEngine
+    participant Strategy as TradingStrategy
+    participant Portfolio as Portfolio Tracker
+
+    Fetcher->>Binance: GET /api/v3/klines (paginated)
+    Binance-->>Fetcher: OHLCV candles
+    Fetcher->>Engine: List<Candle>
+    loop For each candle
+        Engine->>Strategy: onQuote(quote)
+        Strategy->>Strategy: calculateSignal()
+        Strategy-->>Engine: signal [-1.0, +1.0]
+        Engine->>Engine: Apply period multiplier
+        Engine->>Portfolio: Update allocation
+    end
+    Engine-->>Engine: BacktestResult
+```
+
+**Key components** (`com.hft.bdd.backtest`):
+
+| Class | Purpose |
+|-------|---------|
+| `BacktestEngine` | Replays candles through strategies, manages portfolio P&L |
+| `BacktestConfig` | Configuration record (symbol, strategy, period, capital, reinvest mode) |
+| `BacktestResult` | Results with daily snapshots, trade records, Sharpe ratio, profit factor |
+| `HistoricalDataFetcher` | Fetches klines from Binance public API with pagination |
+| `StrategyBacktestTest` | Parameterized JUnit test running all strategy/symbol/period combinations |
+
+**Two portfolio modes:**
+- **Compound**: Reinvest profits, portfolio value compounds over the period
+- **Daily reset**: Reset to initial capital each day, accumulate daily P&Ls
+
+```bash
+# Run backtests (excluded from normal test suite)
+./gradlew :hft-bdd:backtest
+
+# Results written to local-docs/BACKTEST_REPORT.md
+```
+
 ### Running Tests
 
 ```bash
@@ -1523,6 +1569,9 @@ sequenceDiagram
 
 # Run performance benchmarks
 ./gradlew :hft-bdd:test --tests '*Performance*'
+
+# Run strategy backtests against real Binance data
+./gradlew :hft-bdd:backtest
 ```
 
 ### Key Test Scenarios
@@ -1545,11 +1594,12 @@ This HFT trading system provides:
 1. **Ultra-Low Latency**: LMAX Disruptor with 64K ring buffer, zero-allocation object pooling
 2. **Comprehensive Risk Management**: Pluggable rules, circuit breaker, daily limits with normalized P&L comparison
 3. **Multi-Exchange Support**: Alpaca (stocks, 2 decimal places) and Binance (crypto, 8 decimal places) with unified price scale handling and credential verification
-4. **Advanced Algorithms**: VWAP, TWAP execution; Momentum, Mean Reversion strategies
+4. **Advanced Algorithms**: VWAP, TWAP execution; Momentum, Mean Reversion, EMA+ADX+RSI, Bollinger Squeeze, VWAP Mean Reversion strategies
 5. **Full Persistence**: Chronicle Queue stores for orders, trades, positions, strategies, and audit events with automatic startup restoration
 6. **Real-Time Dashboard**: React UI with WebSocket-driven live updates, interactive candlestick charts, and strategy management
 7. **Real-Time Position Tracking**: P&L, exposure, and drawdown calculations across different price scales, persisted across restarts
 8. **Event-Driven Architecture**: Clean separation of concerns with hexagonal design
+9. **Backtesting**: Historical kline replay engine with signal-based portfolio tracking, trading period analysis, and automated report generation
 
 The architecture balances:
 - **Performance**: Nanosecond latency, lock-free structures
