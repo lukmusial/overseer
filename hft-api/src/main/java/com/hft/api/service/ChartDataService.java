@@ -348,11 +348,15 @@ public class ChartDataService {
     public List<TriggerRangeDto> getTriggerRanges(String symbolTicker, String exchangeName, Double lastCandlePrice) {
         List<TriggerRangeDto> ranges = new ArrayList<>();
 
+        // Determine price scale based on exchange
+        Exchange exchange = Exchange.valueOf(exchangeName.toUpperCase());
+        int priceScale = exchange == Exchange.BINANCE ? 100_000_000 : 100;
+
         // Get current price: prefer real-time quote, then last candle close, then static fallback
-        Long currentPriceCents = stubMarketDataService.getCurrentPrice(exchangeName, symbolTicker);
+        Long rawPrice = stubMarketDataService.getCurrentPrice(exchangeName, symbolTicker);
         double currentPrice;
-        if (currentPriceCents != null) {
-            currentPrice = currentPriceCents / 100.0;
+        if (rawPrice != null) {
+            currentPrice = rawPrice / (double) priceScale;
         } else if (lastCandlePrice != null) {
             currentPrice = lastCandlePrice;
         } else {
