@@ -3,21 +3,27 @@ package com.hft.api.controller;
 import com.hft.api.dto.CreateStrategyRequest;
 import com.hft.api.dto.StrategyDto;
 import com.hft.api.service.TradingService;
+import com.hft.core.model.TradingPeriod;
+import com.hft.core.model.TradingPeriodDetector;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/strategies")
 public class StrategyController {
 
     private final TradingService tradingService;
+    private final TradingPeriodDetector tradingPeriodDetector;
 
     public StrategyController(TradingService tradingService) {
         this.tradingService = tradingService;
+        this.tradingPeriodDetector = new TradingPeriodDetector();
     }
 
     @PostMapping
@@ -90,7 +96,77 @@ public class StrategyController {
                                 Map.of("name", "exitZScore", "type", "double", "default", 0.5, "description", "Z-score threshold for exit"),
                                 Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size")
                         )
+                ),
+                Map.of(
+                        "type", "ema_adx_rsi",
+                        "name", "EMA + ADX + RSI",
+                        "description", "Trend following with EMA crossover, ADX trend strength, and RSI confirmation",
+                        "parameters", List.of(
+                                Map.of("name", "fastEmaPeriod", "type", "int", "default", 9, "description", "Fast EMA period"),
+                                Map.of("name", "slowEmaPeriod", "type", "int", "default", 21, "description", "Slow EMA period"),
+                                Map.of("name", "adxPeriod", "type", "int", "default", 14, "description", "ADX smoothing period"),
+                                Map.of("name", "adxThreshold", "type", "double", "default", 25.0, "description", "Minimum ADX for entry"),
+                                Map.of("name", "rsiPeriod", "type", "int", "default", 14, "description", "RSI lookback period"),
+                                Map.of("name", "rsiBullThreshold", "type", "double", "default", 55.0, "description", "RSI threshold for bullish confirmation"),
+                                Map.of("name", "rsiBearThreshold", "type", "double", "default", 45.0, "description", "RSI threshold for bearish confirmation"),
+                                Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size")
+                        )
+                ),
+                Map.of(
+                        "type", "bollinger_squeeze",
+                        "name", "Bollinger Squeeze",
+                        "description", "Detects BB inside KC squeeze, trades breakout direction via MACD histogram",
+                        "parameters", List.of(
+                                Map.of("name", "bbPeriod", "type", "int", "default", 20, "description", "Bollinger Band SMA period"),
+                                Map.of("name", "bbStdDev", "type", "double", "default", 2.5, "description", "BB standard deviation multiplier"),
+                                Map.of("name", "kcPeriod", "type", "int", "default", 20, "description", "Keltner Channel EMA period"),
+                                Map.of("name", "kcAtrPeriod", "type", "int", "default", 14, "description", "KC ATR period"),
+                                Map.of("name", "kcMultiplier", "type", "double", "default", 2.0, "description", "KC ATR multiplier"),
+                                Map.of("name", "macdFast", "type", "int", "default", 8, "description", "MACD fast EMA period"),
+                                Map.of("name", "macdSlow", "type", "int", "default", 17, "description", "MACD slow EMA period"),
+                                Map.of("name", "macdSignal", "type", "int", "default", 9, "description", "MACD signal line period"),
+                                Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size")
+                        )
+                ),
+                Map.of(
+                        "type", "vwap_mean_reversion",
+                        "name", "VWAP Mean Reversion",
+                        "description", "Mean reversion around session VWAP with sigma deviation bands",
+                        "parameters", List.of(
+                                Map.of("name", "upperSigma", "type", "double", "default", 2.3, "description", "Upper band sigma multiplier"),
+                                Map.of("name", "lowerSigma", "type", "double", "default", 2.3, "description", "Lower band sigma multiplier"),
+                                Map.of("name", "exitSigma", "type", "double", "default", 0.5, "description", "Exit threshold sigma"),
+                                Map.of("name", "maxHoldMinutes", "type", "long", "default", 240, "description", "Maximum hold time in minutes"),
+                                Map.of("name", "volumeFilterMultiplier", "type", "double", "default", 2.0, "description", "Volume filter multiplier"),
+                                Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size")
+                        )
                 )
+        ));
+    }
+
+    @GetMapping("/trading-periods")
+    public ResponseEntity<List<Map<String, Object>>> getTradingPeriods() {
+        List<Map<String, Object>> periods = Arrays.stream(TradingPeriod.values())
+                .map(p -> Map.<String, Object>of(
+                        "name", p.name(),
+                        "startTime", p.getStartTime().toString(),
+                        "endTime", p.getEndTime().toString(),
+                        "positionMultiplier", p.getPositionMultiplier(),
+                        "recommendedStrategies", p.getRecommendedStrategies()
+                ))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(periods);
+    }
+
+    @GetMapping("/trading-periods/current")
+    public ResponseEntity<Map<String, Object>> getCurrentTradingPeriod() {
+        TradingPeriod current = tradingPeriodDetector.currentPeriod();
+        return ResponseEntity.ok(Map.of(
+                "name", current.name(),
+                "startTime", current.getStartTime().toString(),
+                "endTime", current.getEndTime().toString(),
+                "positionMultiplier", current.getPositionMultiplier(),
+                "recommendedStrategies", current.getRecommendedStrategies()
         ));
     }
 }
