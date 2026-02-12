@@ -146,11 +146,11 @@ public class ExchangeService {
                     mdPort.addQuoteListener(quote -> {
                         tradingService.getTradingEngine().onQuoteUpdate(quote);
                         tradingService.dispatchQuoteToStrategies(quote);
-                        long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
+                        // Store raw price in native priceScale format (cents for Alpaca)
                         stubMarketDataService.updatePrice(
                                 quote.getSymbol().getExchange().name(),
                                 quote.getSymbol().getTicker(),
-                                priceCents);
+                                quote.getMidPrice());
                         QuoteDto dto = QuoteDto.from(quote);
                         String exch = quote.getSymbol().getExchange().name();
                         String ticker = quote.getSymbol().getTicker();
@@ -212,11 +212,11 @@ public class ExchangeService {
                     mdPort.addQuoteListener(quote -> {
                         tradingService.getTradingEngine().onQuoteUpdate(quote);
                         tradingService.dispatchQuoteToStrategies(quote);
-                        long priceCents = Math.round((double) quote.getMidPrice() / quote.getPriceScale() * 100);
+                        // Store raw price in native priceScale format (100M for Binance)
                         stubMarketDataService.updatePrice(
                                 quote.getSymbol().getExchange().name(),
                                 quote.getSymbol().getTicker(),
-                                priceCents);
+                                quote.getMidPrice());
                         QuoteDto dto = QuoteDto.from(quote);
                         String exch = quote.getSymbol().getExchange().name();
                         String ticker = quote.getSymbol().getTicker();
