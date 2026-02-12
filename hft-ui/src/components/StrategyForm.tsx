@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { CreateStrategyRequest, TradingSymbol } from '../types/api';
+import type { CreateStrategyRequest, TradingSymbol, StrategyTypeInfo, TradingPeriodInfo } from '../types/api';
 import { useApi } from '../hooks/useApi';
 
 interface Props {
@@ -7,52 +7,23 @@ interface Props {
   symbolRefreshKey?: number;
 }
 
-type StrategyType = 'momentum' | 'meanreversion' | 'vwap' | 'twap';
-
-const STRATEGY_TYPES: { value: StrategyType; label: string; description: string }[] = [
-  { value: 'momentum', label: 'Momentum', description: 'Follow price trends using EMA crossovers' },
-  { value: 'meanreversion', label: 'Mean Reversion', description: 'Trade price deviations from historical mean' },
-  { value: 'vwap', label: 'VWAP', description: 'Volume-weighted average price execution' },
-  { value: 'twap', label: 'TWAP', description: 'Time-weighted average price execution' },
-];
-
 const EXCHANGES = ['ALPACA', 'BINANCE'];
 
-const DEFAULT_PARAMS: Record<StrategyType, Record<string, unknown>> = {
-  momentum: {
-    shortPeriod: 10,
-    longPeriod: 30,
-    signalThreshold: 0.02,
-    maxPositionSize: 1000,
-  },
-  meanreversion: {
-    lookbackPeriod: 20,
-    entryZScore: 2.0,
-    exitZScore: 0.5,
-    maxPositionSize: 1000,
-  },
-  vwap: {
-    targetQuantity: 1000,
-    durationMinutes: 60,
-    maxParticipationRate: 0.25,
-    side: 'BUY',
-  },
-  twap: {
-    targetQuantity: 1000,
-    durationMinutes: 60,
-    sliceIntervalSeconds: 60,
-    maxParticipationRate: 0.25,
-    side: 'BUY',
-  },
-};
+function defaultParamsFromType(typeInfo: StrategyTypeInfo): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
+  for (const p of typeInfo.parameters) {
+    params[p.name] = p.default;
+  }
+  return params;
+}
 
 export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
-  const { getSymbols } = useApi();
+  const { getSymbols, getStrategyTypes, getTradingPeriods } = useApi();
   const [name, setName] = useState('');
-  const [type, setType] = useState<StrategyType>('momentum');
+  const [type, setType] = useState('');
   const [selectedSymbol, setSelectedSymbol] = useState<TradingSymbol | null>(null);
   const [exchange, setExchange] = useState('ALPACA');
-  const [parameters, setParameters] = useState<Record<string, unknown>>(DEFAULT_PARAMS.momentum);
+  const [parameters, setParameters] = useState<Record<string, unknown>>({});
   const [symbols, setSymbols] = useState<TradingSymbol[]>([]);
   const [loadingSymbols, setLoadingSymbols] = useState(false);
   const [symbolInput, setSymbolInput] = useState('');
@@ -61,9 +32,41 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
   const [symbolError, setSymbolError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [strategyTypes, setStrategyTypes] = useState<StrategyTypeInfo[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(true);
+  const [tradingPeriods, setTradingPeriods] = useState<TradingPeriodInfo[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+
+  // Fetch strategy types and trading periods on mount
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingTypes(true);
+
+    Promise.all([getStrategyTypes(), getTradingPeriods()])
+      .then(([types, periods]) => {
+        if (!cancelled) {
+          setStrategyTypes(types);
+          setTradingPeriods(periods);
+          if (types.length > 0) {
+            setType(types[0].type);
+            setParameters(defaultParamsFromType(types[0]));
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch strategy types:', err);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingTypes(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [getStrategyTypes, getTradingPeriods]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -118,9 +121,12 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleTypeChange = (newType: StrategyType) => {
+  const handleTypeChange = (newType: string) => {
     setType(newType);
-    setParameters(DEFAULT_PARAMS[newType]);
+    const typeInfo = strategyTypes.find(t => t.type === newType);
+    if (typeInfo) {
+      setParameters(defaultParamsFromType(typeInfo));
+    }
   };
 
   const handleParamChange = (key: string, value: string) => {
@@ -232,6 +238,11 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
       parsedParameters[key] = isNaN(num) ? val : num;
     }
 
+    // Include trading period if selected
+    if (selectedPeriod) {
+      parsedParameters.tradingPeriod = selectedPeriod;
+    }
+
     setIsSubmitting(true);
     try {
       await onSubmit({
@@ -252,7 +263,8 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
     }
   };
 
-  const selectedType = STRATEGY_TYPES.find(t => t.value === type);
+  const selectedType = strategyTypes.find(t => t.type === type);
+  const selectedPeriodInfo = tradingPeriods.find(p => p.name === selectedPeriod);
 
   return (
     <div className="card">
@@ -269,12 +281,18 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
         </div>
         <div className="form-group">
           <label>Type:</label>
-          <select value={type} onChange={(e) => handleTypeChange(e.target.value as StrategyType)}>
-            {STRATEGY_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-          {selectedType && <small className="type-description">{selectedType.description}</small>}
+          {loadingTypes ? (
+            <div className="loading-indicator">Loading strategy types...</div>
+          ) : (
+            <>
+              <select value={type} onChange={(e) => handleTypeChange(e.target.value)}>
+                {strategyTypes.map((t) => (
+                  <option key={t.type} value={t.type}>{t.name}</option>
+                ))}
+              </select>
+              {selectedType && <small className="type-description">{selectedType.description}</small>}
+            </>
+          )}
         </div>
         <div className="form-group">
           <label>Exchange:</label>
@@ -347,6 +365,26 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
             </div>
           )}
         </div>
+        <div className="form-group">
+          <label>Trading Period:</label>
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            className="period-select"
+          >
+            <option value="">All Periods (24h)</option>
+            {tradingPeriods.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name} ({p.startTime}-{p.endTime}, {p.positionMultiplier}x)
+              </option>
+            ))}
+          </select>
+          {selectedPeriodInfo && selectedPeriodInfo.recommendedStrategies.length > 0 && (
+            <small className="type-description">
+              Recommended: {selectedPeriodInfo.recommendedStrategies.join(', ')}
+            </small>
+          )}
+        </div>
         <h3>Parameters</h3>
         {Object.entries(parameters).map(([key, value]) => (
           <div key={key} className="form-group">
@@ -374,7 +412,7 @@ export function StrategyForm({ onSubmit, symbolRefreshKey }: Props) {
         <button
           type="submit"
           className="btn-primary"
-          disabled={loadingSymbols || symbols.length === 0 || isSubmitting}
+          disabled={loadingSymbols || loadingTypes || symbols.length === 0 || isSubmitting}
         >
           {isSubmitting ? 'Creating...' : 'Create Strategy'}
         </button>

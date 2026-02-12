@@ -2,7 +2,27 @@ export type OrderSide = 'BUY' | 'SELL';
 export type OrderType = 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT';
 export type OrderStatus = 'PENDING' | 'SUBMITTED' | 'ACCEPTED' | 'PARTIALLY_FILLED' | 'FILLED' | 'CANCELLED' | 'REJECTED' | 'EXPIRED';
 export type TimeInForce = 'DAY' | 'GTC' | 'IOC' | 'FOK';
-export type StrategyType = 'VWAP' | 'TWAP' | 'MOMENTUM' | 'MEAN_REVERSION';
+export interface StrategyTypeInfo {
+  type: string;
+  name: string;
+  description: string;
+  parameters: StrategyParamInfo[];
+}
+
+export interface StrategyParamInfo {
+  name: string;
+  type: string;
+  default: number | string;
+  description: string;
+}
+
+export interface TradingPeriodInfo {
+  name: string;
+  startTime: string;
+  endTime: string;
+  positionMultiplier: number;
+  recommendedStrategies: string[];
+}
 
 export interface EngineStatus {
   running: boolean;

@@ -10,6 +10,8 @@ import type {
   TradingSymbol,
   ChartData,
   RiskLimits,
+  StrategyTypeInfo,
+  TradingPeriodInfo,
 } from '../types/api';
 
 const API_BASE = '/api';
@@ -159,6 +161,19 @@ export function useApi() {
     return fetchJson<TradingSymbol[]>(`${API_BASE}/exchanges/${exchange}/symbols`);
   }, []);
 
+  // Strategy type & trading period operations
+  const getStrategyTypes = useCallback(async (): Promise<StrategyTypeInfo[]> => {
+    return fetchJson<StrategyTypeInfo[]>(`${API_BASE}/strategies/types`);
+  }, []);
+
+  const getTradingPeriods = useCallback(async (): Promise<TradingPeriodInfo[]> => {
+    return fetchJson<TradingPeriodInfo[]>(`${API_BASE}/strategies/trading-periods`);
+  }, []);
+
+  const getCurrentTradingPeriod = useCallback(async (): Promise<TradingPeriodInfo> => {
+    return fetchJson<TradingPeriodInfo>(`${API_BASE}/strategies/trading-periods/current`);
+  }, []);
+
   // Chart operations
   const getChartData = useCallback(async (
     exchange: string,
@@ -193,6 +208,9 @@ export function useApi() {
     getExchangeStatus,
     switchMode,
     getSymbols,
+    getStrategyTypes,
+    getTradingPeriods,
+    getCurrentTradingPeriod,
     getChartData,
   };
 }

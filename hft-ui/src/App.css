@@ -168,6 +168,72 @@ header h1::before {
   border-color: var(--pip-red);
 }
 
+/* ═══ TRADING PERIOD INDICATOR ═══ */
+.trading-period-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--pip-border-dim);
+  background: var(--pip-bg-light);
+  min-width: 0;
+}
+
+.period-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.period-name {
+  color: var(--pip-green-bright);
+  text-shadow: 0 0 8px var(--pip-green);
+  font-weight: normal;
+  letter-spacing: 1px;
+}
+
+.period-time {
+  color: var(--pip-green-dim);
+}
+
+.period-multiplier {
+  color: var(--pip-amber);
+  border: 1px solid var(--pip-amber-dim);
+  padding: 0 0.2rem;
+  font-size: 0.65rem;
+}
+
+.period-strategies {
+  color: var(--pip-green-dim);
+  font-size: 0.65rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.period-timeline {
+  position: relative;
+  height: 4px;
+  background: var(--pip-bg-dark);
+  border: 1px solid var(--pip-border-dim);
+  min-width: 120px;
+}
+
+.period-segment {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--pip-green-dark);
+  opacity: 0.4;
+}
+
+.period-segment.active {
+  background: var(--pip-green);
+  opacity: 1;
+  box-shadow: 0 0 6px var(--pip-green-glow);
+}
+
 /* ═══ MAIN LAYOUT ═══ */
 main {
   padding: 1rem;
