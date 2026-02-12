@@ -435,6 +435,44 @@ public class ChartDataService {
                 description = String.format("Executes in %d slices over %d minutes, target range $%.2f-$%.2f",
                         slices, durationMinutes, buyLow, buyHigh);
             }
+            case "ema + adx + rsi" -> {
+                // EMA crossover with ADX trend strength and RSI confirmation
+                double adxThreshold = getDoubleParam(params, "adxThreshold", 25.0);
+                double rsiBull = getDoubleParam(params, "rsiBullThreshold", 55.0);
+                double rsiBear = getDoubleParam(params, "rsiBearThreshold", 45.0);
+                double spread = currentPrice * 0.015; // Approximate entry zone based on EMA divergence
+                buyLow = currentPrice * (1 + 0.005);
+                buyHigh = currentPrice * (1 + 0.03);
+                sellLow = currentPrice * (1 - 0.03);
+                sellHigh = currentPrice * (1 - 0.005);
+                description = String.format("Buy when EMA cross up + ADX>%.0f + RSI>%.0f; Sell on cross down + RSI<%.0f",
+                        adxThreshold, rsiBull, rsiBear);
+            }
+            case "bollinger squeeze" -> {
+                // Bollinger Bands inside Keltner Channels squeeze
+                double bbStdDev = getDoubleParam(params, "bbStdDev", 2.5);
+                double kcMultiplier = getDoubleParam(params, "kcMultiplier", 2.0);
+                double stdDev = currentPrice * 0.02;
+                buyLow = currentPrice - (bbStdDev * stdDev);
+                buyHigh = currentPrice + (bbStdDev * stdDev);
+                sellLow = currentPrice - (bbStdDev * stdDev);
+                sellHigh = currentPrice + (bbStdDev * stdDev);
+                description = String.format("Squeeze breakout: BB(%.1fσ) inside KC(%.1fx ATR), direction via MACD",
+                        bbStdDev, kcMultiplier);
+            }
+            case "vwap mean reversion" -> {
+                // Mean reversion around VWAP
+                double upperSigma = getDoubleParam(params, "upperSigma", 2.3);
+                double lowerSigma = getDoubleParam(params, "lowerSigma", 2.3);
+                double exitSigma = getDoubleParam(params, "exitSigma", 0.5);
+                double stdDev = currentPrice * 0.015;
+                buyLow = currentPrice - (lowerSigma * stdDev);
+                buyHigh = currentPrice - (exitSigma * stdDev);
+                sellLow = currentPrice + (exitSigma * stdDev);
+                sellHigh = currentPrice + (upperSigma * stdDev);
+                description = String.format("Buy at VWAP-%.1fσ, exit at -%.1fσ; Sell at +%.1fσ, exit at +%.1fσ",
+                        lowerSigma, exitSigma, upperSigma, exitSigma);
+            }
             default -> {
                 description = "Unknown strategy type";
             }

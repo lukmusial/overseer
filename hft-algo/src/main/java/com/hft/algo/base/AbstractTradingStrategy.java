@@ -242,6 +242,21 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
 
         // Calculate target position based on signal
         long target = calculateTargetPosition(symbol, signal);
+
+        // Clamp target by max position notional (dollar value)
+        // maxPositionNotional is in whole dollars; 0 = no limit (default)
+        long maxPositionNotional = parameters.getLong("maxPositionNotional", 0);
+        if (maxPositionNotional > 0 && target != 0) {
+            long midPrice = (quote.getBidPrice() + quote.getAskPrice()) / 2;
+            if (midPrice > 0) {
+                int priceScale = quote.getPriceScale();
+                long maxQtyByNotional = maxPositionNotional * priceScale / midPrice;
+                if (Math.abs(target) > maxQtyByNotional) {
+                    target = target > 0 ? maxQtyByNotional : -maxQtyByNotional;
+                }
+            }
+        }
+
         targetPositions.put(symbol, target);
 
         // Execute if needed
