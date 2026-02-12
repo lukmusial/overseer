@@ -435,7 +435,7 @@ public class ChartDataService {
                 description = String.format("Executes in %d slices over %d minutes, target range $%.2f-$%.2f",
                         slices, durationMinutes, buyLow, buyHigh);
             }
-            case "ema + adx + rsi" -> {
+            case "emaadxrsi", "ema_adx_rsi" -> {
                 // EMA crossover with ADX trend strength and RSI confirmation
                 double adxThreshold = getDoubleParam(params, "adxThreshold", 25.0);
                 double rsiBull = getDoubleParam(params, "rsiBullThreshold", 55.0);
@@ -448,7 +448,7 @@ public class ChartDataService {
                 description = String.format("Buy when EMA cross up + ADX>%.0f + RSI>%.0f; Sell on cross down + RSI<%.0f",
                         adxThreshold, rsiBull, rsiBear);
             }
-            case "bollinger squeeze" -> {
+            case "bollingersqueeze", "bollinger_squeeze" -> {
                 // Bollinger Bands inside Keltner Channels squeeze
                 double bbStdDev = getDoubleParam(params, "bbStdDev", 2.5);
                 double kcMultiplier = getDoubleParam(params, "kcMultiplier", 2.0);
@@ -460,7 +460,7 @@ public class ChartDataService {
                 description = String.format("Squeeze breakout: BB(%.1fσ) inside KC(%.1fx ATR), direction via MACD",
                         bbStdDev, kcMultiplier);
             }
-            case "vwap mean reversion" -> {
+            case "vwapmeanreversion", "vwap_mean_reversion" -> {
                 // Mean reversion around VWAP
                 double upperSigma = getDoubleParam(params, "upperSigma", 2.3);
                 double lowerSigma = getDoubleParam(params, "lowerSigma", 2.3);
