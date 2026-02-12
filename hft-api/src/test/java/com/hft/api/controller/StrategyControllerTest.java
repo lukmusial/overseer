@@ -139,6 +139,25 @@ class StrategyControllerTest {
     }
 
     @Test
+    void getStrategyTypes_includesPositionAndOrderSizingParameters() throws Exception {
+        // Every strategy type should have all 4 sizing parameters
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(get("/api/strategies/types"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[" + i + "].parameters[?(@.name == 'maxPositionSize')].description")
+                            .value(org.hamcrest.Matchers.everyItem(
+                                    org.hamcrest.Matchers.containsString("quantity"))))
+                    .andExpect(jsonPath("$[" + i + "].parameters[?(@.name == 'maxPositionNotional')].description")
+                            .value(org.hamcrest.Matchers.everyItem(
+                                    org.hamcrest.Matchers.containsString("dollars"))))
+                    .andExpect(jsonPath("$[" + i + "].parameters[?(@.name == 'maxOrderSize')]").isNotEmpty())
+                    .andExpect(jsonPath("$[" + i + "].parameters[?(@.name == 'maxOrderNotional')].default")
+                            .value(org.hamcrest.Matchers.everyItem(
+                                    org.hamcrest.Matchers.is(500000))));
+        }
+    }
+
+    @Test
     void getTradingPeriods_returnsAllPeriods() throws Exception {
         mockMvc.perform(get("/api/strategies/trading-periods"))
                 .andExpect(status().isOk())
