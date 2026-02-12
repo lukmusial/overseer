@@ -9,9 +9,10 @@ This document provides visual documentation of the HFT trading system architectu
 3. [Component Interactions](#component-interactions)
 4. [Sequence Diagrams](#sequence-diagrams)
 5. [Trading Algorithms](#trading-algorithms)
-6. [Risk Management](#risk-management)
-7. [Persistence Layer](#persistence-layer)
-8. [Testing Strategy](#testing-strategy)
+6. [Trading Periods](#trading-periods-uk-hours-utc)
+7. [Risk Management](#risk-management)
+8. [Persistence Layer](#persistence-layer)
+9. [Testing Strategy](#testing-strategy)
 
 ---
 
@@ -618,6 +619,28 @@ classDiagram
         +calculateSignal() double
     }
 
+    class EmaAdxRsiStrategy {
+        -fastEmaPeriod int
+        -slowEmaPeriod int
+        -adxThreshold double
+        -rsiPeriod int
+        +calculateSignal() double
+    }
+
+    class BollingerSqueezeStrategy {
+        -bbPeriod int
+        -kcMultiplier double
+        -macdFast int
+        +calculateSignal() double
+    }
+
+    class VwapMeanReversionStrategy {
+        -upperSigma double
+        -lowerSigma double
+        -exitSigma double
+        +calculateSignal() double
+    }
+
     class TwapAlgorithm {
         -sliceIntervalNanos long
         -totalSlices int
@@ -636,6 +659,9 @@ classDiagram
     TradingStrategy <|.. AbstractTradingStrategy
     AbstractTradingStrategy <|-- MomentumStrategy
     AbstractTradingStrategy <|-- MeanReversionStrategy
+    AbstractTradingStrategy <|-- EmaAdxRsiStrategy
+    AbstractTradingStrategy <|-- BollingerSqueezeStrategy
+    AbstractTradingStrategy <|-- VwapMeanReversionStrategy
     ExecutionAlgorithm <|.. TwapAlgorithm
     ExecutionAlgorithm <|.. VwapAlgorithm
 ```
@@ -971,6 +997,58 @@ Entry Condition (BUY):  Z-Score < -entryZScore  (e.g., -2.0)
 Entry Condition (SELL): Z-Score > +entryZScore  (e.g., +2.0)
 Exit Condition:         |Z-Score| < exitZScore  (e.g., 0.5)
 ```
+
+### EMA + ADX + RSI Strategy (`ema_adx_rsi`)
+
+Trend-following strategy combining three indicators for high-conviction entries:
+
+1. **EMA Crossover** (9/21): Fast EMA above slow EMA = bullish direction
+2. **ADX Filter** (>25): Confirms a strong trend exists before entry
+3. **RSI Confirmation**: RSI > 55 for buys, RSI < 45 for sells
+
+Signal is only generated when all three conditions align, reducing false signals in ranging markets.
+
+### Bollinger Squeeze Strategy (`bollinger_squeeze`)
+
+Volatility breakout strategy detecting when Bollinger Bands contract inside Keltner Channels:
+
+1. **Squeeze Detection**: BB upper < KC upper AND BB lower > KC lower
+2. **Breakout Entry**: When squeeze releases, trade in MACD histogram direction
+3. **Direction**: MACD histogram sign determines long (positive) or short (negative)
+
+Optimal during low-to-high volatility transitions, particularly at London open and US/EU overlap.
+
+### VWAP Mean Reversion Strategy (`vwap_mean_reversion`)
+
+Mean reversion around the session Volume-Weighted Average Price:
+
+1. **VWAP Calculation**: Cumulative price*volume / cumulative volume
+2. **Entry**: Buy when price < VWAP - lowerSigma*sigma, sell when > VWAP + upperSigma*sigma
+3. **Exit**: Close when price returns within exitSigma of VWAP
+4. **Filters**: Volume filter (only trade on above-average volume), max hold time
+
+---
+
+### Trading Periods (UK Hours, UTC)
+
+The system defines trading periods based on UK business hours to optimize position sizing and strategy selection:
+
+```
+Period          Hours (UTC)    Multiplier    Recommended Strategies
+─────────────────────────────────────────────────────────────────────
+LONDON_OPEN     08:00-09:00    0.75          bollinger_squeeze, ema_adx_rsi
+EU_MORNING      09:00-11:00    0.75          ema_adx_rsi, vwap_mean_reversion
+PRE_OVERLAP     11:00-12:00    0.50          bollinger_squeeze, vwap_mean_reversion
+OVERLAP         12:00-16:00    1.00          ema_adx_rsi, bollinger_squeeze
+POST_EU         16:00-18:00    0.50          vwap_mean_reversion
+OFF_HOURS       18:00-08:00    0.25          (none)
+```
+
+The `TradingPeriodDetector` uses a configurable `Clock` for testability and determines the current period via `TradingPeriod.fromUtcTime()`. The position multiplier can be used to scale position sizes during lower-liquidity periods.
+
+**API Endpoints:**
+- `GET /api/strategies/trading-periods` - Returns all 6 periods with times, multipliers, and recommended strategies
+- `GET /api/strategies/trading-periods/current` - Returns the current period based on UTC time
 
 ---
 

@@ -123,7 +123,43 @@ class StrategyControllerTest {
         mockMvc.perform(get("/api/strategies/types"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type").value("momentum"))
-                .andExpect(jsonPath("$[1].type").value("meanreversion"));
+                .andExpect(jsonPath("$[1].type").value("meanreversion"))
+                .andExpect(jsonPath("$[2].type").value("ema_adx_rsi"))
+                .andExpect(jsonPath("$[3].type").value("bollinger_squeeze"))
+                .andExpect(jsonPath("$[4].type").value("vwap_mean_reversion"));
+    }
+
+    @Test
+    void getStrategyTypes_returnsNewStrategyParameters() throws Exception {
+        mockMvc.perform(get("/api/strategies/types"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[2].name").value("EMA + ADX + RSI"))
+                .andExpect(jsonPath("$[3].name").value("Bollinger Squeeze"))
+                .andExpect(jsonPath("$[4].name").value("VWAP Mean Reversion"));
+    }
+
+    @Test
+    void getTradingPeriods_returnsAllPeriods() throws Exception {
+        mockMvc.perform(get("/api/strategies/trading-periods"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(6))
+                .andExpect(jsonPath("$[0].name").value("LONDON_OPEN"))
+                .andExpect(jsonPath("$[0].positionMultiplier").value(0.75))
+                .andExpect(jsonPath("$[3].name").value("OVERLAP"))
+                .andExpect(jsonPath("$[3].positionMultiplier").value(1.0))
+                .andExpect(jsonPath("$[5].name").value("OFF_HOURS"))
+                .andExpect(jsonPath("$[5].positionMultiplier").value(0.25));
+    }
+
+    @Test
+    void getCurrentTradingPeriod_returnsCurrentPeriod() throws Exception {
+        mockMvc.perform(get("/api/strategies/trading-periods/current"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").isString())
+                .andExpect(jsonPath("$.positionMultiplier").isNumber())
+                .andExpect(jsonPath("$.startTime").isString())
+                .andExpect(jsonPath("$.endTime").isString())
+                .andExpect(jsonPath("$.recommendedStrategies").isArray());
     }
 
     private StrategyDto createStrategyDto(String id, AlgorithmState state) {
