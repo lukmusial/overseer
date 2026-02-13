@@ -132,6 +132,14 @@ describe('CandlestickChart', () => {
       stopStrategy: vi.fn(),
       removeStrategy: vi.fn(),
       getExchangeStatus: vi.fn(),
+      switchMode: vi.fn(),
+      getRecentOrders: vi.fn(),
+      searchOrders: vi.fn(),
+      getRiskLimits: vi.fn(),
+      updateRiskLimits: vi.fn(),
+      getStrategyTypes: vi.fn(),
+      getTradingPeriods: vi.fn(),
+      getCurrentTradingPeriod: vi.fn(),
     });
   });
 

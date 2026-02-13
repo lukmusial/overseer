@@ -51,3 +51,6 @@ target/
 # Local configuration (secrets)
 application-local.properties
 .env
+
+# Local documentation (not tracked)
+local-docs/
