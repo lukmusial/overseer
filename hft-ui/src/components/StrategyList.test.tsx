@@ -174,6 +174,61 @@ describe('StrategyList', () => {
     expect(screen.getByText('-$3.00')).toBeInTheDocument();
   });
 
+  it('renders info buttons for new strategy types (EmaAdxRsi, BollingerSqueeze, VwapMeanReversion)', () => {
+    const newTypeStrategies: Strategy[] = [
+      {
+        id: 's-ema', name: 'BTC EMA+ADX+RSI', type: 'EmaAdxRsi', state: 'RUNNING',
+        symbols: ['BTCUSDT'], parameters: { fastEmaPeriod: 9, slowEmaPeriod: 21, adxThreshold: 25 },
+        progress: 0, priceScale: 100_000_000, stats: null,
+      },
+      {
+        id: 's-bb', name: 'BTC Squeeze', type: 'BollingerSqueeze', state: 'STOPPED',
+        symbols: ['BTCUSDT'], parameters: { bbStdDev: 2.5, kcMultiplier: 2.0 },
+        progress: 0, priceScale: 100_000_000, stats: null,
+      },
+      {
+        id: 's-vwap', name: 'BTC VWAP MR', type: 'VwapMeanReversion', state: 'RUNNING',
+        symbols: ['BTCUSDT'], parameters: { upperSigma: 2.3, lowerSigma: 2.3, exitSigma: 0.5 },
+        progress: 0, priceScale: 100_000_000, stats: null,
+      },
+    ];
+    render(<StrategyList {...defaultProps} strategies={newTypeStrategies} />);
+
+    // All three should have info buttons
+    expect(screen.getByLabelText('Info about EmaAdxRsi')).toBeInTheDocument();
+    expect(screen.getByLabelText('Info about BollingerSqueeze')).toBeInTheDocument();
+    expect(screen.getByLabelText('Info about VwapMeanReversion')).toBeInTheDocument();
+
+    // Tooltips should contain strategy descriptions
+    expect(screen.getByText('EmaAdxRsi Strategy')).toBeInTheDocument();
+    expect(screen.getByText(/EMA crossover confirmed by ADX/)).toBeInTheDocument();
+    expect(screen.getByText('BollingerSqueeze Strategy')).toBeInTheDocument();
+    expect(screen.getByText(/low-volatility squeeze/)).toBeInTheDocument();
+    expect(screen.getByText('VwapMeanReversion Strategy')).toBeInTheDocument();
+    expect(screen.getByText(/session VWAP with sigma/)).toBeInTheDocument();
+  });
+
+  it('renders P&L correctly with Binance priceScale', () => {
+    const binanceStrategy: Strategy = {
+      id: 's-btc', name: 'BTC Momentum', type: 'Momentum', state: 'RUNNING',
+      symbols: ['BTCUSDT'],
+      parameters: { shortPeriod: 10, longPeriod: 30, signalThreshold: 0.02 },
+      progress: 0,
+      priceScale: 100_000_000, // Binance scale
+      stats: {
+        startTimeNanos: 0, endTimeNanos: 0,
+        totalOrders: 5, filledOrders: 3, cancelledOrders: 1, rejectedOrders: 1,
+        realizedPnl: 50_000_000_000, // $500 in Binance scale
+        unrealizedPnl: 25_000_000_000, // $250 in Binance scale
+        maxDrawdown: 10_000_000_000,
+      },
+    };
+    render(<StrategyList {...defaultProps} strategies={[binanceStrategy]} />);
+
+    // Total P&L = $500 + $250 = $750
+    expect(screen.getByText('+$750.00')).toBeInTheDocument();
+  });
+
   it('shows newly created strategy when list is re-rendered with updated strategies', () => {
     const { rerender } = render(<StrategyList {...defaultProps} strategies={[]} />);
 

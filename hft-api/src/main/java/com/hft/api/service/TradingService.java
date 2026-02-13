@@ -4,10 +4,7 @@ import com.hft.algo.base.AbstractTradingStrategy;
 import com.hft.algo.base.AlgorithmState;
 import com.hft.algo.base.StrategyParameters;
 import com.hft.algo.base.TradingStrategy;
-import com.hft.algo.strategy.MeanReversionStrategy;
-import com.hft.algo.strategy.MomentumStrategy;
-import com.hft.algo.strategy.TwapStrategy;
-import com.hft.algo.strategy.VwapStrategy;
+import com.hft.algo.strategy.*;
 import com.hft.api.config.RiskLimitsProperties;
 import com.hft.api.dto.*;
 import com.hft.core.model.*;
@@ -166,6 +163,9 @@ public class TradingService {
             case "meanreversion", "mean_reversion" -> new MeanReversionStrategy(symbols, params, def.name());
             case "vwap" -> new VwapStrategy(symbols, params, def.name());
             case "twap" -> new TwapStrategy(symbols, params, def.name());
+            case "ema_adx_rsi", "emaadxrsi" -> new EmaAdxRsiStrategy(symbols, params, def.name());
+            case "bollinger_squeeze", "bollingersqueeze" -> new BollingerSqueezeStrategy(symbols, params, def.name());
+            case "vwap_mean_reversion", "vwapmeanreversion" -> new VwapMeanReversionStrategy(symbols, params, def.name());
             default -> throw new IllegalArgumentException("Unknown strategy type: " + def.type());
         };
     }
@@ -393,6 +393,9 @@ public class TradingService {
             case "meanreversion", "mean_reversion" -> strategy = new MeanReversionStrategy(symbols, params, customName);
             case "vwap" -> strategy = new VwapStrategy(symbols, params, customName);
             case "twap" -> strategy = new TwapStrategy(symbols, params, customName);
+            case "ema_adx_rsi", "emaadxrsi" -> strategy = new EmaAdxRsiStrategy(symbols, params, customName);
+            case "bollinger_squeeze", "bollingersqueeze" -> strategy = new BollingerSqueezeStrategy(symbols, params, customName);
+            case "vwap_mean_reversion", "vwapmeanreversion" -> strategy = new VwapMeanReversionStrategy(symbols, params, customName);
             default -> throw new IllegalArgumentException("Unknown strategy type: " + request.type());
         }
 

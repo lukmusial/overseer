@@ -55,6 +55,8 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   const [selectedStrategy, setSelectedStrategy] = useState<string>('all');
   const [lastQuote, setLastQuote] = useState<Quote | null>(null);
   const [showThresholds, setShowThresholds] = useState(true);
+  const lastThresholdFetchRef = useRef<number>(0);
+  const fetchDataRef = useRef<() => void>(() => {});
 
   const { getChartData } = useApi();
 
@@ -68,6 +70,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     try {
       const data = await getChartData(exchange, symbol, interval, periods);
       setChartData(data);
+      lastThresholdFetchRef.current = Date.now();
       // Set current candle reference to the last candle
       if (data.candles.length > 0) {
         const lastCandle = data.candles[data.candles.length - 1];
@@ -85,6 +88,9 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       setLoading(false);
     }
   }, [exchange, symbol, interval, periods, getChartData, refreshKey]);
+
+  // Keep fetchDataRef current for use in callbacks without re-subscribing
+  fetchDataRef.current = fetchData;
 
   // Initialize chart
   useEffect(() => {
@@ -203,12 +209,29 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     fetchData();
   }, [fetchData]);
 
+  // Periodically refresh chart data (trigger ranges, data source changes)
+  useEffect(() => {
+    if (!exchange || !symbol) return;
+
+    const timer = window.setInterval(() => {
+      fetchData();
+    }, 30_000); // 30 seconds
+
+    return () => window.clearInterval(timer);
+  }, [exchange, symbol, interval, periods, fetchData]);
+
   // Subscribe to real-time quote updates
   useEffect(() => {
     if (!subscribe || !exchange || !symbol) return;
 
     const unsubscribe = subscribe<Quote>(`/topic/quotes/${exchange}/${symbol}`, (quote) => {
       setLastQuote(quote);
+
+      // Re-fetch chart data (including thresholds) when stale >10s
+      const timeSinceLastFetch = Date.now() - lastThresholdFetchRef.current;
+      if (timeSinceLastFetch > 10_000) {
+        fetchDataRef.current();
+      }
 
       // Update the chart with the new quote
       if (!candlestickSeriesRef.current || !currentCandleRef.current) return;
@@ -346,7 +369,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
 
       const newLines: IPriceLine[] = [];
       filteredRanges.forEach((range: TriggerRange) => {
-        if (range.buyTriggerLow !== null && series) {
+        if (range.buyTriggerLow != null && series) {
           newLines.push(series.createPriceLine({
             price: range.buyTriggerLow,
             color: pipGreen,
@@ -356,7 +379,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
             title: `Buy Low (${range.strategyName})`,
           }));
         }
-        if (range.buyTriggerHigh !== null && series) {
+        if (range.buyTriggerHigh != null && series) {
           newLines.push(series.createPriceLine({
             price: range.buyTriggerHigh,
             color: pipGreen,
@@ -366,7 +389,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
             title: `Buy High (${range.strategyName})`,
           }));
         }
-        if (range.sellTriggerLow !== null && series) {
+        if (range.sellTriggerLow != null && series) {
           newLines.push(series.createPriceLine({
             price: range.sellTriggerLow,
             color: pipRed,
@@ -376,7 +399,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
             title: `Sell Low (${range.strategyName})`,
           }));
         }
-        if (range.sellTriggerHigh !== null && series) {
+        if (range.sellTriggerHigh != null && series) {
           newLines.push(series.createPriceLine({
             price: range.sellTriggerHigh,
             color: pipRed,
@@ -487,25 +510,25 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
               {filteredRanges.map((range: TriggerRange) => (
                 <div key={range.strategyId} className="threshold-group">
                   <div className="threshold-strategy-name">{range.strategyName}</div>
-                  {range.buyTriggerLow !== null && (
+                  {range.buyTriggerLow != null && (
                     <div className="threshold-line buy">
                       <span className="threshold-label">Buy Low</span>
                       <span className="threshold-value">${range.buyTriggerLow.toFixed(2)}</span>
                     </div>
                   )}
-                  {range.buyTriggerHigh !== null && (
+                  {range.buyTriggerHigh != null && (
                     <div className="threshold-line buy">
                       <span className="threshold-label">Buy High</span>
                       <span className="threshold-value">${range.buyTriggerHigh.toFixed(2)}</span>
                     </div>
                   )}
-                  {range.sellTriggerLow !== null && (
+                  {range.sellTriggerLow != null && (
                     <div className="threshold-line sell">
                       <span className="threshold-label">Sell Low</span>
                       <span className="threshold-value">${range.sellTriggerLow.toFixed(2)}</span>
                     </div>
                   )}
-                  {range.sellTriggerHigh !== null && (
+                  {range.sellTriggerHigh != null && (
                     <div className="threshold-line sell">
                       <span className="threshold-label">Sell High</span>
                       <span className="threshold-value">${range.sellTriggerHigh.toFixed(2)}</span>

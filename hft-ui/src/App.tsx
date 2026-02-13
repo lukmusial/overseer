@@ -11,6 +11,7 @@ import { PositionList } from './components/PositionList';
 import { ExchangeStatusPanel } from './components/ExchangeStatusPanel';
 import { ChartPanel } from './components/ChartPanel';
 import { RiskLimitsPanel } from './components/RiskLimitsPanel';
+import { TradingPeriodIndicator } from './components/TradingPeriodIndicator';
 import type {
   EngineStatus as EngineStatusType,
   Order,
@@ -257,6 +258,7 @@ export default function App() {
             </button>
           </nav>
         </div>
+        <TradingPeriodIndicator />
         <div className={`connection-status ${wsConnected ? 'connected' : 'disconnected'}`}>
           {wsConnected ? 'WebSocket Connected' : 'WebSocket Disconnected'}
         </div>

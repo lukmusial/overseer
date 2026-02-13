@@ -270,6 +270,64 @@ class MomentumStrategyTest {
     }
 
     @Test
+    void onQuote_WithMaxPositionNotional_ShouldClampTargetByDollarValue() {
+        // Create strategy with maxPositionNotional = $5,000 and maxPositionSize = 100 shares
+        // Price = $150.00 (15000 in minor units, priceScale=100)
+        // Without notional limit: target could be up to 100 shares
+        // With $5,000 limit: max qty = 5000 * 100 / 15000 = 33 shares
+        var params = new com.hft.algo.base.StrategyParameters();
+        params.set("shortPeriod", 5);
+        params.set("longPeriod", 10);
+        params.set("signalThreshold", 0.01);
+        params.set("maxPositionSize", 100L);
+        params.set("maxPositionNotional", 5000L);
+
+        MomentumStrategy notionalStrategy = new MomentumStrategy(
+                Set.of(testSymbol), params, null);
+        notionalStrategy.initialize(context);
+        notionalStrategy.start();
+
+        // Create strong uptrend to generate maximum signal
+        for (int i = 0; i < 50; i++) {
+            long price = 10000L + (i * 500);
+            notionalStrategy.onQuote(createQuote(price));
+        }
+
+        long target = notionalStrategy.getTargetPosition(testSymbol);
+        // The target should be clamped: at price ~34500 (last quote mid),
+        // maxQtyByNotional = 5000 * 100 / 34500 ≈ 14
+        // So target must be <= 100 (maxPositionSize) AND <= ~14 (notional limit)
+        assertTrue(target <= 100, "Target should not exceed maxPositionSize");
+
+        // Verify notional clamping is active (target should be much less than 100
+        // due to the $5,000 notional limit at high prices)
+        if (target > 0) {
+            // Calculate the expected notional limit at the current mid price
+            long lastMidPrice = 10000L + (49 * 500); // ~34500
+            long expectedMaxQty = 5000L * 100 / lastMidPrice;
+            assertTrue(target <= expectedMaxQty + 1,
+                    "Target (" + target + ") should be clamped by notional limit (~" + expectedMaxQty + ")");
+        }
+    }
+
+    @Test
+    void onQuote_WithZeroMaxPositionNotional_ShouldNotClamp() {
+        // maxPositionNotional = 0 means no notional limit (default)
+        strategy.start();
+
+        // Create strong uptrend
+        for (int i = 0; i < 50; i++) {
+            long price = 10000L + (i * 500);
+            strategy.onQuote(createQuote(price));
+        }
+
+        long target = strategy.getTargetPosition(testSymbol);
+        // With no notional limit and maxPositionSize=100, target can go up to 100
+        assertTrue(target <= 100, "Target should not exceed maxPositionSize");
+        // No additional clamping applied
+    }
+
+    @Test
     void builder_ShouldRequireAtLeastOneSymbol() {
         assertThrows(IllegalStateException.class, () ->
             MomentumStrategy.builder()

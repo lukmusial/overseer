@@ -9,9 +9,10 @@ This document provides visual documentation of the HFT trading system architectu
 3. [Component Interactions](#component-interactions)
 4. [Sequence Diagrams](#sequence-diagrams)
 5. [Trading Algorithms](#trading-algorithms)
-6. [Risk Management](#risk-management)
-7. [Persistence Layer](#persistence-layer)
-8. [Testing Strategy](#testing-strategy)
+6. [Trading Periods](#trading-periods-uk-hours-utc)
+7. [Risk Management](#risk-management)
+8. [Persistence Layer](#persistence-layer)
+9. [Testing Strategy](#testing-strategy)
 
 ---
 
@@ -618,6 +619,28 @@ classDiagram
         +calculateSignal() double
     }
 
+    class EmaAdxRsiStrategy {
+        -fastEmaPeriod int
+        -slowEmaPeriod int
+        -adxThreshold double
+        -rsiPeriod int
+        +calculateSignal() double
+    }
+
+    class BollingerSqueezeStrategy {
+        -bbPeriod int
+        -kcMultiplier double
+        -macdFast int
+        +calculateSignal() double
+    }
+
+    class VwapMeanReversionStrategy {
+        -upperSigma double
+        -lowerSigma double
+        -exitSigma double
+        +calculateSignal() double
+    }
+
     class TwapAlgorithm {
         -sliceIntervalNanos long
         -totalSlices int
@@ -636,6 +659,9 @@ classDiagram
     TradingStrategy <|.. AbstractTradingStrategy
     AbstractTradingStrategy <|-- MomentumStrategy
     AbstractTradingStrategy <|-- MeanReversionStrategy
+    AbstractTradingStrategy <|-- EmaAdxRsiStrategy
+    AbstractTradingStrategy <|-- BollingerSqueezeStrategy
+    AbstractTradingStrategy <|-- VwapMeanReversionStrategy
     ExecutionAlgorithm <|.. TwapAlgorithm
     ExecutionAlgorithm <|.. VwapAlgorithm
 ```
@@ -971,6 +997,58 @@ Entry Condition (BUY):  Z-Score < -entryZScore  (e.g., -2.0)
 Entry Condition (SELL): Z-Score > +entryZScore  (e.g., +2.0)
 Exit Condition:         |Z-Score| < exitZScore  (e.g., 0.5)
 ```
+
+### EMA + ADX + RSI Strategy (`ema_adx_rsi`)
+
+Trend-following strategy combining three indicators for high-conviction entries:
+
+1. **EMA Crossover** (9/21): Fast EMA above slow EMA = bullish direction
+2. **ADX Filter** (>25): Confirms a strong trend exists before entry
+3. **RSI Confirmation**: RSI > 55 for buys, RSI < 45 for sells
+
+Signal is only generated when all three conditions align, reducing false signals in ranging markets.
+
+### Bollinger Squeeze Strategy (`bollinger_squeeze`)
+
+Volatility breakout strategy detecting when Bollinger Bands contract inside Keltner Channels:
+
+1. **Squeeze Detection**: BB upper < KC upper AND BB lower > KC lower
+2. **Breakout Entry**: When squeeze releases, trade in MACD histogram direction
+3. **Direction**: MACD histogram sign determines long (positive) or short (negative)
+
+Optimal during low-to-high volatility transitions, particularly at London open and US/EU overlap.
+
+### VWAP Mean Reversion Strategy (`vwap_mean_reversion`)
+
+Mean reversion around the session Volume-Weighted Average Price:
+
+1. **VWAP Calculation**: Cumulative price*volume / cumulative volume
+2. **Entry**: Buy when price < VWAP - lowerSigma*sigma, sell when > VWAP + upperSigma*sigma
+3. **Exit**: Close when price returns within exitSigma of VWAP
+4. **Filters**: Volume filter (only trade on above-average volume), max hold time
+
+---
+
+### Trading Periods (UK Hours, UTC)
+
+The system defines trading periods based on UK business hours to optimize position sizing and strategy selection:
+
+```
+Period          Hours (UTC)    Multiplier    Recommended Strategies
+─────────────────────────────────────────────────────────────────────
+LONDON_OPEN     08:00-09:00    0.75          bollinger_squeeze, ema_adx_rsi
+EU_MORNING      09:00-11:00    0.75          ema_adx_rsi, vwap_mean_reversion
+PRE_OVERLAP     11:00-12:00    0.50          bollinger_squeeze, vwap_mean_reversion
+OVERLAP         12:00-16:00    1.00          ema_adx_rsi, bollinger_squeeze
+POST_EU         16:00-18:00    0.50          vwap_mean_reversion
+OFF_HOURS       18:00-08:00    0.25          (none)
+```
+
+The `TradingPeriodDetector` uses a configurable `Clock` for testability and determines the current period via `TradingPeriod.fromUtcTime()`. The position multiplier can be used to scale position sizes during lower-liquidity periods.
+
+**API Endpoints:**
+- `GET /api/strategies/trading-periods` - Returns all 6 periods with times, multipliers, and recommended strategies
+- `GET /api/strategies/trading-periods/current` - Returns the current period based on UTC time
 
 ---
 
@@ -1434,6 +1512,52 @@ sequenceDiagram
     PnL->>PnL: Recalculate P&L
 ```
 
+### Backtesting Framework
+
+The `hft-bdd` module includes a backtesting engine that replays historical Binance kline data through strategies to evaluate performance.
+
+```mermaid
+sequenceDiagram
+    participant Binance as Binance API
+    participant Fetcher as HistoricalDataFetcher
+    participant Engine as BacktestEngine
+    participant Strategy as TradingStrategy
+    participant Portfolio as Portfolio Tracker
+
+    Fetcher->>Binance: GET /api/v3/klines (paginated)
+    Binance-->>Fetcher: OHLCV candles
+    Fetcher->>Engine: List<Candle>
+    loop For each candle
+        Engine->>Strategy: onQuote(quote)
+        Strategy->>Strategy: calculateSignal()
+        Strategy-->>Engine: signal [-1.0, +1.0]
+        Engine->>Engine: Apply period multiplier
+        Engine->>Portfolio: Update allocation
+    end
+    Engine-->>Engine: BacktestResult
+```
+
+**Key components** (`com.hft.bdd.backtest`):
+
+| Class | Purpose |
+|-------|---------|
+| `BacktestEngine` | Replays candles through strategies, manages portfolio P&L |
+| `BacktestConfig` | Configuration record (symbol, strategy, period, capital, reinvest mode) |
+| `BacktestResult` | Results with daily snapshots, trade records, Sharpe ratio, profit factor |
+| `HistoricalDataFetcher` | Fetches klines from Binance public API with pagination |
+| `StrategyBacktestTest` | Parameterized JUnit test running all strategy/symbol/period combinations |
+
+**Two portfolio modes:**
+- **Compound**: Reinvest profits, portfolio value compounds over the period
+- **Daily reset**: Reset to initial capital each day, accumulate daily P&Ls
+
+```bash
+# Run backtests (excluded from normal test suite)
+./gradlew :hft-bdd:backtest
+
+# Results written to local-docs/BACKTEST_REPORT.md
+```
+
 ### Running Tests
 
 ```bash
@@ -1445,6 +1569,9 @@ sequenceDiagram
 
 # Run performance benchmarks
 ./gradlew :hft-bdd:test --tests '*Performance*'
+
+# Run strategy backtests against real Binance data
+./gradlew :hft-bdd:backtest
 ```
 
 ### Key Test Scenarios
@@ -1467,11 +1594,12 @@ This HFT trading system provides:
 1. **Ultra-Low Latency**: LMAX Disruptor with 64K ring buffer, zero-allocation object pooling
 2. **Comprehensive Risk Management**: Pluggable rules, circuit breaker, daily limits with normalized P&L comparison
 3. **Multi-Exchange Support**: Alpaca (stocks, 2 decimal places) and Binance (crypto, 8 decimal places) with unified price scale handling and credential verification
-4. **Advanced Algorithms**: VWAP, TWAP execution; Momentum, Mean Reversion strategies
+4. **Advanced Algorithms**: VWAP, TWAP execution; Momentum, Mean Reversion, EMA+ADX+RSI, Bollinger Squeeze, VWAP Mean Reversion strategies
 5. **Full Persistence**: Chronicle Queue stores for orders, trades, positions, strategies, and audit events with automatic startup restoration
 6. **Real-Time Dashboard**: React UI with WebSocket-driven live updates, interactive candlestick charts, and strategy management
 7. **Real-Time Position Tracking**: P&L, exposure, and drawdown calculations across different price scales, persisted across restarts
 8. **Event-Driven Architecture**: Clean separation of concerns with hexagonal design
+9. **Backtesting**: Historical kline replay engine with signal-based portfolio tracking, trading period analysis, and automated report generation
 
 The architecture balances:
 - **Performance**: Nanosecond latency, lock-free structures

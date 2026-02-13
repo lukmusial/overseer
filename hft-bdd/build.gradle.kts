@@ -46,6 +46,29 @@ dependencies {
 
 tasks.test {
     systemProperty("cucumber.junit-platform.naming-strategy", "long")
+    useJUnitPlatform {
+        excludeTags("backtest")
+    }
+    testLogging {
+        showStandardStreams = true
+        events("passed", "skipped", "failed")
+    }
+}
+
+// Dedicated task for running backtests (requires internet for Binance API)
+// Usage: ./gradlew :hft-bdd:backtest
+tasks.register<Test>("backtest") {
+    description = "Run strategy backtests against historical Binance data"
+    group = "verification"
+    useJUnitPlatform {
+        includeTags("backtest")
+    }
+    // Only run tests from the backtest package (exclude Cucumber runner)
+    filter {
+        includeTestsMatching("com.hft.bdd.backtest.*")
+    }
+    // Set working directory to project root for report output
+    workingDir = rootProject.projectDir
     testLogging {
         showStandardStreams = true
         events("passed", "skipped", "failed")
