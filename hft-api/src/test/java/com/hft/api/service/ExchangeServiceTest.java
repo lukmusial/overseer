@@ -14,6 +14,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ExchangeServiceTest {
@@ -23,6 +24,7 @@ class ExchangeServiceTest {
     private SimpMessagingTemplate messagingTemplate;
     private TradingService tradingService;
     private StubMarketDataService stubMarketDataService;
+    private ChartDataService chartDataService;
 
     @BeforeEach
     void setUp() {
@@ -50,8 +52,9 @@ class ExchangeServiceTest {
         TradingEngine mockEngine = mock(TradingEngine.class);
         when(tradingService.getTradingEngine()).thenReturn(mockEngine);
         stubMarketDataService = mock(StubMarketDataService.class);
+        chartDataService = mock(ChartDataService.class);
 
-        exchangeService = new ExchangeService(properties, new StandardEnvironment(), messagingTemplate, tradingService, stubMarketDataService);
+        exchangeService = new ExchangeService(properties, new StandardEnvironment(), messagingTemplate, tradingService, stubMarketDataService, chartDataService);
         exchangeService.initialize();
     }
 
@@ -213,7 +216,7 @@ class ExchangeServiceTest {
         binance.setMode("stub");
         disabledProps.setBinance(binance);
 
-        ExchangeService service = new ExchangeService(disabledProps, new StandardEnvironment(), messagingTemplate, tradingService, stubMarketDataService);
+        ExchangeService service = new ExchangeService(disabledProps, new StandardEnvironment(), messagingTemplate, tradingService, stubMarketDataService, chartDataService);
         service.initialize();
 
         ExchangeStatusDto alpacaStatus = service.getExchangeStatus("ALPACA");
@@ -282,6 +285,12 @@ class ExchangeServiceTest {
         // After switching to sandbox (no API keys), fetching symbols returns stub fallback
         List<SymbolDto> after = exchangeService.getSymbols("ALPACA");
         assertNotSame(before, after, "Cache should have been cleared");
+    }
+
+    @Test
+    void switchMode_clearsChartCache() {
+        exchangeService.switchMode("BINANCE", "testnet");
+        verify(chartDataService).clearCache();
     }
 
     @Test
