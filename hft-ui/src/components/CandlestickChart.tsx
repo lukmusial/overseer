@@ -55,6 +55,8 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   const [selectedStrategy, setSelectedStrategy] = useState<string>('all');
   const [lastQuote, setLastQuote] = useState<Quote | null>(null);
   const [showThresholds, setShowThresholds] = useState(true);
+  const lastThresholdFetchRef = useRef<number>(0);
+  const fetchDataRef = useRef<() => void>(() => {});
 
   const { getChartData } = useApi();
 
@@ -68,6 +70,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     try {
       const data = await getChartData(exchange, symbol, interval, periods);
       setChartData(data);
+      lastThresholdFetchRef.current = Date.now();
       // Set current candle reference to the last candle
       if (data.candles.length > 0) {
         const lastCandle = data.candles[data.candles.length - 1];
@@ -85,6 +88,9 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       setLoading(false);
     }
   }, [exchange, symbol, interval, periods, getChartData, refreshKey]);
+
+  // Keep fetchDataRef current for use in callbacks without re-subscribing
+  fetchDataRef.current = fetchData;
 
   // Initialize chart
   useEffect(() => {
@@ -220,6 +226,12 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
 
     const unsubscribe = subscribe<Quote>(`/topic/quotes/${exchange}/${symbol}`, (quote) => {
       setLastQuote(quote);
+
+      // Re-fetch chart data (including thresholds) when stale >10s
+      const timeSinceLastFetch = Date.now() - lastThresholdFetchRef.current;
+      if (timeSinceLastFetch > 10_000) {
+        fetchDataRef.current();
+      }
 
       // Update the chart with the new quote
       if (!candlestickSeriesRef.current || !currentCandleRef.current) return;
