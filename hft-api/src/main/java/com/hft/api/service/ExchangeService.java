@@ -52,6 +52,7 @@ public class ExchangeService {
     private final SimpMessagingTemplate messagingTemplate;
     private final TradingService tradingService;
     private final StubMarketDataService stubMarketDataService;
+    private final ChartDataService chartDataService;
     private final Map<String, ExchangeConnection> connections = new ConcurrentHashMap<>();
 
     // HTTP clients for symbol fetching
@@ -72,12 +73,14 @@ public class ExchangeService {
 
     public ExchangeService(ExchangeProperties properties, Environment environment,
                            SimpMessagingTemplate messagingTemplate, @Lazy TradingService tradingService,
-                           @Lazy StubMarketDataService stubMarketDataService) {
+                           @Lazy StubMarketDataService stubMarketDataService,
+                           @Lazy ChartDataService chartDataService) {
         this.properties = properties;
         this.environment = environment;
         this.messagingTemplate = messagingTemplate;
         this.tradingService = tradingService;
         this.stubMarketDataService = stubMarketDataService;
+        this.chartDataService = chartDataService;
     }
 
     @PostConstruct
@@ -441,6 +444,7 @@ public class ExchangeService {
                     alpacaClient = null;
                 }
                 symbolCache.remove(key);
+                chartDataService.clearCache();
                 properties.getAlpaca().setMode(newMode);
                 initializeAlpaca();
                 yield getExchangeStatus(key);
@@ -457,6 +461,7 @@ public class ExchangeService {
                     binanceClient = null;
                 }
                 symbolCache.remove(key);
+                chartDataService.clearCache();
                 properties.getBinance().setMode(newMode);
                 initializeBinance();
                 yield getExchangeStatus(key);

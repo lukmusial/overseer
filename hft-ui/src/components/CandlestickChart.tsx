@@ -203,6 +203,17 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     fetchData();
   }, [fetchData]);
 
+  // Periodically refresh chart data (trigger ranges, data source changes)
+  useEffect(() => {
+    if (!exchange || !symbol) return;
+
+    const timer = window.setInterval(() => {
+      fetchData();
+    }, 30_000); // 30 seconds
+
+    return () => window.clearInterval(timer);
+  }, [exchange, symbol, interval, periods, fetchData]);
+
   // Subscribe to real-time quote updates
   useEffect(() => {
     if (!subscribe || !exchange || !symbol) return;
