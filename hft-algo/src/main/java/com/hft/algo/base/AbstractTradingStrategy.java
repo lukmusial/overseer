@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public abstract class AbstractTradingStrategy implements TradingStrategy {
 
-    protected final String id;
+    protected String id;
     protected final String customName;
     protected final Set<Symbol> symbols;
     protected StrategyParameters parameters;
@@ -66,6 +66,14 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
     @Override
     public String getId() {
         return id;
+    }
+
+    /**
+     * Restores the strategy ID from persistence.
+     * Used when recreating a strategy from a persisted definition to preserve the original ID.
+     */
+    public void setId(String id) {
+        this.id = id;
     }
 
     /**

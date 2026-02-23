@@ -169,7 +169,7 @@ public class TradingService {
             def.parameters().forEach(params::set);
         }
 
-        return switch (def.type().toLowerCase()) {
+        AbstractTradingStrategy strategy = switch (def.type().toLowerCase()) {
             case "momentum" -> new MomentumStrategy(symbols, params, def.name());
             case "meanreversion", "mean_reversion" -> new MeanReversionStrategy(symbols, params, def.name());
             case "vwap" -> new VwapStrategy(symbols, params, def.name());
@@ -179,6 +179,10 @@ public class TradingService {
             case "vwap_mean_reversion", "vwapmeanreversion" -> new VwapMeanReversionStrategy(symbols, params, def.name());
             default -> throw new IllegalArgumentException("Unknown strategy type: " + def.type());
         };
+
+        // Preserve the original persisted ID so deletions match tombstone records
+        strategy.setId(def.id());
+        return strategy;
     }
 
     private void persistStrategy(TradingStrategy strategy) {
