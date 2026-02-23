@@ -128,6 +128,117 @@ class PositionTest {
         assertEquals(0, position.getUnrealizedPnl());
     }
 
+    // --- Crypto / quantityScale tests ---
+
+    @Test
+    void shouldHandleFractionalCryptoBuy() {
+        // 0.5 BTC at $50,000.00 (priceScale=100_000_000, quantityScale=100_000_000)
+        Symbol btcSymbol = new Symbol("BTCUSDT", Exchange.BINANCE);
+        Position cryptoPos = new Position(btcSymbol);
+        cryptoPos.setPriceScale(100_000_000);
+        cryptoPos.setQuantityScale(100_000_000);
+
+        long price = 5_000_000_000_000L; // $50,000.00 in satoshi-scale
+        long qty = 50_000_000L;          // 0.5 BTC
+
+        Trade trade = new Trade();
+        trade.setSymbol(btcSymbol);
+        trade.setSide(OrderSide.BUY);
+        trade.setQuantity(qty);
+        trade.setPrice(price);
+        trade.setPriceScale(100_000_000);
+        trade.setExecutedAt(System.nanoTime());
+
+        cryptoPos.applyTrade(trade);
+
+        assertEquals(50_000_000L, cryptoPos.getQuantity());
+        assertEquals(0.5, cryptoPos.getQuantityAsDouble(), 1e-9);
+        assertEquals(price, cryptoPos.getAverageEntryPrice());
+        // Market value = price * qty / priceScale / quantityScale = $25,000
+        assertEquals(25_000, cryptoPos.getMarketValue());
+    }
+
+    @Test
+    void shouldCalculateCryptoPnlWithoutOverflow() {
+        // Buy 0.5 BTC at $50,000 then price rises to $60,000
+        Symbol btcSymbol = new Symbol("BTCUSDT", Exchange.BINANCE);
+        Position cryptoPos = new Position(btcSymbol);
+        cryptoPos.setPriceScale(100_000_000);
+        cryptoPos.setQuantityScale(100_000_000);
+
+        long buyPrice = 5_000_000_000_000L;  // $50,000 in 1e8 scale
+        long qty = 50_000_000L;               // 0.5 BTC
+        long newPrice = 6_000_000_000_000L;   // $60,000 in 1e8 scale
+
+        Trade trade = new Trade();
+        trade.setSymbol(btcSymbol);
+        trade.setSide(OrderSide.BUY);
+        trade.setQuantity(qty);
+        trade.setPrice(buyPrice);
+        trade.setPriceScale(100_000_000);
+        trade.setExecutedAt(System.nanoTime());
+
+        cryptoPos.applyTrade(trade);
+        cryptoPos.updateMarketValue(newPrice);
+
+        // Unrealized P&L = (60000 - 50000) * 0.5 = $5,000
+        // In priceScale units: 5000 * 100_000_000 = 500_000_000_000
+        long expectedPnl = (long) ((double) (newPrice - buyPrice) * qty / 100_000_000);
+        assertEquals(expectedPnl, cryptoPos.getUnrealizedPnl());
+        // Verify it's approximately $5,000 worth
+        double pnlDollars = (double) cryptoPos.getUnrealizedPnl() / 100_000_000;
+        assertEquals(5_000.0, pnlDollars, 0.01);
+    }
+
+    @Test
+    void shouldCloseCryptoPositionWithRealizedPnl() {
+        Symbol btcSymbol = new Symbol("BTCUSDT", Exchange.BINANCE);
+        Position cryptoPos = new Position(btcSymbol);
+        cryptoPos.setPriceScale(100_000_000);
+        cryptoPos.setQuantityScale(100_000_000);
+
+        long buyPrice = 5_000_000_000_000L;   // $50,000
+        long sellPrice = 5_500_000_000_000L;   // $55,000
+        long qty = 50_000_000L;                // 0.5 BTC
+
+        Trade buy = new Trade();
+        buy.setSymbol(btcSymbol);
+        buy.setSide(OrderSide.BUY);
+        buy.setQuantity(qty);
+        buy.setPrice(buyPrice);
+        buy.setPriceScale(100_000_000);
+        buy.setExecutedAt(System.nanoTime());
+
+        Trade sell = new Trade();
+        sell.setSymbol(btcSymbol);
+        sell.setSide(OrderSide.SELL);
+        sell.setQuantity(qty);
+        sell.setPrice(sellPrice);
+        sell.setPriceScale(100_000_000);
+        sell.setExecutedAt(System.nanoTime());
+
+        cryptoPos.applyTrade(buy);
+        cryptoPos.applyTrade(sell);
+
+        assertTrue(cryptoPos.isFlat());
+        // Realized P&L = ($55,000 - $50,000) * 0.5 = $2,500
+        double pnlDollars = (double) cryptoPos.getRealizedPnl() / 100_000_000;
+        assertEquals(2_500.0, pnlDollars, 0.01);
+    }
+
+    @Test
+    void shouldDefaultQuantityScaleToOne() {
+        // Existing stock positions should work unchanged
+        assertEquals(1, position.getQuantityScale());
+
+        Trade trade = createTrade(OrderSide.BUY, 100, 15000);
+        position.applyTrade(trade);
+
+        assertEquals(100, position.getQuantity());
+        // Market value = 15000 * 100 / 100 / 1 = 15000
+        assertEquals(15000, position.getMarketValue());
+    }
+
     private Trade createTrade(OrderSide side, long quantity, long price) {
         Trade trade = new Trade();
         trade.setSymbol(symbol);

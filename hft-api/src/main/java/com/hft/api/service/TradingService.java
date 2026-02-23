@@ -115,7 +115,8 @@ public class TradingService {
                         snapshot.marketValue(),
                         snapshot.currentPrice(),
                         snapshot.priceScale(),
-                        snapshot.openedAt()
+                        snapshot.openedAt(),
+                        snapshot.quantityScale()
                 );
             }
         }

@@ -8,6 +8,7 @@ public record OrderMarkerDto(
         double price,
         String side,        // BUY or SELL
         long quantity,
+        int quantityScale,
         String status,      // FILLED, CANCELLED, etc.
         String strategyId,
         String orderId

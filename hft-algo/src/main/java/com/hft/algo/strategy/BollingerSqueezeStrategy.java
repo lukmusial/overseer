@@ -111,7 +111,7 @@ public class BollingerSqueezeStrategy extends AbstractTradingStrategy {
         this.macdFast = parameters.getInt("macdFast", 8);
         this.macdSlow = parameters.getInt("macdSlow", 17);
         this.macdSignalPeriod = parameters.getInt("macdSignal", 9);
-        this.maxPositionSize = parameters.getLong("maxPositionSize", 1000);
+        this.maxPositionSize = (long) (parameters.getDouble("maxPositionSize", 1000) * getQuantityScale());
 
         this.kcEmaMultiplier = 2.0 / (kcPeriod + 1);
         this.macdFastMultiplier = 2.0 / (macdFast + 1);

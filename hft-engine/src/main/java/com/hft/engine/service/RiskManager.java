@@ -48,7 +48,11 @@ public class RiskManager {
             return "Max orders per day exceeded: " + limits.maxOrdersPerDay();
         }
 
-        // Check position limits
+        // Derive quantity scale from symbol's exchange
+        int quantityScale = order.getSymbol() != null
+                ? order.getSymbol().getExchange().getQuantityScale() : 1;
+
+        // Check position limits (limits are in human units; divide quantities by quantityScale)
         Position position = positionManager.getPosition(order.getSymbol());
         if (position != null) {
             long projectedQty = position.getQuantity();
@@ -58,18 +62,20 @@ public class RiskManager {
                 projectedQty -= order.getQuantity();
             }
 
-            if (Math.abs(projectedQty) > limits.maxPositionSize()) {
-                return "Position limit exceeded: " + Math.abs(projectedQty) + " > " + limits.maxPositionSize();
+            double projectedHuman = (double) Math.abs(projectedQty) / quantityScale;
+            if (projectedHuman > limits.maxPositionSize()) {
+                return "Position limit exceeded: " + projectedHuman + " > " + limits.maxPositionSize();
             }
         }
 
-        // Check order size
-        if (order.getQuantity() > limits.maxOrderSize()) {
-            return "Order size exceeded: " + order.getQuantity() + " > " + limits.maxOrderSize();
+        // Check order size (limits are in human units)
+        double orderSizeHuman = (double) order.getQuantity() / quantityScale;
+        if (orderSizeHuman > limits.maxOrderSize()) {
+            return "Order size exceeded: " + orderSizeHuman + " > " + limits.maxOrderSize();
         }
 
         // Check notional value (convert price from internal representation to dollars)
-        long orderNotional = order.getQuantity() * order.getPrice() / order.getPriceScale();
+        long orderNotional = (long) ((double) order.getQuantity() * order.getPrice() / order.getPriceScale() / quantityScale);
         if (orderNotional > limits.maxOrderNotional()) {
             return "Order notional exceeded: " + orderNotional + " > " + limits.maxOrderNotional();
         }
@@ -95,7 +101,8 @@ public class RiskManager {
      * Records a fill for risk tracking.
      */
     public void recordFill(Symbol symbol, OrderSide side, long quantity, long price, int priceScale) {
-        long notional = quantity * price / priceScale;
+        int quantityScale = symbol != null ? symbol.getExchange().getQuantityScale() : 1;
+        long notional = (long) ((double) quantity * price / priceScale / quantityScale);
         notionalTradedToday.addAndGet(notional);
 
         SymbolRiskState state = symbolRiskStates.computeIfAbsent(symbol, s -> new SymbolRiskState());

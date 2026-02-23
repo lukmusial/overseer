@@ -50,6 +50,11 @@ public class PositionManager {
     public void applyTrade(Trade trade) {
         Position position = getOrCreatePosition(trade.getSymbol());
 
+        // Set quantity scale from the trade's symbol exchange
+        if (trade.getSymbol() != null) {
+            position.setQuantityScale(trade.getSymbol().getExchange().getQuantityScale());
+        }
+
         long previousRealizedPnl = position.getRealizedPnl();
         position.applyTrade(trade);
         long newRealizedPnl = position.getRealizedPnl();
@@ -232,6 +237,17 @@ public class PositionManager {
     public void restorePosition(Symbol symbol, long quantity, long avgEntryPrice,
                                 long totalCost, long realizedPnl, long marketValue,
                                 long currentPrice, int priceScale, long openedAt) {
+        restorePosition(symbol, quantity, avgEntryPrice, totalCost, realizedPnl,
+                marketValue, currentPrice, priceScale, openedAt, 1);
+    }
+
+    /**
+     * Restores a position from persisted snapshot data with quantity scale.
+     */
+    public void restorePosition(Symbol symbol, long quantity, long avgEntryPrice,
+                                long totalCost, long realizedPnl, long marketValue,
+                                long currentPrice, int priceScale, long openedAt,
+                                int quantityScale) {
         Position position = getOrCreatePosition(symbol);
         position.setQuantity(quantity);
         position.setAverageEntryPrice(avgEntryPrice);
@@ -241,6 +257,9 @@ public class PositionManager {
         position.setCurrentPrice(currentPrice);
         if (priceScale > 0) {
             position.setPriceScale(priceScale);
+        }
+        if (quantityScale > 0) {
+            position.setQuantityScale(quantityScale);
         }
         position.setOpenedAt(openedAt);
         if (currentPrice > 0) {

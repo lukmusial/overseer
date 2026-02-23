@@ -69,7 +69,7 @@ public class MomentumStrategy extends AbstractTradingStrategy {
         this.shortPeriod = parameters.getInt("shortPeriod", 10);
         this.longPeriod = parameters.getInt("longPeriod", 30);
         this.signalThreshold = parameters.getDouble("signalThreshold", 0.02);
-        this.maxPositionSize = parameters.getLong("maxPositionSize", 1000);
+        this.maxPositionSize = (long) (parameters.getDouble("maxPositionSize", 1000) * getQuantityScale());
 
         // Calculate EMA multipliers
         this.shortMultiplier = 2.0 / (shortPeriod + 1);

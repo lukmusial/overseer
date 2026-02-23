@@ -115,6 +115,7 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
     @Override
     public long getUnrealizedPnl() {
         long unrealized = 0;
+        int qtyScale = getQuantityScale();
         for (Symbol symbol : symbols) {
             long position = currentPositions.getOrDefault(symbol, 0L);
             if (position != 0) {
@@ -122,7 +123,7 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
                 long avgEntry = avgEntryPrices.getOrDefault(symbol, 0L);
                 if (quote != null && avgEntry > 0) {
                     long currentPrice = (quote.getBidPrice() + quote.getAskPrice()) / 2;
-                    unrealized += position * (currentPrice - avgEntry);
+                    unrealized += (long) ((double) position * (currentPrice - avgEntry) / qtyScale);
                 }
             }
         }
@@ -250,7 +251,8 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
             long midPrice = (quote.getBidPrice() + quote.getAskPrice()) / 2;
             if (midPrice > 0) {
                 int priceScale = quote.getPriceScale();
-                long maxQtyByNotional = maxPositionNotional * priceScale / midPrice;
+                int qtyScale = getQuantityScale();
+                long maxQtyByNotional = (long) ((double) maxPositionNotional * priceScale * qtyScale / midPrice);
                 if (Math.abs(target) > maxQtyByNotional) {
                     target = target > 0 ? maxQtyByNotional : -maxQtyByNotional;
                 }
@@ -286,10 +288,11 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         long newPosition = previousPosition + fillQty;
 
         // Calculate P&L if reducing position
+        int qtyScale = getQuantityScale();
         if ((previousPosition > 0 && fillQty < 0) || (previousPosition < 0 && fillQty > 0)) {
             long avgEntry = avgEntryPrices.getOrDefault(symbol, fillPrice);
             long closingQty = Math.min(Math.abs(previousPosition), Math.abs(fillQty));
-            long pnl = closingQty * (fillPrice - avgEntry);
+            long pnl = (long) ((double) closingQty * (fillPrice - avgEntry) / qtyScale);
             if (previousPosition < 0) {
                 pnl = -pnl; // Short position: profit when price drops
             }
@@ -302,7 +305,8 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
             long prevQty = Math.abs(previousPosition);
             long addQty = Math.abs(fillQty);
             if (prevQty + addQty > 0) {
-                long newAvg = (prevAvg * prevQty + fillPrice * addQty) / (prevQty + addQty);
+                long newAvg = (long) ((double) prevAvg * prevQty / (prevQty + addQty)
+                        + (double) fillPrice * addQty / (prevQty + addQty));
                 avgEntryPrices.put(symbol, newAvg);
             }
         }
@@ -364,8 +368,9 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         long quantity = Math.abs(delta);
         long price = side == OrderSide.BUY ? quote.getAskPrice() : quote.getBidPrice();
 
-        // Apply position sizing limits
-        long maxOrderSize = parameters.getLong("maxOrderSize", 1000);
+        // Apply position sizing limits (maxOrderSize is in human units, e.g. 0.5 BTC)
+        int quantityScale = getQuantityScale();
+        long maxOrderSize = (long) (parameters.getDouble("maxOrderSize", 1000) * quantityScale);
         quantity = Math.min(quantity, maxOrderSize);
 
         // Cap quantity by max notional value to avoid risk limit violations
@@ -373,7 +378,7 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         if (price > 0) {
             long maxNotional = parameters.getLong("maxOrderNotional", 500_000);
             int priceScale = quote.getPriceScale();
-            long maxQtyByNotional = maxNotional * priceScale / price;
+            long maxQtyByNotional = (long) ((double) maxNotional * priceScale * quantityScale / price);
             quantity = Math.min(quantity, Math.max(maxQtyByNotional, 0));
         }
 
@@ -403,6 +408,17 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         if (drawdown > maxDrawdown.get()) {
             maxDrawdown.set(drawdown);
         }
+    }
+
+    /**
+     * Returns the quantity scale for this strategy's symbols.
+     * Derives from the exchange: STOCK=1, CRYPTO=100_000_000.
+     */
+    protected int getQuantityScale() {
+        return symbols.stream()
+                .findFirst()
+                .map(s -> s.getExchange().getQuantityScale())
+                .orElse(1);
     }
 
     // Abstract methods for subclasses

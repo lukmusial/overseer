@@ -42,6 +42,21 @@ export function formatPnl(pnl: number, scale: number = 100): string {
 }
 
 /**
+ * Formats a quantity value given its quantity scale.
+ * Divides by scale, shows appropriate decimals, strips trailing zeros.
+ * e.g., formatQuantity(50_000_000, 100_000_000) => "0.5"
+ *        formatQuantity(100, 1) => "100"
+ */
+export function formatQuantity(quantity: number, quantityScale: number = 1): string {
+  if (quantityScale <= 1) return quantity.toLocaleString();
+  const value = quantity / quantityScale;
+  const decimals = getDecimalsFromScale(quantityScale);
+  // Format with full precision then strip trailing zeros
+  const formatted = value.toFixed(decimals);
+  return formatted.replace(/\.?0+$/, '') || '0';
+}
+
+/**
  * Formats a currency value (already in decimal form).
  */
 export function formatCurrency(value: number, decimals: number = 2): string {
