@@ -9,7 +9,9 @@ import com.hft.core.model.*;
 import com.hft.persistence.PersistenceManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -216,6 +218,73 @@ class TradingServiceTest {
 
         assertEquals("My Momentum", dto.strategyName());
         assertEquals(created.id(), dto.strategyId());
+    }
+
+    @Test
+    void deletedStrategyShouldNotSurviveRestart(@TempDir Path tempDir) {
+        // Use Chronicle persistence so tombstones are written to disk
+        PersistenceManager chroniclePm = PersistenceManager.chronicle(tempDir);
+        TradingService service1 = new TradingService(chroniclePm);
+        service1.init();
+
+        // Create a strategy
+        CreateStrategyRequest request = new CreateStrategyRequest(
+                "Temp Strategy", "momentum", List.of("AAPL"), "ALPACA",
+                Map.of("shortPeriod", 10, "longPeriod", 30)
+        );
+        StrategyDto created = service1.createStrategy(request);
+        assertEquals(1, service1.getStrategies().size());
+
+        // Delete it
+        service1.deleteStrategy(created.id());
+        assertEquals(0, service1.getStrategies().size());
+
+        // Close persistence
+        chroniclePm.flush();
+        chroniclePm.close();
+
+        // Simulate restart with fresh persistence from the same directory
+        PersistenceManager chroniclePm2 = PersistenceManager.chronicle(tempDir);
+        TradingService service2 = new TradingService(chroniclePm2);
+        service2.init();
+
+        // Deleted strategy should NOT come back
+        assertEquals(0, service2.getStrategies().size(),
+                "Deleted strategy should not survive restart");
+
+        chroniclePm2.close();
+    }
+
+    @Test
+    void restoredStrategyIdShouldMatchOriginal(@TempDir Path tempDir) {
+        // Use Chronicle persistence
+        PersistenceManager chroniclePm = PersistenceManager.chronicle(tempDir);
+        TradingService service1 = new TradingService(chroniclePm);
+        service1.init();
+
+        // Create a strategy and note its ID
+        CreateStrategyRequest request = new CreateStrategyRequest(
+                "Persistent Strategy", "momentum", List.of("AAPL"), "ALPACA",
+                Map.of("shortPeriod", 10, "longPeriod", 30)
+        );
+        StrategyDto created = service1.createStrategy(request);
+        String originalId = created.id();
+
+        chroniclePm.flush();
+        chroniclePm.close();
+
+        // Restart
+        PersistenceManager chroniclePm2 = PersistenceManager.chronicle(tempDir);
+        TradingService service2 = new TradingService(chroniclePm2);
+        service2.init();
+
+        // Strategy should have the same ID
+        List<StrategyDto> strategies = service2.getStrategies();
+        assertEquals(1, strategies.size());
+        assertEquals(originalId, strategies.get(0).id(),
+                "Restored strategy should preserve its original ID");
+
+        chroniclePm2.close();
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.hft.algo.base.AlgorithmState;
 import com.hft.algo.base.StrategyParameters;
 import com.hft.algo.base.TradingStrategy;
 import com.hft.algo.strategy.*;
+import com.hft.api.config.EngineProperties;
 import com.hft.api.config.RiskLimitsProperties;
 import com.hft.api.dto.*;
 import com.hft.core.model.*;
@@ -37,18 +38,27 @@ public class TradingService {
     private final Map<String, TradingStrategy> activeStrategies = new ConcurrentHashMap<>();
 
     /**
-     * Spring-managed constructor with risk limits from configuration.
+     * Spring-managed constructor with risk limits and engine config from configuration.
      */
     @Autowired
-    public TradingService(RiskLimitsProperties riskLimitsProperties) {
-        this(PersistenceManager.chronicle(), riskLimitsProperties.toRiskLimits());
+    public TradingService(RiskLimitsProperties riskLimitsProperties, EngineProperties engineProperties) {
+        this(PersistenceManager.chronicle(), riskLimitsProperties.toRiskLimits(),
+                engineProperties.getRingBufferSize(), engineProperties.toWaitStrategy());
     }
 
     /**
      * Constructor for testing - allows injecting custom persistence and risk limits.
      */
     public TradingService(PersistenceManager persistenceManager, RiskManager.RiskLimits riskLimits) {
-        this.tradingEngine = new TradingEngine(riskLimits);
+        this(persistenceManager, riskLimits, 1024 * 64, new com.lmax.disruptor.BusySpinWaitStrategy());
+    }
+
+    /**
+     * Full constructor with all engine parameters.
+     */
+    public TradingService(PersistenceManager persistenceManager, RiskManager.RiskLimits riskLimits,
+                          int ringBufferSize, com.lmax.disruptor.WaitStrategy waitStrategy) {
+        this.tradingEngine = new TradingEngine(riskLimits, ringBufferSize, waitStrategy);
         this.algorithmContext = new TradingEngineAlgorithmContext(tradingEngine);
         this.persistenceManager = persistenceManager;
         registerOrderPersistenceListener();
@@ -115,7 +125,8 @@ public class TradingService {
                         snapshot.marketValue(),
                         snapshot.currentPrice(),
                         snapshot.priceScale(),
-                        snapshot.openedAt()
+                        snapshot.openedAt(),
+                        snapshot.quantityScale()
                 );
             }
         }
@@ -158,7 +169,7 @@ public class TradingService {
             def.parameters().forEach(params::set);
         }
 
-        return switch (def.type().toLowerCase()) {
+        AbstractTradingStrategy strategy = switch (def.type().toLowerCase()) {
             case "momentum" -> new MomentumStrategy(symbols, params, def.name());
             case "meanreversion", "mean_reversion" -> new MeanReversionStrategy(symbols, params, def.name());
             case "vwap" -> new VwapStrategy(symbols, params, def.name());
@@ -168,6 +179,10 @@ public class TradingService {
             case "vwap_mean_reversion", "vwapmeanreversion" -> new VwapMeanReversionStrategy(symbols, params, def.name());
             default -> throw new IllegalArgumentException("Unknown strategy type: " + def.type());
         };
+
+        // Preserve the original persisted ID so deletions match tombstone records
+        strategy.setId(def.id());
+        return strategy;
     }
 
     private void persistStrategy(TradingStrategy strategy) {

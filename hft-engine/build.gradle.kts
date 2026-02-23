@@ -1,5 +1,9 @@
 // hft-engine: Order matching and event processing with LMAX Disruptor
 
+plugins {
+    `java-library`
+}
+
 val disruptorVersion: String by project
 val agronaVersion: String by project
 val junitVersion: String by project
@@ -12,7 +16,8 @@ dependencies {
     implementation(project(":hft-persistence"))
 
     // LMAX Disruptor for lock-free inter-thread messaging
-    implementation("com.lmax:disruptor:$disruptorVersion")
+    // Exposed as 'api' because WaitStrategy appears in engine's public constructors
+    api("com.lmax:disruptor:$disruptorVersion")
     implementation("org.agrona:agrona:$agronaVersion")
 
     // Testing

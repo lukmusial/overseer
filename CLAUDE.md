@@ -45,6 +45,20 @@ Never skip tests, application startup verification, documentation updates, or co
 - Regressions are caught immediately
 - Documentation stays in sync with code
 
+### Test Failure Policy (ZERO TOLERANCE)
+
+**Every test failure MUST be investigated.** Never dismiss a failure as "pre-existing" or "unrelated to my change":
+
+1. **Investigate first** — read the assertion message, check the test code, understand what broke
+2. **Rerun to check for flakiness** — if a test fails, rerun it (`--rerun-tasks`). If it's intermittent, it's a flaky test that needs fixing (e.g., race condition, missing `Thread.sleep`/`awaitility`, async assertion timing)
+3. **Fix or report** — either fix the failure or clearly flag it to the user with the root cause analysis. Do not silently move on
+4. **No green-washing** — do not claim "all tests pass" when some were skipped or ignored. Report the exact count: "78/81 passed, 2 flaky, 1 unrelated to this change (here's why: ...)"
+5. **Flaky tests are bugs** — a test that sometimes passes and sometimes fails indicates a real problem (usually a race condition). Treat it as a defect worth investigating, not noise to dismiss
+
+### Commit Policy
+
+**Always commit at the end of completing a plan (or plan phase), as long as tests pass.** Do not wait for the user to ask — committing is the final step of every completed unit of work. If a plan has multiple independent phases, commit after each phase completes successfully. Leaving working, tested changes uncommitted is never acceptable.
+
 ```bash
 # Standard workflow for backend changes
 ./gradlew test

@@ -17,6 +17,7 @@ import com.hft.risk.rules.StandardRules;
 import com.lmax.disruptor.BusySpinWaitStrategy;
 import com.lmax.disruptor.EventTranslatorOneArg;
 import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
@@ -91,6 +92,14 @@ public class IntegratedTradingEngine implements AutoCloseable {
      * Creates a new integrated trading engine with full configuration.
      */
     public IntegratedTradingEngine(RiskLimits riskLimits, PersistenceManager persistence, int ringBufferSize) {
+        this(riskLimits, persistence, ringBufferSize, new BusySpinWaitStrategy());
+    }
+
+    /**
+     * Creates a new integrated trading engine with full configuration and custom wait strategy.
+     */
+    public IntegratedTradingEngine(RiskLimits riskLimits, PersistenceManager persistence, int ringBufferSize,
+                                   WaitStrategy waitStrategy) {
         // Initialize services
         this.orderManager = new OrderManager();
         this.positionManager = new PositionManager();
@@ -110,13 +119,13 @@ public class IntegratedTradingEngine implements AutoCloseable {
         this.positionHandler = new PositionHandler(positionManager);
         this.metricsHandler = new MetricsHandler(orderMetrics);
 
-        // Create disruptor
+        // Create disruptor with configurable wait strategy
         this.disruptor = new Disruptor<>(
                 TradingEventFactory.INSTANCE,
                 ringBufferSize,
                 DaemonThreadFactory.INSTANCE,
                 ProducerType.MULTI,
-                new BusySpinWaitStrategy()
+                waitStrategy
         );
 
         // Configure handler chain - risk is checked before publishing, so no risk handler here

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatPrice, formatPnl, getDecimalsFromScale } from './format';
+import { formatPrice, formatPnl, formatQuantity, getDecimalsFromScale } from './format';
 
 describe('format utilities', () => {
   describe('getDecimalsFromScale', () => {
@@ -94,6 +94,37 @@ describe('format utilities', () => {
     });
   });
 
+  describe('formatQuantity', () => {
+    it('formats fractional BTC quantity (0.5 BTC)', () => {
+      expect(formatQuantity(50_000_000, 100_000_000)).toBe('0.5');
+    });
+
+    it('formats whole stock quantity', () => {
+      expect(formatQuantity(100, 1)).toBe('100');
+    });
+
+    it('formats small crypto quantity', () => {
+      expect(formatQuantity(1_000_000, 100_000_000)).toBe('0.01');
+    });
+
+    it('formats zero quantity', () => {
+      expect(formatQuantity(0, 100_000_000)).toBe('0');
+    });
+
+    it('formats whole BTC quantity', () => {
+      expect(formatQuantity(100_000_000, 100_000_000)).toBe('1');
+    });
+
+    it('strips trailing zeros', () => {
+      // 0.10000000 should become 0.1
+      expect(formatQuantity(10_000_000, 100_000_000)).toBe('0.1');
+    });
+
+    it('defaults to scale 1 when not provided', () => {
+      expect(formatQuantity(42)).toBe('42');
+    });
+  });
+
   describe('price scale consistency', () => {
     it('Alpaca and Binance prices for same dollar value display same', () => {
       // $100 in Alpaca format: 10_000 (cents)
@@ -108,11 +139,11 @@ describe('format utilities', () => {
       expect(binanceValue).toBe(100);
     });
 
-    it('order quantities are not affected by priceScale', () => {
-      // Order quantities are stored as plain longs, not scaled by price
-      // A quantity of 7 BTC should display as 7, not as 7/100_000_000
-      const quantity = 7;
-      expect(quantity).toBe(7); // Quantities are never divided by priceScale
+    it('order quantities use quantityScale not priceScale', () => {
+      // Stock quantities (quantityScale=1) display as-is
+      expect(formatQuantity(7, 1)).toBe('7');
+      // Crypto quantities (quantityScale=100_000_000) are divided by quantityScale
+      expect(formatQuantity(700_000_000, 100_000_000)).toBe('7');
     });
   });
 });
