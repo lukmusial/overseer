@@ -15,6 +15,7 @@ import com.hft.engine.service.RiskManager;
 import com.lmax.disruptor.BusySpinWaitStrategy;
 import com.lmax.disruptor.EventTranslatorOneArg;
 import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
@@ -76,6 +77,10 @@ public class TradingEngine {
     }
 
     public TradingEngine(RiskManager.RiskLimits riskLimits, int ringBufferSize) {
+        this(riskLimits, ringBufferSize, new BusySpinWaitStrategy());
+    }
+
+    public TradingEngine(RiskManager.RiskLimits riskLimits, int ringBufferSize, WaitStrategy waitStrategy) {
         // Initialize services
         this.orderManager = new OrderManager();
         this.positionManager = new PositionManager();
@@ -90,13 +95,13 @@ public class TradingEngine {
         this.riskHandler = new RiskHandler(riskManager);
         this.metricsHandler = new MetricsHandler(orderMetrics);
 
-        // Create disruptor with busy-spin wait strategy for lowest latency
+        // Create disruptor with configurable wait strategy
         this.disruptor = new Disruptor<>(
                 TradingEventFactory.INSTANCE,
                 ringBufferSize,
                 DaemonThreadFactory.INSTANCE,
                 ProducerType.MULTI,
-                new BusySpinWaitStrategy()
+                waitStrategy
         );
 
         // Configure handler chain:
