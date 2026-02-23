@@ -116,7 +116,8 @@ public class TradingEngine {
 
         this.ringBuffer = disruptor.getRingBuffer();
 
-        log.info("TradingEngine initialized with ring buffer size: {}", ringBufferSize);
+        log.info("TradingEngine initialized with ring buffer size: {}, wait strategy: {}",
+                ringBufferSize, waitStrategy.getClass().getSimpleName());
     }
 
     /**
