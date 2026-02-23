@@ -50,7 +50,7 @@ public class TwapStrategy extends AbstractTradingStrategy {
     }
 
     private void loadParameters() {
-        this.targetQuantity = parameters.getLong("targetQuantity", 1000);
+        this.targetQuantity = (long) (parameters.getDouble("targetQuantity", 1000) * getQuantityScale());
         long durationMinutes = parameters.getLong("durationMinutes", 60);
         this.durationNanos = durationMinutes * 60 * 1_000_000_000L;
         long sliceIntervalSeconds = parameters.getLong("sliceIntervalSeconds", 60);

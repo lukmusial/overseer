@@ -72,7 +72,8 @@ public interface PositionSnapshotStore {
             long totalCost,
             long currentPrice,
             int priceScale,
-            long openedAt
+            long openedAt,
+            int quantityScale
     ) {
         /**
          * Creates a snapshot with basic fields (backward-compatible).
@@ -81,7 +82,18 @@ public interface PositionSnapshotStore {
                                 long realizedPnl, long unrealizedPnl, long marketValue,
                                 long timestampNanos) {
             this(symbol, quantity, averageEntryPrice, realizedPnl, unrealizedPnl,
-                    marketValue, timestampNanos, 0, 0, 100, 0);
+                    marketValue, timestampNanos, 0, 0, 100, 0, 1);
+        }
+
+        /**
+         * Backward-compatible constructor without quantityScale (defaults to 1).
+         */
+        public PositionSnapshot(Symbol symbol, long quantity, long averageEntryPrice,
+                                long realizedPnl, long unrealizedPnl, long marketValue,
+                                long timestampNanos, long totalCost, long currentPrice,
+                                int priceScale, long openedAt) {
+            this(symbol, quantity, averageEntryPrice, realizedPnl, unrealizedPnl,
+                    marketValue, timestampNanos, totalCost, currentPrice, priceScale, openedAt, 1);
         }
 
         public static PositionSnapshot from(Position position, long timestampNanos) {
@@ -96,7 +108,8 @@ public interface PositionSnapshotStore {
                     position.getTotalCost(),
                     position.getCurrentPrice(),
                     position.getPriceScale(),
-                    position.getOpenedAt()
+                    position.getOpenedAt(),
+                    position.getQuantityScale()
             );
         }
     }

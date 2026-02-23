@@ -98,7 +98,7 @@ public class EmaAdxRsiStrategy extends AbstractTradingStrategy {
         this.rsiPeriod = parameters.getInt("rsiPeriod", 14);
         this.rsiBullThreshold = parameters.getDouble("rsiBullThreshold", 55.0);
         this.rsiBearThreshold = parameters.getDouble("rsiBearThreshold", 45.0);
-        this.maxPositionSize = parameters.getLong("maxPositionSize", 1000);
+        this.maxPositionSize = (long) (parameters.getDouble("maxPositionSize", 1000) * getQuantityScale());
 
         this.fastMultiplier = 2.0 / (fastEmaPeriod + 1);
         this.slowMultiplier = 2.0 / (slowEmaPeriod + 1);

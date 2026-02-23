@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, CandlestickSeries, IChartApi, ISeriesApi, CandlestickData, Time, createSeriesMarkers, ISeriesMarkersPluginApi, SeriesMarker, IPriceLine } from 'lightweight-charts';
 import { useApi } from '../hooks/useApi';
 import type { ChartData, TriggerRange, OrderMarker, Strategy, Quote, Order } from '../types/api';
+import { formatQuantity } from '../utils/format';
 
 interface CandlestickChartProps {
   exchange: string;
@@ -167,7 +168,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
       }
 
       tooltip.innerHTML = orders.map(o =>
-        `<div>${o.side} ${o.quantity} @ ${o.price.toFixed(2)}<br><span class="order-tooltip-status">${o.status}</span></div>`
+        `<div>${o.side} ${formatQuantity(o.quantity, o.quantityScale)} @ ${o.price.toFixed(2)}<br><span class="order-tooltip-status">${o.status}</span></div>`
       ).join('');
       tooltip.style.display = 'block';
 
@@ -287,6 +288,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
         price,
         side: order.side,
         quantity: order.quantity,
+        quantityScale: order.quantityScale,
         status: order.status,
         strategyId: order.strategyId,
         orderId: String(order.clientOrderId),

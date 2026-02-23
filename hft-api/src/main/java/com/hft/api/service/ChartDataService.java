@@ -327,11 +327,14 @@ public class ChartDataService {
                         ? order.getAverageFilledPrice() / (double) scale
                         : order.getPrice() / (double) scale;
 
+                int quantityScale = order.getSymbol() != null
+                        ? order.getSymbol().getExchange().getQuantityScale() : 1;
                 markers.add(new OrderMarkerDto(
                         timeSeconds,
                         price,
                         order.getSide().name(),
                         order.getQuantity(),
+                        quantityScale,
                         order.getStatus().name(),
                         order.getStrategyId(),
                         String.valueOf(order.getClientOrderId())

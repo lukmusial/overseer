@@ -252,6 +252,57 @@ class RiskManagerTest {
         assertEquals(1000, limits.maxOrderSize());
     }
 
+    // --- Crypto / quantityScale tests ---
+
+    @Test
+    void checkPreTradeRisk_CryptoFractionalOrder_ShouldApprove() {
+        // 0.5 BTC order, priceScale=1e8, quantityScale=1e8
+        // Limits: maxOrderSize=1000 (human units), maxPositionSize=5000
+        // 0.5 < 1000, so should pass
+        Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
+        Order order = new Order();
+        order.setSymbol(btc);
+        order.setSide(OrderSide.BUY);
+        order.setQuantity(50_000_000L);  // 0.5 BTC in satoshi-scale
+        order.setPrice(5_000_000_000_000L);  // $50,000 in 1e8 scale
+        order.setPriceScale(100_000_000);
+        order.setType(OrderType.LIMIT);
+
+        String rejection = riskManager.checkPreTradeRisk(order);
+        assertNull(rejection, "Fractional crypto order should be approved: " + rejection);
+    }
+
+    @Test
+    void checkPreTradeRisk_CryptoOrderNotional_CorrectlyCalculated() {
+        // 3 BTC at $50,000 = $150,000 notional
+        // maxOrderNotional = 100000 -> should be rejected
+        Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
+        Order order = new Order();
+        order.setSymbol(btc);
+        order.setSide(OrderSide.BUY);
+        order.setQuantity(300_000_000L);  // 3 BTC
+        order.setPrice(5_000_000_000_000L);
+        order.setPriceScale(100_000_000);
+        order.setType(OrderType.LIMIT);
+
+        String rejection = riskManager.checkPreTradeRisk(order);
+        assertNotNull(rejection);
+        assertTrue(rejection.contains("Order notional exceeded"));
+    }
+
+    @Test
+    void recordFill_CryptoShouldCalculateNotionalCorrectly() {
+        Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
+        // 0.5 BTC at $50,000 = $25,000 notional
+        riskManager.recordFill(btc, OrderSide.BUY,
+                50_000_000L,             // 0.5 BTC
+                5_000_000_000_000L,      // $50,000
+                100_000_000);            // priceScale
+
+        long notional = riskManager.getNotionalTradedToday();
+        assertEquals(25_000L, notional); // $25,000
+    }
+
     private Order createOrder(Symbol symbol, OrderSide side, long quantity, long price) {
         Order order = new Order();
         order.setSymbol(symbol);

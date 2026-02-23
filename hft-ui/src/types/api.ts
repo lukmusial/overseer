@@ -49,6 +49,7 @@ export interface Order {
   filledQuantity: number;
   averageFilledPrice: number;
   priceScale: number;
+  quantityScale: number;
   status: OrderStatus;
   rejectReason: string | null;
   strategyId: string | null;
@@ -68,6 +69,7 @@ export interface Position {
   unrealizedPnl: number;
   maxDrawdown: number;
   priceScale: number;
+  quantityScale: number;
   isLong: boolean;
   isShort: boolean;
   isFlat: boolean;
@@ -162,6 +164,7 @@ export interface OrderMarker {
   price: number;
   side: OrderSide;
   quantity: number;
+  quantityScale: number;
   status: string;
   strategyId: string | null;
   orderId: string;

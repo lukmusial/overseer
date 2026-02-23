@@ -110,18 +110,20 @@ class EmaAdxRsiStrategyTest {
     void onFill_shouldUpdatePosition() {
         strategy.start();
 
-        Trade fill = createFill(OrderSide.BUY, 50, 50000_00L);
+        // Use scaled quantity for BINANCE (1 BTC = 100_000_000)
+        Trade fill = createFill(OrderSide.BUY, 50_000_000L, 50000_00L);
         strategy.onFill(fill);
 
-        assertEquals(50, strategy.getCurrentPosition(testSymbol));
+        assertEquals(50_000_000L, strategy.getCurrentPosition(testSymbol));
     }
 
     @Test
     void realizedPnl_shouldTrackOnClose() {
         strategy.start();
 
-        strategy.onFill(createFill(OrderSide.BUY, 100, 50000_00L));
-        strategy.onFill(createFill(OrderSide.SELL, 100, 51000_00L));
+        // Use scaled quantity for BINANCE (1 BTC = 100_000_000)
+        strategy.onFill(createFill(OrderSide.BUY, 100_000_000L, 50000_00L));
+        strategy.onFill(createFill(OrderSide.SELL, 100_000_000L, 51000_00L));
 
         assertEquals(0, strategy.getCurrentPosition(testSymbol));
         assertTrue(strategy.getRealizedPnl() > 0, "Should have positive realized P&L");

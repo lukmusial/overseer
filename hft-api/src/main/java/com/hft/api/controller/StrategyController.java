@@ -83,9 +83,9 @@ public class StrategyController {
                                 Map.of("name", "shortPeriod", "type", "int", "default", 10, "description", "Short EMA period"),
                                 Map.of("name", "longPeriod", "type", "int", "default", 30, "description", "Long EMA period"),
                                 Map.of("name", "signalThreshold", "type", "double", "default", 0.02, "description", "Minimum signal strength"),
-                                Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
+                                Map.of("name", "maxPositionSize", "type", "double", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
                                 Map.of("name", "maxPositionNotional", "type", "long", "default", 0, "description", "Maximum position value in dollars (0 = no limit)"),
-                                Map.of("name", "maxOrderSize", "type", "long", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
+                                Map.of("name", "maxOrderSize", "type", "double", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
                                 Map.of("name", "maxOrderNotional", "type", "long", "default", 500000, "description", "Maximum dollar value per individual order")
                         )
                 ),
@@ -97,9 +97,9 @@ public class StrategyController {
                                 Map.of("name", "lookbackPeriod", "type", "int", "default", 20, "description", "Lookback period for statistics"),
                                 Map.of("name", "entryZScore", "type", "double", "default", 2.0, "description", "Z-score threshold for entry"),
                                 Map.of("name", "exitZScore", "type", "double", "default", 0.5, "description", "Z-score threshold for exit"),
-                                Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
+                                Map.of("name", "maxPositionSize", "type", "double", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
                                 Map.of("name", "maxPositionNotional", "type", "long", "default", 0, "description", "Maximum position value in dollars (0 = no limit)"),
-                                Map.of("name", "maxOrderSize", "type", "long", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
+                                Map.of("name", "maxOrderSize", "type", "double", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
                                 Map.of("name", "maxOrderNotional", "type", "long", "default", 500000, "description", "Maximum dollar value per individual order")
                         )
                 ),
@@ -115,9 +115,9 @@ public class StrategyController {
                                 Map.of("name", "rsiPeriod", "type", "int", "default", 14, "description", "RSI lookback period"),
                                 Map.of("name", "rsiBullThreshold", "type", "double", "default", 55.0, "description", "RSI threshold for bullish confirmation"),
                                 Map.of("name", "rsiBearThreshold", "type", "double", "default", 45.0, "description", "RSI threshold for bearish confirmation"),
-                                Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
+                                Map.of("name", "maxPositionSize", "type", "double", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
                                 Map.of("name", "maxPositionNotional", "type", "long", "default", 0, "description", "Maximum position value in dollars (0 = no limit)"),
-                                Map.of("name", "maxOrderSize", "type", "long", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
+                                Map.of("name", "maxOrderSize", "type", "double", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
                                 Map.of("name", "maxOrderNotional", "type", "long", "default", 500000, "description", "Maximum dollar value per individual order")
                         )
                 ),
@@ -134,9 +134,9 @@ public class StrategyController {
                                 Map.of("name", "macdFast", "type", "int", "default", 8, "description", "MACD fast EMA period"),
                                 Map.of("name", "macdSlow", "type", "int", "default", 17, "description", "MACD slow EMA period"),
                                 Map.of("name", "macdSignal", "type", "int", "default", 9, "description", "MACD signal line period"),
-                                Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
+                                Map.of("name", "maxPositionSize", "type", "double", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
                                 Map.of("name", "maxPositionNotional", "type", "long", "default", 0, "description", "Maximum position value in dollars (0 = no limit)"),
-                                Map.of("name", "maxOrderSize", "type", "long", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
+                                Map.of("name", "maxOrderSize", "type", "double", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
                                 Map.of("name", "maxOrderNotional", "type", "long", "default", 500000, "description", "Maximum dollar value per individual order")
                         )
                 ),
@@ -150,9 +150,9 @@ public class StrategyController {
                                 Map.of("name", "exitSigma", "type", "double", "default", 0.5, "description", "Exit threshold sigma"),
                                 Map.of("name", "maxHoldMinutes", "type", "long", "default", 240, "description", "Maximum hold time in minutes"),
                                 Map.of("name", "volumeFilterMultiplier", "type", "double", "default", 2.0, "description", "Volume filter multiplier"),
-                                Map.of("name", "maxPositionSize", "type", "long", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
+                                Map.of("name", "maxPositionSize", "type", "double", "default", 1000, "description", "Maximum position size in asset quantity (shares/coins)"),
                                 Map.of("name", "maxPositionNotional", "type", "long", "default", 0, "description", "Maximum position value in dollars (0 = no limit)"),
-                                Map.of("name", "maxOrderSize", "type", "long", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
+                                Map.of("name", "maxOrderSize", "type", "double", "default", 1000, "description", "Maximum quantity per individual order (shares/coins)"),
                                 Map.of("name", "maxOrderNotional", "type", "long", "default", 500000, "description", "Maximum dollar value per individual order")
                         )
                 )

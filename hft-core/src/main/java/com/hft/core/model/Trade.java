@@ -73,10 +73,11 @@ public class Trade {
     }
 
     /**
-     * Returns the notional value = price * quantity
+     * Returns the notional value = price * quantity, safe from overflow.
      */
     public long getNotionalValue() {
-        return price * quantity / priceScale;
+        int qs = symbol != null ? symbol.getExchange().getQuantityScale() : 1;
+        return (long) ((double) price * quantity / priceScale / qs);
     }
 
     // Getters and setters
