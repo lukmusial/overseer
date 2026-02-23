@@ -281,12 +281,12 @@ class PositionManagerTest {
         positionManager.applyTrade(createTrade(aapl, OrderSide.BUY, 100, 15000L, 100));
         positionManager.applyTrade(createTrade(aapl, OrderSide.SELL, 100, 16000L, 100));
 
-        // BTCUSDT: crypto with priceScale=100_000_000 (satoshi-like)
-        // Buy 1 BTC @ $50,000.00 (5_000_000_000_000L in scale 100_000_000), sell @ $51,000.00
-        // Realized P&L = (5_100_000_000_000 - 5_000_000_000_000) * 1 = 100_000_000_000 (in scale 100_000_000 = $1,000.00)
+        // BTCUSDT: crypto with priceScale=100_000_000, quantityScale=100_000_000
+        // Buy 1 BTC (=100_000_000 internal qty) @ $50,000.00 (5_000_000_000_000L), sell @ $51,000.00
+        // Realized P&L = (5_100_000_000_000 - 5_000_000_000_000) * 100_000_000 / 100_000_000 = 100_000_000_000 (in scale 100_000_000 = $1,000.00)
         Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
-        positionManager.applyTrade(createTrade(btc, OrderSide.BUY, 1, 5_000_000_000_000L, 100_000_000));
-        positionManager.applyTrade(createTrade(btc, OrderSide.SELL, 1, 5_100_000_000_000L, 100_000_000));
+        positionManager.applyTrade(createTrade(btc, OrderSide.BUY, 100_000_000, 5_000_000_000_000L, 100_000_000));
+        positionManager.applyTrade(createTrade(btc, OrderSide.SELL, 100_000_000, 5_100_000_000_000L, 100_000_000));
 
         // Both positions are flat with realized P&L
         Position aaplPos = positionManager.getPosition(aapl);
@@ -320,9 +320,9 @@ class PositionManagerTest {
         positionManager.applyTrade(createTrade(aapl, OrderSide.BUY, 100, 15000L, 100));
         positionManager.updateMarketValue(aapl, 16000L); // +$10/share * 100 = $1,000 unrealized
 
-        // BTCUSDT: crypto with priceScale=100_000_000, buy and hold
+        // BTCUSDT: crypto with priceScale=100_000_000, quantityScale=100_000_000, buy and hold
         Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
-        positionManager.applyTrade(createTrade(btc, OrderSide.BUY, 1, 5_000_000_000_000L, 100_000_000));
+        positionManager.applyTrade(createTrade(btc, OrderSide.BUY, 100_000_000, 5_000_000_000_000L, 100_000_000));
         positionManager.updateMarketValue(btc, 5_100_000_000_000L); // +$1,000 unrealized
 
         long totalUnrealizedCents = positionManager.getTotalUnrealizedPnlCents();

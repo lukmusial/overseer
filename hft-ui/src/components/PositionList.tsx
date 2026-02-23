@@ -1,5 +1,5 @@
 import type { Position } from '../types/api';
-import { formatPrice, formatPnl } from '../utils/format';
+import { formatPrice, formatPnl, formatQuantity } from '../utils/format';
 
 interface Props {
   positions: Position[];
@@ -41,7 +41,7 @@ export function PositionList({ positions }: Props) {
                 <td>{pos.symbol}</td>
                 <td>{pos.exchange}</td>
                 <td className={pos.isLong ? 'long' : 'short'}>
-                  {pos.isLong ? '+' : ''}{pos.quantity}
+                  {pos.isLong ? '+' : ''}{formatQuantity(pos.quantity, pos.quantityScale)}
                 </td>
                 <td>${formatPrice(pos.averageEntryPrice, scale)}</td>
                 <td>${formatPrice(pos.marketPrice, scale)}</td>

@@ -101,7 +101,7 @@ public class VwapMeanReversionStrategy extends AbstractTradingStrategy {
         this.exitSigma = parameters.getDouble("exitSigma", 0.5);
         this.maxHoldMinutes = parameters.getLong("maxHoldMinutes", 240);
         this.volumeFilterMultiplier = parameters.getDouble("volumeFilterMultiplier", 2.0);
-        this.maxPositionSize = parameters.getLong("maxPositionSize", 1000);
+        this.maxPositionSize = (long) (parameters.getDouble("maxPositionSize", 1000) * getQuantityScale());
     }
 
     @Override

@@ -22,6 +22,7 @@ public record OrderDto(
         long filledQuantity,
         long averageFilledPrice,
         int priceScale,
+        int quantityScale,
         OrderStatus status,
         String rejectReason,
         String strategyId,
@@ -41,6 +42,8 @@ public record OrderDto(
     }
 
     public static OrderDto from(com.hft.core.model.Order order, String strategyName) {
+        int quantityScale = order.getSymbol() != null
+                ? order.getSymbol().getExchange().getQuantityScale() : 1;
         return new OrderDto(
                 order.getClientOrderId(),
                 order.getExchangeOrderId(),
@@ -55,6 +58,7 @@ public record OrderDto(
                 order.getFilledQuantity(),
                 order.getAverageFilledPrice(),
                 order.getPriceScale(),
+                quantityScale,
                 order.getStatus(),
                 order.getRejectReason(),
                 order.getStrategyId(),

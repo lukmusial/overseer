@@ -1052,6 +1052,25 @@ The `TradingPeriodDetector` uses a configurable `Clock` for testability and dete
 
 ---
 
+## Disruptor Wait Strategy
+
+The LMAX Disruptor ring buffer's wait strategy controls how consumer threads wait for new events. This is configurable via `hft.engine.wait-strategy` in application properties:
+
+| Strategy | Property Value | Latency | Idle CPU | Best For |
+|----------|---------------|---------|----------|----------|
+| `BusySpinWaitStrategy` | `busy_spin` | Lowest (~ns) | 100% per core | Production trading |
+| `YieldingWaitStrategy` | `yielding` | Low (~ns-µs) | High (Thread.yield) | Low-latency with some CPU sharing |
+| `SleepingWaitStrategy` | `sleeping` | Moderate (~µs) | Near zero | Development, testing |
+| `BlockingWaitStrategy` | `blocking` | Highest (~ms) | Zero (locks) | Batch processing, resource-constrained |
+
+**Profile defaults:**
+- `stub` / default: `sleeping` — safe for local development, no wasted CPU
+- `prod`: `busy_spin` — lowest latency for live trading
+
+The ring buffer size is also configurable via `hft.engine.ring-buffer-size` (default: 65536).
+
+---
+
 ## Risk Management
 
 ### Risk Engine Architecture

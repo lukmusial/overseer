@@ -74,7 +74,7 @@ public class MeanReversionStrategy extends AbstractTradingStrategy {
         this.lookbackPeriod = parameters.getInt("lookbackPeriod", 20);
         this.entryZScore = parameters.getDouble("entryZScore", 2.0);
         this.exitZScore = parameters.getDouble("exitZScore", 0.5);
-        this.maxPositionSize = parameters.getLong("maxPositionSize", 1000);
+        this.maxPositionSize = (long) (parameters.getDouble("maxPositionSize", 1000) * getQuantityScale());
     }
 
     @Override

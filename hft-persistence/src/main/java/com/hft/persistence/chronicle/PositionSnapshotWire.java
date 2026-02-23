@@ -20,6 +20,7 @@ public class PositionSnapshotWire extends SelfDescribingMarshallable {
     private long currentPrice;
     private long marketValue;
     private int priceScale;
+    private int quantityScale;
     private long openedAt;
     private long timestampNanos;
 
@@ -38,6 +39,7 @@ public class PositionSnapshotWire extends SelfDescribingMarshallable {
         wire.currentPrice = position.getCurrentPrice();
         wire.marketValue = position.getMarketValue();
         wire.priceScale = position.getPriceScale();
+        wire.quantityScale = position.getQuantityScale();
         wire.openedAt = position.getOpenedAt();
         wire.timestampNanos = timestampNanos;
         return wire;
@@ -55,7 +57,8 @@ public class PositionSnapshotWire extends SelfDescribingMarshallable {
                 totalCost,
                 currentPrice,
                 priceScale,
-                openedAt
+                openedAt,
+                quantityScale > 0 ? quantityScale : 1
         );
     }
 
@@ -74,6 +77,7 @@ public class PositionSnapshotWire extends SelfDescribingMarshallable {
     public long getCurrentPrice() { return currentPrice; }
     public long getMarketValue() { return marketValue; }
     public int getPriceScale() { return priceScale; }
+    public int getQuantityScale() { return quantityScale; }
     public long getOpenedAt() { return openedAt; }
     public long getTimestampNanos() { return timestampNanos; }
 }

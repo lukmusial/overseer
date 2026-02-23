@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { Order, Strategy } from '../types/api';
-import { formatPrice } from '../utils/format';
+import { formatPrice, formatQuantity } from '../utils/format';
 
 interface Props {
   orders: Order[];
@@ -142,9 +142,9 @@ export function OrderList({ orders, strategies, onCancel, maxOrders, showViewAll
               <td>{order.symbol}</td>
               <td className={order.side === 'BUY' ? 'buy' : 'sell'}>{order.side}</td>
               <td>{order.type}</td>
-              <td>{order.quantity}</td>
+              <td>{formatQuantity(order.quantity, order.quantityScale)}</td>
               <td>{order.price > 0 ? formatPrice(order.price, order.priceScale || 100) : '-'}</td>
-              <td>{order.filledQuantity}/{order.quantity}</td>
+              <td>{formatQuantity(order.filledQuantity, order.quantityScale)}/{formatQuantity(order.quantity, order.quantityScale)}</td>
               <td>
                 <span className={`status-badge status-${order.status.toLowerCase()}`}>
                   {order.status}

@@ -25,6 +25,7 @@ public class Position {
     private long maxDrawdown;
 
     private int priceScale = 100;
+    private int quantityScale = 1;
 
     // Timestamps
     private long openedAt;
@@ -65,7 +66,7 @@ public class Position {
 
         long tradeQty = trade.getSide() == OrderSide.BUY ? trade.getQuantity() : -trade.getQuantity();
         long tradePrice = trade.getPrice();
-        long tradeCost = tradePrice * Math.abs(trade.getQuantity()) / priceScale;
+        long tradeCost = (long) ((double) tradePrice * Math.abs(trade.getQuantity()) / priceScale / quantityScale);
 
         if (quantity == 0) {
             // Opening new position
@@ -74,9 +75,10 @@ public class Position {
             averageEntryPrice = tradePrice;
             totalCost = tradeCost;
         } else if ((quantity > 0 && tradeQty > 0) || (quantity < 0 && tradeQty < 0)) {
-            // Adding to existing position
+            // Adding to existing position - use double to avoid overflow
             long totalQty = Math.abs(quantity) + Math.abs(tradeQty);
-            averageEntryPrice = (averageEntryPrice * Math.abs(quantity) + tradePrice * Math.abs(tradeQty)) / totalQty;
+            averageEntryPrice = (long) ((double) averageEntryPrice * Math.abs(quantity) / totalQty
+                    + (double) tradePrice * Math.abs(tradeQty) / totalQty);
             quantity += tradeQty;
             totalCost += tradeCost;
         } else {
@@ -85,22 +87,22 @@ public class Position {
             long absPositionQty = Math.abs(quantity);
 
             if (absTradeQty <= absPositionQty) {
-                // Partial close - P&L in minor units (cents)
-                long closedPnl = (tradePrice - averageEntryPrice) * absTradeQty;
+                // Partial close - P&L in priceScale units, divided by quantityScale
+                long closedPnl = (long) ((double) (tradePrice - averageEntryPrice) * absTradeQty / quantityScale);
                 if (quantity < 0) {
                     closedPnl = -closedPnl; // Reverse for short positions
                 }
                 realizedPnl += closedPnl;
                 quantity += tradeQty;
-                totalCost = averageEntryPrice * Math.abs(quantity) / priceScale;
+                totalCost = (long) ((double) averageEntryPrice * Math.abs(quantity) / priceScale / quantityScale);
 
                 if (quantity == 0) {
                     averageEntryPrice = 0;
                     totalCost = 0;
                 }
             } else {
-                // Full close and reverse - P&L in minor units (cents)
-                long closedPnl = (tradePrice - averageEntryPrice) * absPositionQty;
+                // Full close and reverse - P&L in priceScale units, divided by quantityScale
+                long closedPnl = (long) ((double) (tradePrice - averageEntryPrice) * absPositionQty / quantityScale);
                 if (quantity < 0) {
                     closedPnl = -closedPnl;
                 }
@@ -110,7 +112,7 @@ public class Position {
                 long newQty = absTradeQty - absPositionQty;
                 quantity = tradeQty > 0 ? newQty : -newQty;
                 averageEntryPrice = tradePrice;
-                totalCost = tradePrice * newQty / priceScale;
+                totalCost = (long) ((double) tradePrice * newQty / priceScale / quantityScale);
                 openedAt = trade.getExecutedAt();
             }
         }
@@ -124,11 +126,11 @@ public class Position {
      */
     public void updateMarketValue(long price) {
         this.currentPrice = price;
-        this.marketValue = price * Math.abs(quantity) / priceScale;
+        this.marketValue = (long) ((double) price * Math.abs(quantity) / priceScale / quantityScale);
 
         if (quantity != 0) {
-            // Unrealized P&L in minor units (cents)
-            unrealizedPnl = (price - averageEntryPrice) * quantity;
+            // Unrealized P&L in priceScale units, divided by quantityScale
+            unrealizedPnl = (long) ((double) (price - averageEntryPrice) * quantity / quantityScale);
         } else {
             unrealizedPnl = 0;
         }
@@ -244,6 +246,18 @@ public class Position {
         this.priceScale = priceScale;
     }
 
+    public int getQuantityScale() {
+        return quantityScale;
+    }
+
+    public void setQuantityScale(int quantityScale) {
+        this.quantityScale = quantityScale;
+    }
+
+    public double getQuantityAsDouble() {
+        return (double) quantity / quantityScale;
+    }
+
     public long getOpenedAt() {
         return openedAt;
     }
@@ -270,8 +284,8 @@ public class Position {
 
     @Override
     public String toString() {
-        return String.format("Position{%s qty=%d, avgEntry=%.4f, unrealizedPnl=%.2f, realizedPnl=%.2f}",
-                symbol, quantity, getAverageEntryPriceAsDouble(),
+        return String.format("Position{%s qty=%.8g, avgEntry=%.4f, unrealizedPnl=%.2f, realizedPnl=%.2f}",
+                symbol, getQuantityAsDouble(), getAverageEntryPriceAsDouble(),
                 (double) unrealizedPnl / priceScale, (double) realizedPnl / priceScale);
     }
 }

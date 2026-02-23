@@ -24,6 +24,21 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
+// JVM args needed for Chronicle Queue tests on Java 21
+tasks.withType<Test> {
+    jvmArgs(
+        "--add-exports", "java.base/jdk.internal.ref=ALL-UNNAMED",
+        "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-exports", "jdk.unsupported/sun.misc=ALL-UNNAMED",
+        "--add-exports", "jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+        "--add-opens", "jdk.compiler/com.sun.tools.javac=ALL-UNNAMED",
+        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens", "java.base/java.io=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED"
+    )
+}
+
 tasks.bootJar {
     enabled = false
 }
