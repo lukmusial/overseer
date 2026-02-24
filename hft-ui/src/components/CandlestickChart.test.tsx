@@ -171,7 +171,7 @@ describe('CandlestickChart', () => {
     render(<CandlestickChart exchange="ALPACA" symbol="AAPL" />);
 
     await waitFor(() => {
-      expect(mockGetChartData).toHaveBeenCalledWith('ALPACA', 'AAPL', '5m', 100);
+      expect(mockGetChartData).toHaveBeenCalledWith('ALPACA', 'AAPL', '5m', 100, undefined);
     });
   });
 
@@ -189,7 +189,7 @@ describe('CandlestickChart', () => {
     });
 
     await waitFor(() => {
-      expect(mockGetChartData).toHaveBeenCalledWith('ALPACA', 'AAPL', '15m', 100);
+      expect(mockGetChartData).toHaveBeenCalledWith('ALPACA', 'AAPL', '15m', 100, undefined);
     });
   });
 
@@ -207,7 +207,7 @@ describe('CandlestickChart', () => {
     });
 
     await waitFor(() => {
-      expect(mockGetChartData).toHaveBeenCalledWith('ALPACA', 'AAPL', '5m', 200);
+      expect(mockGetChartData).toHaveBeenCalledWith('ALPACA', 'AAPL', '5m', 200, undefined);
     });
   });
 
@@ -597,46 +597,53 @@ describe('CandlestickChart', () => {
     expect(mockRemove).toHaveBeenCalled();
   });
 
-  describe('quote topic subscription based on exchangeMode', () => {
-    it('subscribes to /topic/chart-quotes when dataSource=live and exchangeMode=testnet', async () => {
-      const liveTestnetData: ChartData = {
+  describe('quote topic subscription based on dataSourcePref and exchangeMode', () => {
+    it('subscribes to /topic/quotes when exchangeMode=testnet (default dataSourcePref=exchange)', async () => {
+      const testnetData: ChartData = {
+        ...mockChartData,
+        exchange: 'BINANCE',
+        symbol: 'BTCUSDT',
+        dataSource: 'exchange',
+        exchangeMode: 'testnet',
+      };
+      mockGetChartData.mockResolvedValue(testnetData);
+
+      const mockSubscribe = vi.fn(() => vi.fn());
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" subscribe={mockSubscribe} exchangeMode="testnet" />);
+
+      await waitFor(() => {
+        expect(mockGetChartData).toHaveBeenCalled();
+      });
+
+      // Default dataSourcePref for testnet is 'exchange', so should subscribe to regular quotes
+      await waitFor(() => {
+        const calls = mockSubscribe.mock.calls.map(c => c[0]);
+        expect(calls).toContain('/topic/quotes/BINANCE/BTCUSDT');
+        expect(calls).not.toContain('/topic/chart-quotes/BINANCE/BTCUSDT');
+      });
+    });
+
+    it('subscribes to /topic/chart-quotes when user selects Live Market in testnet mode', async () => {
+      const testnetData: ChartData = {
         ...mockChartData,
         exchange: 'BINANCE',
         symbol: 'BTCUSDT',
         dataSource: 'live',
         exchangeMode: 'testnet',
       };
-      mockGetChartData.mockResolvedValue(liveTestnetData);
+      mockGetChartData.mockResolvedValue(testnetData);
 
       const mockSubscribe = vi.fn(() => vi.fn());
-      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" subscribe={mockSubscribe} />);
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" subscribe={mockSubscribe} exchangeMode="testnet" />);
 
       await waitFor(() => {
         expect(mockGetChartData).toHaveBeenCalled();
       });
 
-      // Should subscribe to chart-quotes topic (not regular quotes)
-      await waitFor(() => {
-        const calls = mockSubscribe.mock.calls.map(c => c[0]);
-        expect(calls).toContain('/topic/chart-quotes/BINANCE/BTCUSDT');
-      });
-    });
-
-    it('subscribes to /topic/chart-quotes when dataSource=live and exchangeMode=sandbox', async () => {
-      const liveSandboxData: ChartData = {
-        ...mockChartData,
-        exchange: 'BINANCE',
-        symbol: 'BTCUSDT',
-        dataSource: 'live',
-        exchangeMode: 'sandbox',
-      };
-      mockGetChartData.mockResolvedValue(liveSandboxData);
-
-      const mockSubscribe = vi.fn(() => vi.fn());
-      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" subscribe={mockSubscribe} />);
-
-      await waitFor(() => {
-        expect(mockGetChartData).toHaveBeenCalled();
+      // Switch to "Live Market"
+      const dataSelect = screen.getByDisplayValue(/Exchange/);
+      await act(async () => {
+        fireEvent.change(dataSelect, { target: { value: 'live' } });
       });
 
       await waitFor(() => {
@@ -645,18 +652,18 @@ describe('CandlestickChart', () => {
       });
     });
 
-    it('subscribes to /topic/quotes when dataSource=live and exchangeMode=live', async () => {
-      const liveLiveData: ChartData = {
+    it('subscribes to /topic/quotes when exchangeMode=live (no selector)', async () => {
+      const liveData: ChartData = {
         ...mockChartData,
         exchange: 'BINANCE',
         symbol: 'BTCUSDT',
         dataSource: 'live',
         exchangeMode: 'live',
       };
-      mockGetChartData.mockResolvedValue(liveLiveData);
+      mockGetChartData.mockResolvedValue(liveData);
 
       const mockSubscribe = vi.fn(() => vi.fn());
-      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" subscribe={mockSubscribe} />);
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" subscribe={mockSubscribe} exchangeMode="live" />);
 
       await waitFor(() => {
         expect(mockGetChartData).toHaveBeenCalled();
@@ -669,7 +676,7 @@ describe('CandlestickChart', () => {
       });
     });
 
-    it('subscribes to /topic/quotes when dataSource=stub', async () => {
+    it('subscribes to /topic/quotes when exchangeMode=stub', async () => {
       const stubData: ChartData = {
         ...mockChartData,
         exchange: 'BINANCE',
@@ -680,7 +687,7 @@ describe('CandlestickChart', () => {
       mockGetChartData.mockResolvedValue(stubData);
 
       const mockSubscribe = vi.fn(() => vi.fn());
-      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" subscribe={mockSubscribe} />);
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" subscribe={mockSubscribe} exchangeMode="stub" />);
 
       await waitFor(() => {
         expect(mockGetChartData).toHaveBeenCalled();
@@ -690,6 +697,112 @@ describe('CandlestickChart', () => {
         const calls = mockSubscribe.mock.calls.map(c => c[0]);
         expect(calls).toContain('/topic/quotes/BINANCE/BTCUSDT');
         expect(calls).not.toContain('/topic/chart-quotes/BINANCE/BTCUSDT');
+      });
+    });
+  });
+
+  describe('data source selector', () => {
+    it('shows data source selector when exchangeMode=testnet', async () => {
+      const testnetData: ChartData = {
+        ...mockChartData,
+        exchange: 'BINANCE',
+        symbol: 'BTCUSDT',
+        dataSource: 'exchange',
+        exchangeMode: 'testnet',
+      };
+      mockGetChartData.mockResolvedValue(testnetData);
+
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" exchangeMode="testnet" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Data:')).toBeInTheDocument();
+      });
+
+      // Should show Exchange (Testnet) as default
+      expect(screen.getByDisplayValue('Exchange (Testnet)')).toBeInTheDocument();
+    });
+
+    it('shows data source selector when exchangeMode=sandbox', async () => {
+      const sandboxData: ChartData = {
+        ...mockChartData,
+        exchange: 'BINANCE',
+        symbol: 'BTCUSDT',
+        dataSource: 'exchange',
+        exchangeMode: 'sandbox',
+      };
+      mockGetChartData.mockResolvedValue(sandboxData);
+
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" exchangeMode="sandbox" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Data:')).toBeInTheDocument();
+      });
+
+      expect(screen.getByDisplayValue('Exchange (Sandbox)')).toBeInTheDocument();
+    });
+
+    it('hides data source selector when exchangeMode=live', async () => {
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" exchangeMode="live" />);
+
+      await waitFor(() => {
+        expect(mockGetChartData).toHaveBeenCalled();
+      });
+
+      expect(screen.queryByText('Data:')).not.toBeInTheDocument();
+    });
+
+    it('hides data source selector when exchangeMode=stub', async () => {
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" exchangeMode="stub" />);
+
+      await waitFor(() => {
+        expect(mockGetChartData).toHaveBeenCalled();
+      });
+
+      expect(screen.queryByText('Data:')).not.toBeInTheDocument();
+    });
+
+    it('passes source=exchange to API when Exchange is selected in testnet mode', async () => {
+      const testnetData: ChartData = {
+        ...mockChartData,
+        exchange: 'BINANCE',
+        symbol: 'BTCUSDT',
+        dataSource: 'exchange',
+        exchangeMode: 'testnet',
+      };
+      mockGetChartData.mockResolvedValue(testnetData);
+
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" exchangeMode="testnet" />);
+
+      await waitFor(() => {
+        // Default for testnet is 'exchange'
+        expect(mockGetChartData).toHaveBeenCalledWith('BINANCE', 'BTCUSDT', '5m', 100, 'exchange');
+      });
+    });
+
+    it('passes source=live to API when Live Market is selected in testnet mode', async () => {
+      const testnetData: ChartData = {
+        ...mockChartData,
+        exchange: 'BINANCE',
+        symbol: 'BTCUSDT',
+        dataSource: 'live',
+        exchangeMode: 'testnet',
+      };
+      mockGetChartData.mockResolvedValue(testnetData);
+
+      render(<CandlestickChart exchange="BINANCE" symbol="BTCUSDT" exchangeMode="testnet" />);
+
+      await waitFor(() => {
+        expect(mockGetChartData).toHaveBeenCalled();
+      });
+
+      // Switch to Live Market
+      const dataSelect = screen.getByDisplayValue('Exchange (Testnet)');
+      await act(async () => {
+        fireEvent.change(dataSelect, { target: { value: 'live' } });
+      });
+
+      await waitFor(() => {
+        expect(mockGetChartData).toHaveBeenCalledWith('BINANCE', 'BTCUSDT', '5m', 100, 'live');
       });
     });
   });
