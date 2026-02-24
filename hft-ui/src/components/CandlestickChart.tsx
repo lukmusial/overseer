@@ -222,10 +222,20 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   }, [exchange, symbol, interval, periods, fetchData]);
 
   // Subscribe to real-time quote updates
+  // When candles come from the live API but the exchange is in sandbox/testnet mode,
+  // subscribe to /topic/chart-quotes which broadcasts live prices to stay consistent.
   useEffect(() => {
     if (!subscribe || !exchange || !symbol) return;
 
-    const unsubscribe = subscribe<Quote>(`/topic/quotes/${exchange}/${symbol}`, (quote) => {
+    const dataSource = chartData?.dataSource;
+    const exchangeMode = chartData?.exchangeMode;
+    const useChartQuotes = dataSource === 'live'
+      && (exchangeMode === 'sandbox' || exchangeMode === 'testnet');
+    const topic = useChartQuotes
+      ? `/topic/chart-quotes/${exchange}/${symbol}`
+      : `/topic/quotes/${exchange}/${symbol}`;
+
+    const unsubscribe = subscribe<Quote>(topic, (quote) => {
       setLastQuote(quote);
 
       // Re-fetch chart data (including thresholds) when stale >10s
@@ -270,7 +280,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     });
 
     return unsubscribe;
-  }, [subscribe, exchange, symbol, interval]);
+  }, [subscribe, exchange, symbol, interval, chartData?.dataSource, chartData?.exchangeMode]);
 
   // Subscribe to real-time order updates
   useEffect(() => {

@@ -7,12 +7,16 @@ import com.hft.algo.base.TradingStrategy;
 import com.hft.core.model.Exchange;
 import com.hft.core.model.Order;
 import com.hft.core.model.Symbol;
+import com.hft.api.dto.ExchangeStatusDto;
+import com.hft.api.dto.QuoteDto;
 import com.hft.exchange.alpaca.AlpacaHttpClient;
 import com.hft.exchange.alpaca.dto.AlpacaBar;
 import com.hft.exchange.alpaca.dto.AlpacaBarsResponse;
 import com.hft.exchange.binance.BinanceHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -20,6 +24,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.Set;
 
 /**
  * Service for generating chart data including historical candles,
@@ -33,6 +38,7 @@ public class ChartDataService {
     private final TradingService tradingService;
     private final StubMarketDataService stubMarketDataService;
     private final ExchangeService exchangeService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     // Cache TTL for real exchange data (30 seconds)
     private static final long REAL_DATA_CACHE_TTL_MS = 30_000;
@@ -65,6 +71,9 @@ public class ChartDataService {
             "XRPUSDT", 0.050
     );
 
+    // Tracks which Binance symbols have been requested for charts (for live quote broadcasting)
+    private final Set<String> trackedBinanceSymbols = ConcurrentHashMap.newKeySet();
+
     // Cache for generated historical data
     private final Map<String, List<CandleDto>> candleCache = new ConcurrentHashMap<>();
     // Timestamps for cache entries (used for time-based expiry of real data)
@@ -75,10 +84,11 @@ public class ChartDataService {
     private final Map<String, String> cacheDataSource = new ConcurrentHashMap<>();
 
     public ChartDataService(TradingService tradingService, StubMarketDataService stubMarketDataService,
-                            ExchangeService exchangeService) {
+                            ExchangeService exchangeService, SimpMessagingTemplate messagingTemplate) {
         this.tradingService = tradingService;
         this.stubMarketDataService = stubMarketDataService;
         this.exchangeService = exchangeService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -95,7 +105,11 @@ public class ChartDataService {
         String cacheKey = symbolTicker + ":" + exchangeName + ":" + interval + ":" + periods;
         String dataSource = cacheDataSource.getOrDefault(cacheKey, "stub");
 
-        return new ChartDataDto(symbolTicker, exchangeName, interval, dataSource, candles, orders, triggerRanges);
+        // Get the runtime mode of the exchange (e.g., "stub", "sandbox", "testnet", "live")
+        ExchangeStatusDto status = exchangeService.getExchangeStatus(exchangeName);
+        String exchangeMode = status != null ? status.mode() : "stub";
+
+        return new ChartDataDto(symbolTicker, exchangeName, interval, dataSource, exchangeMode, candles, orders, triggerRanges);
     }
 
     /**
@@ -179,6 +193,9 @@ public class ChartDataService {
         if (client == null) {
             return null;
         }
+
+        // Track this symbol for live chart quote broadcasting
+        trackedBinanceSymbols.add(symbol);
 
         // Always use the live Binance endpoint for market data — testnet is unreliable
         sourceOut[0] = "live";
@@ -547,6 +564,51 @@ public class ChartDataService {
     }
 
     /**
+     * Periodically broadcasts live Binance ticker prices for chart consumption.
+     * When Binance is in sandbox/testnet mode, the WebSocket quotes come from testnet
+     * while historical candles come from the live API, causing chart oscillation.
+     * This method fetches live prices and broadcasts them on a separate topic
+     * so the frontend can use consistent data.
+     */
+    @Scheduled(fixedRate = 2000)
+    public void broadcastLiveChartQuotes() {
+        if (trackedBinanceSymbols.isEmpty()) {
+            return;
+        }
+
+        ExchangeStatusDto status = exchangeService.getExchangeStatus("BINANCE");
+        if (status == null) {
+            return;
+        }
+
+        String mode = status.mode();
+        // Only broadcast live prices when in sandbox/testnet mode —
+        // in live mode, the WebSocket quotes already match the candle source
+        if (!"sandbox".equals(mode) && !"testnet".equals(mode)) {
+            return;
+        }
+
+        BinanceHttpClient client = exchangeService.getBinanceClient();
+        if (client == null) {
+            return;
+        }
+
+        for (String symbol : trackedBinanceSymbols) {
+            try {
+                JsonNode ticker = client.getTickerPriceLive(symbol).get(5, TimeUnit.SECONDS);
+                if (ticker != null && ticker.has("price")) {
+                    double price = Double.parseDouble(ticker.get("price").asText());
+                    long now = System.currentTimeMillis();
+                    QuoteDto quoteDto = new QuoteDto(symbol, "BINANCE", price, price, 0, 0, price, 0.0, now);
+                    messagingTemplate.convertAndSend("/topic/chart-quotes/BINANCE/" + symbol, quoteDto);
+                }
+            } catch (Exception e) {
+                log.debug("Failed to fetch live ticker for {}: {}", symbol, e.getMessage());
+            }
+        }
+    }
+
+    /**
      * Clear the candle cache (useful when data needs refresh).
      */
     public void clearCache() {
@@ -554,5 +616,6 @@ public class ChartDataService {
         cacheTimestamps.clear();
         cacheIsReal.clear();
         cacheDataSource.clear();
+        trackedBinanceSymbols.clear();
     }
 }
