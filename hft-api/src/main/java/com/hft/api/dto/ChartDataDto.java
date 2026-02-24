@@ -10,6 +10,7 @@ public record ChartDataDto(
         String exchange,
         String interval,        // e.g., "1m", "5m", "1h", "1d"
         String dataSource,      // "stub", "live", "testnet", "sandbox"
+        String exchangeMode,    // runtime mode of the exchange: "stub", "sandbox", "testnet", "live"
         List<CandleDto> candles,
         List<OrderMarkerDto> orders,
         List<TriggerRangeDto> triggerRanges

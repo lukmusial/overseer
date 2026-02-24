@@ -193,6 +193,7 @@ export interface ChartData {
   exchange: string;
   interval: string;
   dataSource: string;  // "stub", "live", "testnet", "sandbox"
+  exchangeMode: string; // runtime mode: "stub", "sandbox", "testnet", "live"
   candles: Candle[];
   orders: OrderMarker[];
   triggerRanges: TriggerRange[];
