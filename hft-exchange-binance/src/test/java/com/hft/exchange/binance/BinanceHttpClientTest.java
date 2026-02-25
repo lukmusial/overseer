@@ -52,4 +52,34 @@ class BinanceHttpClientTest {
             client.close();
         }
     }
+
+    @Test
+    void getTickerPriceLive_returnsNonNullFuture() {
+        // Even with testnet config, getTickerPriceLive should use the live URL
+        BinanceConfig config = BinanceConfig.testnet("test-key", "test-secret");
+        BinanceHttpClient client = new BinanceHttpClient(config);
+
+        try {
+            var future = client.getTickerPriceLive("BTCUSDT");
+            assertNotNull(future, "Should return a non-null CompletableFuture");
+        } finally {
+            client.close();
+        }
+    }
+
+    @Test
+    void getTickerPriceLive_acceptsDifferentSymbols() {
+        BinanceConfig config = BinanceConfig.testnet("test-key", "test-secret");
+        BinanceHttpClient client = new BinanceHttpClient(config);
+
+        try {
+            String[] symbols = {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"};
+            for (String symbol : symbols) {
+                var future = client.getTickerPriceLive(symbol);
+                assertNotNull(future, "Should return non-null future for symbol: " + symbol);
+            }
+        } finally {
+            client.close();
+        }
+    }
 }
