@@ -10,6 +10,7 @@ interface CandlestickChartProps {
   strategies?: Strategy[];
   refreshKey?: number;
   subscribe?: <T>(destination: string, callback: (data: T) => void) => () => void;
+  exchangeMode?: string;
 }
 
 const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'];
@@ -38,7 +39,7 @@ function getCandleTime(timestampMs: number, intervalMs: number): number {
   return Math.floor(timestampSec / intervalSec) * intervalSec;
 }
 
-export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey, subscribe }: CandlestickChartProps) {
+export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey, subscribe, exchangeMode }: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -48,6 +49,8 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   const ordersByTimeRef = useRef<Map<number, OrderMarker[]>>(new Map());
   const priceLinesRef = useRef<IPriceLine[]>([]);
 
+  const isTestnetOrSandbox = exchangeMode === 'testnet' || exchangeMode === 'sandbox';
+
   const [interval, setInterval] = useState('5m');
   const [periods, setPeriods] = useState(100);
   const [chartData, setChartData] = useState<ChartData | null>(null);
@@ -56,10 +59,18 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   const [selectedStrategy, setSelectedStrategy] = useState<string>('all');
   const [lastQuote, setLastQuote] = useState<Quote | null>(null);
   const [showThresholds, setShowThresholds] = useState(true);
+  const [dataSourcePref, setDataSourcePref] = useState<'live' | 'exchange'>(
+    isTestnetOrSandbox ? 'exchange' : 'live'
+  );
   const lastThresholdFetchRef = useRef<number>(0);
   const fetchDataRef = useRef<() => void>(() => {});
 
   const { getChartData } = useApi();
+
+  // Reset data source preference when exchange mode changes
+  useEffect(() => {
+    setDataSourcePref(isTestnetOrSandbox ? 'exchange' : 'live');
+  }, [isTestnetOrSandbox]);
 
   // Fetch chart data
   const fetchData = useCallback(async () => {
@@ -69,7 +80,8 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     setError(null);
 
     try {
-      const data = await getChartData(exchange, symbol, interval, periods);
+      const source = isTestnetOrSandbox ? dataSourcePref : undefined;
+      const data = await getChartData(exchange, symbol, interval, periods, source);
       setChartData(data);
       lastThresholdFetchRef.current = Date.now();
       // Set current candle reference to the last candle
@@ -88,7 +100,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     } finally {
       setLoading(false);
     }
-  }, [exchange, symbol, interval, periods, getChartData, refreshKey]);
+  }, [exchange, symbol, interval, periods, getChartData, refreshKey, isTestnetOrSandbox, dataSourcePref]);
 
   // Keep fetchDataRef current for use in callbacks without re-subscribing
   fetchDataRef.current = fetchData;
@@ -222,10 +234,18 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
   }, [exchange, symbol, interval, periods, fetchData]);
 
   // Subscribe to real-time quote updates
+  // When the user selects "Live Market" in testnet/sandbox mode,
+  // subscribe to /topic/chart-quotes which broadcasts live prices to stay consistent.
+  // When "Exchange" is selected (or in live/stub mode), use regular /topic/quotes.
   useEffect(() => {
     if (!subscribe || !exchange || !symbol) return;
 
-    const unsubscribe = subscribe<Quote>(`/topic/quotes/${exchange}/${symbol}`, (quote) => {
+    const useChartQuotes = dataSourcePref === 'live' && isTestnetOrSandbox;
+    const topic = useChartQuotes
+      ? `/topic/chart-quotes/${exchange}/${symbol}`
+      : `/topic/quotes/${exchange}/${symbol}`;
+
+    const unsubscribe = subscribe<Quote>(topic, (quote) => {
       setLastQuote(quote);
 
       // Re-fetch chart data (including thresholds) when stale >10s
@@ -270,7 +290,7 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
     });
 
     return unsubscribe;
-  }, [subscribe, exchange, symbol, interval]);
+  }, [subscribe, exchange, symbol, interval, dataSourcePref, isTestnetOrSandbox]);
 
   // Subscribe to real-time order updates
   useEffect(() => {
@@ -470,6 +490,15 @@ export function CandlestickChart({ exchange, symbol, strategies = [], refreshKey
               ))}
             </select>
           </div>
+          {isTestnetOrSandbox && (
+            <div className="control-group">
+              <label>Data:</label>
+              <select value={dataSourcePref} onChange={e => setDataSourcePref(e.target.value as 'live' | 'exchange')}>
+                <option value="exchange">Exchange ({exchangeMode === 'testnet' ? 'Testnet' : 'Sandbox'})</option>
+                <option value="live">Live Market</option>
+              </select>
+            </div>
+          )}
           <div className="control-group">
             <label>Strategy:</label>
             <select value={selectedStrategy} onChange={e => setSelectedStrategy(e.target.value)}>

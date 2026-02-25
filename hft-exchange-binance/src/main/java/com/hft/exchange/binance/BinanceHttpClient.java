@@ -265,6 +265,25 @@ public class BinanceHttpClient {
         return executeAsync(request, JsonNode.class);
     }
 
+    /**
+     * Fetches the current ticker price always from the live Binance endpoint.
+     * Testnet prices differ from production, so chart updates should use live prices
+     * to stay consistent with historical candles (which also come from live).
+     * This is a public endpoint that does not require authentication.
+     *
+     * @param symbol Trading pair symbol (e.g., "BTCUSDT")
+     * @return JSON object: {"symbol":"BTCUSDT","price":"63000.12"}
+     */
+    public CompletableFuture<JsonNode> getTickerPriceLive(String symbol) {
+        String url = BinanceConfig.LIVE_BASE_URL + "/api/v3/ticker/price?symbol=" + symbol;
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .build();
+
+        return executeAsync(request, JsonNode.class);
+    }
+
     public void close() {
         httpClient.dispatcher().executorService().shutdown();
         httpClient.connectionPool().evictAll();

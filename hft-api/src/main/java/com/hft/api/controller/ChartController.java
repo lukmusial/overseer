@@ -28,20 +28,22 @@ public class ChartController {
      * @param symbol   Symbol ticker (AAPL, BTCUSDT, etc.)
      * @param interval Candle interval (1m, 5m, 15m, 30m, 1h, 4h, 1d)
      * @param periods  Number of candles to return (default 100)
+     * @param source   Data source: "live" (always live API) or "exchange" (configured endpoint)
      */
     @GetMapping("/{exchange}/{symbol}")
     public ResponseEntity<ChartDataDto> getChartData(
             @PathVariable String exchange,
             @PathVariable String symbol,
             @RequestParam(defaultValue = "5m") String interval,
-            @RequestParam(defaultValue = "100") int periods) {
+            @RequestParam(defaultValue = "100") int periods,
+            @RequestParam(defaultValue = "live") String source) {
 
         // Validate parameters
         if (periods < 1 || periods > 1000) {
             periods = 100;
         }
 
-        ChartDataDto data = chartDataService.getChartData(symbol, exchange, interval, periods);
+        ChartDataDto data = chartDataService.getChartData(symbol, exchange, interval, periods, source);
         return ResponseEntity.ok(data);
     }
 
@@ -53,13 +55,14 @@ public class ChartController {
             @PathVariable String exchange,
             @PathVariable String symbol,
             @RequestParam(defaultValue = "5m") String interval,
-            @RequestParam(defaultValue = "100") int periods) {
+            @RequestParam(defaultValue = "100") int periods,
+            @RequestParam(defaultValue = "live") String source) {
 
         if (periods < 1 || periods > 1000) {
             periods = 100;
         }
 
-        List<CandleDto> candles = chartDataService.getHistoricalCandles(symbol, exchange, interval, periods);
+        List<CandleDto> candles = chartDataService.getHistoricalCandles(symbol, exchange, interval, periods, source);
         return ResponseEntity.ok(candles);
     }
 

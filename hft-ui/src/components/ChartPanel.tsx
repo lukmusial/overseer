@@ -231,6 +231,7 @@ export function ChartPanel({ exchanges, strategies, symbolRefreshKey, subscribe,
           strategies={strategies}
           refreshKey={symbolRefreshKey}
           subscribe={subscribe}
+          exchangeMode={exchanges.find(e => e.exchange === selectedExchange)?.mode}
         />
       ) : (
         <div className="empty-message">

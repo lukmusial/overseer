@@ -179,11 +179,14 @@ export function useApi() {
     exchange: string,
     symbol: string,
     interval: string = '5m',
-    periods: number = 100
+    periods: number = 100,
+    source?: string
   ): Promise<ChartData> => {
-    return fetchJson<ChartData>(
-      `${API_BASE}/chart/${exchange}/${symbol}?interval=${interval}&periods=${periods}`
-    );
+    let url = `${API_BASE}/chart/${exchange}/${symbol}?interval=${interval}&periods=${periods}`;
+    if (source) {
+      url += `&source=${source}`;
+    }
+    return fetchJson<ChartData>(url);
   }, []);
 
   return {
