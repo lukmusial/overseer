@@ -7,25 +7,27 @@ A modular high-frequency trading client in Java supporting:
 - **Stocks**: Alpaca (REST/WebSocket API, paper trading)
 - **Crypto**: Binance (REST/WebSocket API, testnet)
 
-## Java Setup (Required: Java 21)
+## Java Setup (Required: Java 25 + Java 21)
 
-This project requires Java 21. The Java home is configured in `gradle.properties`:
-- **Intel Mac**: `/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
-- **Apple Silicon**: `/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
+This project compiles and runs against **Java 25** via Gradle toolchains. Gradle itself runs on **Java 21** (required for Kotlin DSL compatibility).
 
-All `./gradlew` commands will automatically use the configured Java version.
+Both JDKs must be installed. `gradle.properties` configures:
+- `org.gradle.java.home` — points to JDK 21 (runs Gradle)
+- `javaVersion=25` — the toolchain auto-detects JDK 25 for compilation/testing
 
-### Installing Java 21 (if not present)
+### Installing (if not present)
 ```bash
 # Homebrew (recommended)
-brew install openjdk@21
+brew install openjdk@21 openjdk
 
-# Verify installation
-/usr/libexec/java_home -V 2>&1 | grep 21
+# Verify both are installed
+/usr/libexec/java_home -V 2>&1 | grep -E "21|25"
 ```
 
 ### Switching between Intel/Apple Silicon
-Edit `gradle.properties` and update `org.gradle.java.home` to match your architecture.
+Edit `gradle.properties` and update `org.gradle.java.home` to the JDK 21 path for your architecture:
+- **Intel Mac**: `/usr/local/Cellar/openjdk@21/21.0.10/libexec/openjdk.jdk/Contents/Home`
+- **Apple Silicon**: `/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
 
 ## Development Workflow (NON-NEGOTIABLE)
 
@@ -269,7 +271,7 @@ On startup, `TradingService.init()` restores persisted state in order:
 2. **Primitive Collections**: Use Agrona collections instead of JDK
 3. **Off-heap Memory**: Chronicle for persistence
 4. **Lock-free Messaging**: LMAX Disruptor ring buffer
-5. **GC Tuning**: ZGC with `-XX:+UseZGC -XX:+ZGenerational`
+5. **GC Tuning**: ZGC with `-XX:+UseZGC` (generational is default since Java 24)
 
 ### Core Domain Models
 - `Order`: Mutable for pooling, tracks full lifecycle and latency metrics
@@ -361,13 +363,13 @@ Key benchmarks:
 
 ### Development
 ```bash
--XX:+UseZGC -XX:+ZGenerational -Xms1g -Xmx1g
+-XX:+UseZGC -Xms1g -Xmx1g
 ```
 
 ### Production
 ```bash
 -XX:+UseZGC
--XX:+ZGenerational
+
 -XX:+AlwaysPreTouch
 -XX:+UseNUMA
 -XX:+DisableExplicitGC
