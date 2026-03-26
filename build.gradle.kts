@@ -1,7 +1,7 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.2.2" apply false
-    id("io.spring.dependency-management") version "1.1.4" apply false
+    id("org.springframework.boot") version "3.5.5" apply false
+    id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
 val javaVersion: String by project
@@ -46,8 +46,7 @@ subprojects {
         }
         jvmArgs(
             "--enable-preview",
-            "-XX:+UseZGC",
-            "-XX:+ZGenerational"
+            "-XX:+UseZGC"
         )
     }
 
@@ -58,8 +57,7 @@ subprojects {
         }
         jvmArgs(
             "--enable-preview",
-            "-XX:+UseZGC",
-            "-XX:+ZGenerational"
+            "-XX:+UseZGC"
         )
     }
 
@@ -82,7 +80,6 @@ tasks.register("printJvmArgs") {
         println("""
             Recommended JVM args for low-latency:
             -XX:+UseZGC
-            -XX:+ZGenerational
             -XX:+AlwaysPreTouch
             -XX:+UseNUMA
             -XX:+DisableExplicitGC

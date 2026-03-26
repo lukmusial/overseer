@@ -24,7 +24,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
-// JVM args needed for Chronicle Queue tests on Java 21
+// JVM args needed for Chronicle Queue tests on Java 25
 tasks.withType<Test> {
     jvmArgs(
         "--add-exports", "java.base/jdk.internal.ref=ALL-UNNAMED",

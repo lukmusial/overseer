@@ -83,11 +83,10 @@ tasks.bootRun {
     jvmArgs = listOf(
         "--enable-preview",
         "-XX:+UseZGC",
-        "-XX:+ZGenerational",
         "-XX:+AlwaysPreTouch",
         "-Xms2g",
         "-Xmx2g",
-        // Chronicle Queue requirements for Java 11+
+        // Chronicle Queue requirements for module system
         "--add-exports", "java.base/jdk.internal.ref=ALL-UNNAMED",
         "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
         "--add-exports", "jdk.unsupported/sun.misc=ALL-UNNAMED",

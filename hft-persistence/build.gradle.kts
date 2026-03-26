@@ -16,7 +16,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
 }
 
-// JVM args needed for Chronicle on Java 21
+// JVM args needed for Chronicle on Java 25
 tasks.withType<Test> {
     jvmArgs(
         "--add-exports", "java.base/jdk.internal.ref=ALL-UNNAMED",
