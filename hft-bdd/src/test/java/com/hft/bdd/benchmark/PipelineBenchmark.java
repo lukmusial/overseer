@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hft.core.model.*;
 import com.hft.core.metrics.OrderMetrics;
+import com.hft.core.util.FastDecimalParser;
 import com.hft.engine.TradingEngine;
 import com.hft.engine.service.RiskManager;
 import com.lmax.disruptor.YieldingWaitStrategy;
@@ -130,11 +131,29 @@ public class PipelineBenchmark {
     }
 
     /**
+     * Stage 2 (optimized): Parse 4 price strings using FastDecimalParser.
+     * Zero-allocation alternative to BigDecimal.
+     */
+    @Benchmark
+    public void priceParsingFastDecimal(Blackhole bh) {
+        long bid = FastDecimalParser.parseDecimal(PRICE_BID, 8);
+        long ask = FastDecimalParser.parseDecimal(PRICE_ASK, 8);
+        long bidSz = FastDecimalParser.parseDecimal(SIZE_BID, 8);
+        long askSz = FastDecimalParser.parseDecimal(SIZE_ASK, 8);
+        bh.consume(bid);
+        bh.consume(ask);
+        bh.consume(bidSz);
+        bh.consume(askSz);
+    }
+
+    /**
      * Stage 5: Pre-trade risk check + ring buffer publish.
      * Creates a realistic order and submits it through the TradingEngine.
+     * Resets daily counters each iteration to avoid hitting limits.
      */
     @Benchmark
     public void riskCheckPreTrade(Blackhole bh) {
+        tradingEngine.resetDailyCounters();
         Order order = new Order();
         order.setSymbol(symbol);
         order.setSide(OrderSide.BUY);
@@ -147,22 +166,55 @@ public class PipelineBenchmark {
     }
 
     /**
-     * Stages 1-6: Full internal pipeline measurement.
-     * JSON parse -> price extraction -> Quote construction -> ring buffer publish.
+     * Stages 1-6 (BASELINE): Full pipeline using BigDecimal parsing.
+     * JSON parse -> BigDecimal price extraction -> Quote construction -> ring buffer publish.
      */
     @Benchmark
-    public void fullInternalPipeline(Blackhole bh) throws Exception {
+    public void fullPipelineBaseline(Blackhole bh) throws Exception {
         // Stage 1: JSON parse
         JsonNode root = objectMapper.readTree(BINANCE_BOOK_TICKER_JSON);
         JsonNode data = root.get("data");
 
-        // Stage 2: Price extraction
+        // Stage 2: Price extraction (BigDecimal — old path)
         long bidPrice = new BigDecimal(data.get("b").asText()).multiply(SATOSHI_MULTIPLIER).longValue();
         long askPrice = new BigDecimal(data.get("a").asText()).multiply(SATOSHI_MULTIPLIER).longValue();
         long bidSize = new BigDecimal(data.get("B").asText()).multiply(SATOSHI_MULTIPLIER).longValue();
         long askSize = new BigDecimal(data.get("A").asText()).multiply(SATOSHI_MULTIPLIER).longValue();
 
-        // Stage 3: Quote construction
+        // Stage 3: Quote construction (new — old path)
+        Quote quote = new Quote();
+        quote.setSymbol(symbol);
+        quote.setBidPrice(bidPrice);
+        quote.setAskPrice(askPrice);
+        quote.setBidSize(bidSize);
+        quote.setAskSize(askSize);
+        quote.setTimestamp(System.nanoTime());
+        quote.setReceivedAt(System.nanoTime());
+        quote.setPriceScale(100_000_000);
+
+        // Stage 4-6: ring buffer publish
+        tradingEngine.onQuoteUpdate(quote);
+
+        bh.consume(quote);
+    }
+
+    /**
+     * Stages 1-6 (OPTIMIZED): Full pipeline using FastDecimalParser + pooled Quote.
+     * JSON parse -> FastDecimal price extraction -> pooled Quote -> ring buffer publish.
+     */
+    @Benchmark
+    public void fullPipelineOptimized(Blackhole bh) throws Exception {
+        // Stage 1: JSON parse
+        JsonNode root = objectMapper.readTree(BINANCE_BOOK_TICKER_JSON);
+        JsonNode data = root.get("data");
+
+        // Stage 2: Price extraction (FastDecimalParser — new path)
+        long bidPrice = FastDecimalParser.parseDecimal(data.get("b").asText(), 8);
+        long askPrice = FastDecimalParser.parseDecimal(data.get("a").asText(), 8);
+        long bidSize = FastDecimalParser.parseDecimal(data.get("B").asText(), 8);
+        long askSize = FastDecimalParser.parseDecimal(data.get("A").asText(), 8);
+
+        // Stage 3: Quote construction (pooled — new path)
         Quote quote = quotePool.acquire();
         quote.setSymbol(symbol);
         quote.setBidPrice(bidPrice);
@@ -173,7 +225,7 @@ public class PipelineBenchmark {
         quote.setReceivedAt(System.nanoTime());
         quote.setPriceScale(100_000_000);
 
-        // Stage 4-6: Strategy dispatch + risk check + ring buffer publish
+        // Stage 4-6: ring buffer publish
         tradingEngine.onQuoteUpdate(quote);
 
         bh.consume(quote);

@@ -55,6 +55,22 @@ tasks.test {
     }
 }
 
+// JMH benchmark execution task
+// Usage: ./gradlew :hft-bdd:jmh or ./gradlew :hft-bdd:jmh -Pbenchmark=PipelineBenchmark
+tasks.register<JavaExec>("jmh") {
+    description = "Run JMH benchmarks"
+    group = "verification"
+    mainClass.set("org.openjdk.jmh.Main")
+    classpath = sourceSets["test"].runtimeClasspath
+    val benchmark = project.findProperty("benchmark")?.toString() ?: ".*Benchmark.*"
+    val jdk25 = "/usr/local/Cellar/openjdk/25.0.2/libexec/openjdk.jdk/Contents/Home/bin/java"
+    args = listOf(benchmark, "-f", "1", "-wi", "3", "-i", "5", "-tu", "ns", "-bm", "avgt",
+                  "-jvm", jdk25, "-jvmArgs", "-XX:+UseZGC -Xms1g -Xmx1g")
+    // Run main JMH process with Java 25 too (it loads benchmark classes)
+    executable = jdk25
+    dependsOn("testClasses")
+}
+
 // Dedicated task for running backtests (requires internet for Binance API)
 // Usage: ./gradlew :hft-bdd:backtest
 tasks.register<Test>("backtest") {
