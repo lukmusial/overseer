@@ -10,13 +10,17 @@ import com.hft.core.port.MarketDataPort;
 import com.hft.exchange.alpaca.AlpacaConfig;
 import com.hft.exchange.alpaca.AlpacaHttpClient;
 import com.hft.exchange.alpaca.AlpacaMarketDataPort;
+import com.hft.exchange.alpaca.AlpacaOrderPort;
+import com.hft.exchange.alpaca.AlpacaTradingStreamClient;
 import com.hft.exchange.alpaca.AlpacaWebSocketClient;
 import com.hft.exchange.alpaca.dto.AlpacaAccount;
 import com.hft.exchange.alpaca.dto.AlpacaAsset;
 import com.hft.exchange.binance.BinanceConfig;
 import com.hft.exchange.binance.BinanceHttpClient;
 import com.hft.exchange.binance.BinanceMarketDataPort;
+import com.hft.exchange.binance.BinanceOrderPort;
 import com.hft.exchange.binance.BinanceWebSocketClient;
+import com.hft.exchange.binance.BinanceWebSocketOrderPort;
 import com.hft.exchange.binance.dto.BinanceAccount;
 import com.hft.exchange.binance.dto.BinanceExchangeInfo;
 import com.hft.exchange.binance.dto.BinanceSymbol;
@@ -70,6 +74,10 @@ public class ExchangeService {
     private BinanceMarketDataPort binanceMarketDataPort;
     private AlpacaWebSocketClient alpacaWsClient;
     private AlpacaMarketDataPort alpacaMarketDataPort;
+
+    // WebSocket order ports and trading streams
+    private BinanceWebSocketOrderPort binanceWsOrderPort;
+    private AlpacaTradingStreamClient alpacaTradingStream;
 
     // Tracks which symbols have real (non-stub) data feeds
     private final Set<String> realDataSymbols = ConcurrentHashMap.newKeySet();
@@ -171,6 +179,17 @@ public class ExchangeService {
                     wsClient.connect().thenRun(() -> subscribeActiveSymbols("ALPACA", mdPort));
                     this.alpacaWsClient = wsClient;
                     this.alpacaMarketDataPort = mdPort;
+
+                    // Register REST order port (Alpaca doesn't support WS order placement)
+                    AlpacaOrderPort orderPort = new AlpacaOrderPort(alpacaClient);
+                    tradingService.getTradingEngine().registerExchange(Exchange.ALPACA, orderPort);
+                    log.info("Alpaca REST order port registered");
+
+                    // Connect trading stream for real-time order updates (fills, cancellations)
+                    AlpacaTradingStreamClient tradingStream = new AlpacaTradingStreamClient(config);
+                    tradingStream.connect();
+                    this.alpacaTradingStream = tradingStream;
+                    log.info("Alpaca trading stream connected");
                 }
 
                 connections.put("ALPACA", new ExchangeConnection("ALPACA", alpacaLabel,
@@ -239,6 +258,13 @@ public class ExchangeService {
                     wsClient.connect().thenRun(() -> subscribeActiveSymbols("BINANCE", mdPort));
                     this.binanceWsClient = wsClient;
                     this.binanceMarketDataPort = mdPort;
+
+                    // Register WebSocket order port for low-latency order submission
+                    BinanceWebSocketOrderPort wsOrderPort = new BinanceWebSocketOrderPort(config, binanceClient);
+                    wsOrderPort.connect();
+                    tradingService.getTradingEngine().registerExchange(Exchange.BINANCE, wsOrderPort);
+                    this.binanceWsOrderPort = wsOrderPort;
+                    log.info("Binance WebSocket order port registered");
                 }
 
                 connections.put("BINANCE", new ExchangeConnection("BINANCE", binanceLabel,
@@ -616,6 +642,12 @@ public class ExchangeService {
     @PreDestroy
     public void cleanup() {
         uiBroadcastExecutor.shutdown();
+        if (binanceWsOrderPort != null) {
+            binanceWsOrderPort.disconnect();
+        }
+        if (alpacaTradingStream != null) {
+            alpacaTradingStream.disconnect();
+        }
         if (alpacaWsClient != null) {
             alpacaWsClient.disconnect();
         }
