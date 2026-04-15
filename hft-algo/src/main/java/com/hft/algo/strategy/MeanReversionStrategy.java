@@ -5,7 +5,11 @@ import com.hft.algo.base.StrategyParameters;
 import com.hft.core.model.Quote;
 import com.hft.core.model.Symbol;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Mean Reversion trading strategy.
@@ -30,8 +34,10 @@ public class MeanReversionStrategy extends AbstractTradingStrategy {
 
     private static final String NAME = "MeanReversion";
 
-    // Price history for calculations
-    private final Map<Symbol, LinkedList<Long>> priceHistories = new HashMap<>();
+    // Price history using primitive ring buffers (cache-friendly, zero-allocation per quote)
+    private final Map<Symbol, long[]> priceBuffers = new HashMap<>();
+    private final Map<Symbol, Integer> bufferHeads = new HashMap<>();
+    private final Map<Symbol, Integer> bufferCounts = new HashMap<>();
 
     // Statistics
     private final Map<Symbol, Double> means = new HashMap<>();
@@ -52,9 +58,11 @@ public class MeanReversionStrategy extends AbstractTradingStrategy {
         super(symbols, parameters, customName);
         loadParameters();
 
-        // Initialize price histories
+        // Initialize price ring buffers (pre-allocated, no per-quote allocation)
         for (Symbol symbol : symbols) {
-            priceHistories.put(symbol, new LinkedList<>());
+            priceBuffers.put(symbol, new long[lookbackPeriod]);
+            bufferHeads.put(symbol, 0);
+            bufferCounts.put(symbol, 0);
         }
     }
 
@@ -91,35 +99,39 @@ public class MeanReversionStrategy extends AbstractTradingStrategy {
     protected double calculateSignal(Symbol symbol, Quote quote) {
         long price = (quote.getBidPrice() + quote.getAskPrice()) / 2;
 
-        // Add price to history
-        LinkedList<Long> history = priceHistories.get(symbol);
-        history.addLast(price);
+        // Add price to ring buffer (zero allocation)
+        long[] buffer = priceBuffers.get(symbol);
+        int head = bufferHeads.get(symbol);
+        int count = bufferCounts.get(symbol);
 
-        // Maintain lookback window
-        while (history.size() > lookbackPeriod) {
-            history.removeFirst();
+        buffer[head] = price;
+        head = (head + 1) % lookbackPeriod;
+        bufferHeads.put(symbol, head);
+        if (count < lookbackPeriod) {
+            count++;
+            bufferCounts.put(symbol, count);
         }
 
         // Need enough history to calculate statistics
-        if (history.size() < lookbackPeriod) {
+        if (count < lookbackPeriod) {
             return 0.0;
         }
 
-        // Calculate mean
+        // Calculate mean (L1-cache-friendly sequential array access)
         double sum = 0;
-        for (long p : history) {
-            sum += p;
+        for (int i = 0; i < lookbackPeriod; i++) {
+            sum += buffer[i];
         }
-        double mean = sum / history.size();
+        double mean = sum / lookbackPeriod;
         means.put(symbol, mean);
 
         // Calculate standard deviation
         double sumSquaredDiff = 0;
-        for (long p : history) {
-            double diff = p - mean;
+        for (int i = 0; i < lookbackPeriod; i++) {
+            double diff = buffer[i] - mean;
             sumSquaredDiff += diff * diff;
         }
-        double stdDev = Math.sqrt(sumSquaredDiff / history.size());
+        double stdDev = Math.sqrt(sumSquaredDiff / lookbackPeriod);
         stdDevs.put(symbol, stdDev);
 
         // Avoid division by zero
