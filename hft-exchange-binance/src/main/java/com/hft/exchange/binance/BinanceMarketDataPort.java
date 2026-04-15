@@ -9,6 +9,10 @@ import com.hft.core.model.Trade;
 import com.hft.core.port.MarketDataPort;
 import com.hft.exchange.binance.dto.BinanceTicker;
 import com.hft.exchange.binance.dto.BinanceTrade;
+import com.hft.exchange.binance.parser.BinanceMessageParser;
+import com.hft.exchange.binance.parser.JacksonBinanceParser;
+import com.hft.exchange.binance.parser.ManualBinanceParser;
+import com.hft.exchange.binance.parser.JsoniterBinanceParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,13 +57,36 @@ public class BinanceMarketDataPort implements MarketDataPort {
     // Quote pool to avoid per-quote heap allocation
     private final ObjectPool<Quote> quotePool = new ObjectPool<>(Quote::new, 256);
 
+    // Configurable message parser strategy
+    private final BinanceMessageParser messageParser;
+
+    /** Parser modes: MANUAL (fastest, default), JSONITER, JACKSON (legacy). */
+    public enum ParserMode { MANUAL, JSONITER, JACKSON }
+
     public BinanceMarketDataPort(BinanceHttpClient httpClient, BinanceWebSocketClient webSocketClient) {
+        this(httpClient, webSocketClient, ParserMode.MANUAL);
+    }
+
+    public BinanceMarketDataPort(BinanceHttpClient httpClient, BinanceWebSocketClient webSocketClient, ParserMode parserMode) {
         this.httpClient = httpClient;
         this.webSocketClient = webSocketClient;
+        this.messageParser = switch (parserMode) {
+            case MANUAL -> new ManualBinanceParser();
+            case JSONITER -> new JsoniterBinanceParser();
+            case JACKSON -> new JacksonBinanceParser();
+        };
 
-        // Register for WebSocket callbacks
-        webSocketClient.addTickerListener(this::handleTickerMessage);
-        webSocketClient.addTradeListener(this::handleTradeMessage);
+        if (parserMode == ParserMode.JACKSON) {
+            // Legacy path: use Jackson JsonNode listeners
+            webSocketClient.addTickerListener(this::handleTickerMessage);
+            webSocketClient.addTradeListener(this::handleTradeMessage);
+        } else {
+            // Fast path: use raw string listeners (bypass Jackson tree in WebSocket client)
+            webSocketClient.addRawTickerListener(this::handleRawTickerMessage);
+            webSocketClient.addRawTradeListener(this::handleRawTradeMessage);
+        }
+
+        log.info("BinanceMarketDataPort using {} parser", messageParser.name());
     }
 
     @Override
@@ -242,6 +269,89 @@ public class BinanceMarketDataPort implements MarketDataPort {
             notifyTradeListeners(trade);
         } catch (Exception e) {
             log.error("Error processing trade message", e);
+        }
+    }
+
+    /**
+     * Fast-path handler for raw ticker messages (bypasses Jackson tree entirely).
+     * Uses the configured BinanceMessageParser strategy.
+     */
+    private void handleRawTickerMessage(String rawJson) {
+        long receiveTime = System.nanoTime();
+        quotesReceived.incrementAndGet();
+
+        try {
+            BinanceMessageParser.TickerFields fields = messageParser.parseTicker(rawJson);
+            if (fields == null) {
+                log.warn("Failed to parse raw ticker message");
+                return;
+            }
+
+            Symbol symbol = symbolCache.computeIfAbsent(fields.symbol(), t -> new Symbol(t, Exchange.BINANCE));
+
+            Quote quote = quotePool.acquire();
+            quote.setSymbol(symbol);
+            quote.setBidPrice(fields.bidPrice());
+            quote.setAskPrice(fields.askPrice());
+            quote.setBidSize(fields.bidSize());
+            quote.setAskSize(fields.askSize());
+            quote.setPriceScale(PRICE_SCALE);
+            quote.setTimestamp(System.currentTimeMillis() * 1_000_000L);
+            quote.setReceivedAt(receiveTime);
+
+            notifyQuoteListeners(quote);
+            quotePool.release(quote);
+        } catch (Exception e) {
+            log.error("Error processing raw ticker message", e);
+        }
+    }
+
+    /**
+     * Fast-path handler for raw trade messages.
+     */
+    private void handleRawTradeMessage(String rawJson) {
+        long receiveTime = System.nanoTime();
+        tradesReceived.incrementAndGet();
+
+        try {
+            BinanceMessageParser.TradeFields fields = messageParser.parseTrade(rawJson);
+            if (fields == null) {
+                log.warn("Failed to parse raw trade message");
+                return;
+            }
+
+            String ticker = fields.symbol();
+            Symbol symbol = symbolCache.computeIfAbsent(ticker, t -> new Symbol(t, Exchange.BINANCE));
+
+            Trade trade = new Trade();
+            trade.setSymbol(symbol);
+            trade.setPrice(fields.price());
+            trade.setQuantity(fields.quantity());
+
+            if (fields.tradeTimeMs() > 0) {
+                trade.setExecutedAt(fields.tradeTimeMs() * 1_000_000);
+            }
+
+            long tradeId = fields.tradeId();
+            Long lastId = lastTradeId.get(ticker);
+            if (lastId != null && tradeId <= lastId) {
+                outOfSequenceCount.incrementAndGet();
+            }
+            lastTradeId.put(ticker, tradeId);
+
+            trade.setMaker(fields.isBuyerMaker());
+
+            if (trade.getExecutedAt() > 0) {
+                long latency = receiveTime - trade.getExecutedAt();
+                tradeLatency.record(latency);
+                if (latency > 1_000_000_000L) {
+                    staleQuoteCount.incrementAndGet();
+                }
+            }
+
+            notifyTradeListeners(trade);
+        } catch (Exception e) {
+            log.error("Error processing raw trade message", e);
         }
     }
 

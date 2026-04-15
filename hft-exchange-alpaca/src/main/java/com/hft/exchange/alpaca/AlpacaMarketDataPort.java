@@ -9,6 +9,10 @@ import com.hft.core.model.Trade;
 import com.hft.core.port.MarketDataPort;
 import com.hft.exchange.alpaca.dto.AlpacaQuote;
 import com.hft.exchange.alpaca.dto.AlpacaTrade;
+import com.hft.exchange.alpaca.parser.AlpacaMessageParser;
+import com.hft.exchange.alpaca.parser.JacksonAlpacaParser;
+import com.hft.exchange.alpaca.parser.ManualAlpacaParser;
+import com.hft.exchange.alpaca.parser.JsoniterAlpacaParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,13 +57,36 @@ public class AlpacaMarketDataPort implements MarketDataPort {
     // Quote pool to avoid per-quote heap allocation
     private final ObjectPool<Quote> quotePool = new ObjectPool<>(Quote::new, 256);
 
+    // Configurable message parser strategy
+    private final AlpacaMessageParser messageParser;
+
+    /** Parser modes: MANUAL (fastest, default), JSONITER, JACKSON (legacy). */
+    public enum ParserMode { MANUAL, JSONITER, JACKSON }
+
     public AlpacaMarketDataPort(AlpacaHttpClient httpClient, AlpacaWebSocketClient webSocketClient) {
+        this(httpClient, webSocketClient, ParserMode.MANUAL);
+    }
+
+    public AlpacaMarketDataPort(AlpacaHttpClient httpClient, AlpacaWebSocketClient webSocketClient, ParserMode parserMode) {
         this.httpClient = httpClient;
         this.webSocketClient = webSocketClient;
+        this.messageParser = switch (parserMode) {
+            case MANUAL -> new ManualAlpacaParser();
+            case JSONITER -> new JsoniterAlpacaParser();
+            case JACKSON -> new JacksonAlpacaParser();
+        };
 
-        // Register for WebSocket callbacks
-        webSocketClient.addQuoteListener(this::handleQuoteMessage);
-        webSocketClient.addTradeListener(this::handleTradeMessage);
+        if (parserMode == ParserMode.JACKSON) {
+            // Legacy path: use Jackson JsonNode listeners
+            webSocketClient.addQuoteListener(this::handleQuoteMessage);
+            webSocketClient.addTradeListener(this::handleTradeMessage);
+        } else {
+            // Fast path: use raw string listeners (bypass Jackson tree in WebSocket client)
+            webSocketClient.addRawQuoteListener(this::handleRawQuoteMessage);
+            webSocketClient.addRawTradeListener(this::handleRawTradeMessage);
+        }
+
+        log.info("AlpacaMarketDataPort using {} parser", messageParser.name());
     }
 
     @Override
@@ -246,6 +273,96 @@ public class AlpacaMarketDataPort implements MarketDataPort {
             notifyTradeListeners(trade);
         } catch (Exception e) {
             log.error("Error processing trade message", e);
+        }
+    }
+
+    /**
+     * Fast-path handler for raw quote messages (bypasses Jackson tree entirely).
+     */
+    private void handleRawQuoteMessage(String rawJson) {
+        long receiveTime = System.nanoTime();
+        quotesReceived.incrementAndGet();
+
+        try {
+            AlpacaMessageParser.QuoteFields fields = messageParser.parseQuote(rawJson);
+            if (fields == null) {
+                log.warn("Failed to parse raw quote message");
+                return;
+            }
+
+            Symbol symbol = symbolCache.computeIfAbsent(fields.symbol(), t -> new Symbol(t, Exchange.ALPACA));
+
+            Quote quote = quotePool.acquire();
+            quote.setSymbol(symbol);
+            quote.setBidPrice(fields.bidPrice());
+            quote.setAskPrice(fields.askPrice());
+            quote.setBidSize(fields.bidSize());
+            quote.setAskSize(fields.askSize());
+
+            if (fields.timestamp() != null && !fields.timestamp().isEmpty()) {
+                Instant instant = Instant.parse(fields.timestamp());
+                quote.setTimestamp(instant.toEpochMilli() * 1_000_000);
+            }
+
+            quote.setReceivedAt(receiveTime);
+
+            if (quote.getTimestamp() > 0) {
+                long latency = receiveTime - quote.getTimestamp();
+                quoteLatency.record(latency);
+                if (latency > 1_000_000_000L) {
+                    staleQuoteCount.incrementAndGet();
+                }
+            }
+
+            notifyQuoteListeners(quote);
+            quotePool.release(quote);
+        } catch (Exception e) {
+            log.error("Error processing raw quote message", e);
+        }
+    }
+
+    /**
+     * Fast-path handler for raw trade messages.
+     */
+    private void handleRawTradeMessage(String rawJson) {
+        long receiveTime = System.nanoTime();
+        tradesReceived.incrementAndGet();
+
+        try {
+            AlpacaMessageParser.TradeFields fields = messageParser.parseTrade(rawJson);
+            if (fields == null) {
+                log.warn("Failed to parse raw trade message");
+                return;
+            }
+
+            String ticker = fields.symbol();
+            Symbol symbol = symbolCache.computeIfAbsent(ticker, t -> new Symbol(t, Exchange.ALPACA));
+
+            Trade trade = new Trade();
+            trade.setSymbol(symbol);
+            trade.setPrice(fields.price());
+            trade.setQuantity(fields.quantity());
+
+            if (fields.timestamp() != null && !fields.timestamp().isEmpty()) {
+                Instant instant = Instant.parse(fields.timestamp());
+                trade.setExecutedAt(instant.toEpochMilli() * 1_000_000);
+            }
+
+            long tradeId = fields.tradeId();
+            Long lastId = lastSequence.get(ticker);
+            if (lastId != null && tradeId <= lastId) {
+                outOfSequenceCount.incrementAndGet();
+            }
+            lastSequence.put(ticker, tradeId);
+
+            if (trade.getExecutedAt() > 0) {
+                long latency = receiveTime - trade.getExecutedAt();
+                tradeLatency.record(latency);
+            }
+
+            notifyTradeListeners(trade);
+        } catch (Exception e) {
+            log.error("Error processing raw trade message", e);
         }
     }
 

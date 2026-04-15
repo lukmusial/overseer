@@ -2,6 +2,7 @@
 
 val okhttpVersion: String by project
 val jacksonVersion: String by project
+val jsoniterVersion: String by project
 
 dependencies {
     implementation(project(":hft-core"))
@@ -13,4 +14,7 @@ dependencies {
     // JSON serialization
     implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion")
+
+    // High-performance JSON parsing (alternative to Jackson for hot path)
+    implementation("com.jsoniter:jsoniter:$jsoniterVersion")
 }

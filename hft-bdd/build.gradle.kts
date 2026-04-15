@@ -42,6 +42,7 @@ dependencies {
 
     // JSON processing
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
+    testImplementation("com.jsoniter:jsoniter:0.9.23")
 }
 
 tasks.test {
