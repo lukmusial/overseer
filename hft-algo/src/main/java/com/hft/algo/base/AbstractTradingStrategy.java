@@ -242,8 +242,8 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
             return;
         }
 
-        // Cache quote
-        latestQuotes.put(symbol, quote);
+        // Cache quote (copy-on-store: quote may be pooled and released by the caller)
+        latestQuotes.computeIfAbsent(symbol, k -> new Quote()).copyFrom(quote);
 
         // Update signal
         double signal = calculateSignal(symbol, quote);

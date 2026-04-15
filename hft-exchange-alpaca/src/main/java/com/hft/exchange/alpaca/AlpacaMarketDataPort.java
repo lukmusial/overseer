@@ -12,7 +12,8 @@ import com.hft.exchange.alpaca.dto.AlpacaTrade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
+import com.hft.core.model.ObjectPool;
+import com.hft.core.util.FastDecimalParser;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -45,6 +46,12 @@ public class AlpacaMarketDataPort implements MarketDataPort {
 
     // Last known sequence numbers per symbol
     private final Map<String, Long> lastSequence = new ConcurrentHashMap<>();
+
+    // Symbol cache to avoid per-quote Symbol allocation + hash computation
+    private final Map<String, Symbol> symbolCache = new ConcurrentHashMap<>();
+
+    // Quote pool to avoid per-quote heap allocation
+    private final ObjectPool<Quote> quotePool = new ObjectPool<>(Quote::new, 256);
 
     public AlpacaMarketDataPort(AlpacaHttpClient httpClient, AlpacaWebSocketClient webSocketClient) {
         this.httpClient = httpClient;
@@ -166,9 +173,9 @@ public class AlpacaMarketDataPort implements MarketDataPort {
 
         try {
             String ticker = node.path("S").asText();
-            Symbol symbol = new Symbol(ticker, Exchange.ALPACA);
+            Symbol symbol = symbolCache.computeIfAbsent(ticker, t -> new Symbol(t, Exchange.ALPACA));
 
-            Quote quote = new Quote();
+            Quote quote = quotePool.acquire();
             quote.setSymbol(symbol);
             quote.setBidPrice(parsePrice(node.path("bp").asText()));
             quote.setAskPrice(parsePrice(node.path("ap").asText()));
@@ -196,6 +203,7 @@ public class AlpacaMarketDataPort implements MarketDataPort {
             }
 
             notifyQuoteListeners(quote);
+            quotePool.release(quote);
         } catch (Exception e) {
             log.error("Error processing quote message", e);
         }
@@ -207,7 +215,7 @@ public class AlpacaMarketDataPort implements MarketDataPort {
 
         try {
             String ticker = node.path("S").asText();
-            Symbol symbol = new Symbol(ticker, Exchange.ALPACA);
+            Symbol symbol = symbolCache.computeIfAbsent(ticker, t -> new Symbol(t, Exchange.ALPACA));
 
             Trade trade = new Trade();
             trade.setSymbol(symbol);
@@ -271,9 +279,7 @@ public class AlpacaMarketDataPort implements MarketDataPort {
     }
 
     private long parsePrice(String price) {
-        if (price == null || price.isBlank()) return 0;
-        BigDecimal bd = new BigDecimal(price);
-        return bd.multiply(BigDecimal.valueOf(PRICE_SCALE)).longValue();
+        return FastDecimalParser.parseDecimal(price, 2, 0);
     }
 
     private void notifyQuoteListeners(Quote quote) {

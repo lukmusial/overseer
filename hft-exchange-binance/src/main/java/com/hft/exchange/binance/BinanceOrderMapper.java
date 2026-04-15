@@ -1,6 +1,7 @@
 package com.hft.exchange.binance;
 
 import com.hft.core.model.*;
+import com.hft.core.util.FastDecimalParser;
 import com.hft.exchange.binance.dto.BinanceOrder;
 
 import java.math.BigDecimal;
@@ -159,25 +160,18 @@ public class BinanceOrderMapper {
     }
 
     private static long parsePrice(String price) {
-        if (price == null || price.isBlank()) return 0;
-        BigDecimal bd = new BigDecimal(price);
-        return bd.multiply(BigDecimal.valueOf(PRICE_SCALE)).longValue();
+        return FastDecimalParser.parseDecimal(price, 8, 0);
     }
 
     private static long parseQuantity(String qty) {
-        if (qty == null || qty.isBlank()) return 0;
-        BigDecimal bd = new BigDecimal(qty);
-        // Quantity typically in whole units, scale by 100_000_000 for sub-unit precision
-        return bd.multiply(BigDecimal.valueOf(100_000_000)).longValue();
+        return FastDecimalParser.parseDecimal(qty, 8, 0);
     }
 
     private static String formatPrice(long price) {
-        BigDecimal bd = BigDecimal.valueOf(price).divide(BigDecimal.valueOf(PRICE_SCALE));
-        return bd.stripTrailingZeros().toPlainString();
+        return FastDecimalParser.formatDecimal(price, 8);
     }
 
     private static String formatQuantity(long quantity) {
-        BigDecimal bd = BigDecimal.valueOf(quantity).divide(BigDecimal.valueOf(100_000_000));
-        return bd.stripTrailingZeros().toPlainString();
+        return FastDecimalParser.formatDecimal(quantity, 8);
     }
 }

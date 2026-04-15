@@ -37,6 +37,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -54,6 +56,10 @@ public class ExchangeService {
     private final StubMarketDataService stubMarketDataService;
     private final ChartDataService chartDataService;
     private final Map<String, ExchangeConnection> connections = new ConcurrentHashMap<>();
+    private final ExecutorService uiBroadcastExecutor = Executors.newSingleThreadExecutor(
+        r -> { Thread t = new Thread(r, "ui-broadcast"); t.setDaemon(true); return t; }
+    );
+    private final Map<String, String> topicCache = new ConcurrentHashMap<>();
 
     // HTTP clients for symbol fetching
     private AlpacaHttpClient alpacaClient;
@@ -147,18 +153,20 @@ public class ExchangeService {
                     AlpacaWebSocketClient wsClient = new AlpacaWebSocketClient(config);
                     AlpacaMarketDataPort mdPort = new AlpacaMarketDataPort(alpacaClient, wsClient);
                     mdPort.addQuoteListener(quote -> {
+                        // HOT PATH: trading-critical operations only
                         tradingService.getTradingEngine().onQuoteUpdate(quote);
                         tradingService.dispatchQuoteToStrategies(quote);
-                        // Store raw price in native priceScale format (cents for Alpaca)
-                        stubMarketDataService.updatePrice(
-                                quote.getSymbol().getExchange().name(),
-                                quote.getSymbol().getTicker(),
-                                quote.getMidPrice());
-                        QuoteDto dto = QuoteDto.from(quote);
+
+                        // COLD PATH: capture values for async UI broadcast
                         String exch = quote.getSymbol().getExchange().name();
                         String ticker = quote.getSymbol().getTicker();
-                        messagingTemplate.convertAndSend("/topic/quotes/" + exch + "/" + ticker, dto);
-                        messagingTemplate.convertAndSend("/topic/quotes", dto);
+                        long midPrice = quote.getMidPrice();
+                        QuoteDto dto = QuoteDto.from(quote);
+                        uiBroadcastExecutor.execute(() -> {
+                            stubMarketDataService.updatePrice(exch, ticker, midPrice);
+                            messagingTemplate.convertAndSend(getQuoteTopic(exch, ticker), dto);
+                            messagingTemplate.convertAndSend("/topic/quotes", dto);
+                        });
                     });
                     wsClient.connect().thenRun(() -> subscribeActiveSymbols("ALPACA", mdPort));
                     this.alpacaWsClient = wsClient;
@@ -213,18 +221,20 @@ public class ExchangeService {
                     BinanceWebSocketClient wsClient = new BinanceWebSocketClient(config);
                     BinanceMarketDataPort mdPort = new BinanceMarketDataPort(binanceClient, wsClient);
                     mdPort.addQuoteListener(quote -> {
+                        // HOT PATH: trading-critical operations only
                         tradingService.getTradingEngine().onQuoteUpdate(quote);
                         tradingService.dispatchQuoteToStrategies(quote);
-                        // Store raw price in native priceScale format (100M for Binance)
-                        stubMarketDataService.updatePrice(
-                                quote.getSymbol().getExchange().name(),
-                                quote.getSymbol().getTicker(),
-                                quote.getMidPrice());
-                        QuoteDto dto = QuoteDto.from(quote);
+
+                        // COLD PATH: capture values for async UI broadcast
                         String exch = quote.getSymbol().getExchange().name();
                         String ticker = quote.getSymbol().getTicker();
-                        messagingTemplate.convertAndSend("/topic/quotes/" + exch + "/" + ticker, dto);
-                        messagingTemplate.convertAndSend("/topic/quotes", dto);
+                        long midPrice = quote.getMidPrice();
+                        QuoteDto dto = QuoteDto.from(quote);
+                        uiBroadcastExecutor.execute(() -> {
+                            stubMarketDataService.updatePrice(exch, ticker, midPrice);
+                            messagingTemplate.convertAndSend(getQuoteTopic(exch, ticker), dto);
+                            messagingTemplate.convertAndSend("/topic/quotes", dto);
+                        });
                     });
                     wsClient.connect().thenRun(() -> subscribeActiveSymbols("BINANCE", mdPort));
                     this.binanceWsClient = wsClient;
@@ -592,6 +602,11 @@ public class ExchangeService {
         return binanceClient;
     }
 
+    private String getQuoteTopic(String exchange, String ticker) {
+        String key = exchange + ":" + ticker;
+        return topicCache.computeIfAbsent(key, k -> "/topic/quotes/" + exchange + "/" + ticker);
+    }
+
     private String extractErrorMessage(Exception e) {
         Throwable cause = e.getCause() != null ? e.getCause() : e;
         String msg = cause.getMessage();
@@ -600,6 +615,7 @@ public class ExchangeService {
 
     @PreDestroy
     public void cleanup() {
+        uiBroadcastExecutor.shutdown();
         if (alpacaWsClient != null) {
             alpacaWsClient.disconnect();
         }
