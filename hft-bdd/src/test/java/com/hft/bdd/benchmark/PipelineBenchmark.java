@@ -7,6 +7,10 @@ import com.hft.core.metrics.OrderMetrics;
 import com.hft.core.util.FastDecimalParser;
 import com.hft.engine.TradingEngine;
 import com.hft.engine.service.RiskManager;
+import com.hft.exchange.binance.parser.BinanceMessageParser;
+import com.hft.exchange.binance.parser.ManualBinanceParser;
+import com.hft.exchange.binance.parser.JsoniterBinanceParser;
+import com.hft.exchange.binance.parser.JacksonBinanceParser;
 import com.lmax.disruptor.YieldingWaitStrategy;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
@@ -46,9 +50,17 @@ public class PipelineBenchmark {
     private ObjectPool<Quote> quotePool;
     private TradingEngine tradingEngine;
 
+    // Parser strategies for comparison benchmarks
+    private BinanceMessageParser manualParser;
+    private BinanceMessageParser jsoniterParser;
+    private BinanceMessageParser jacksonParser;
+
     @Setup(Level.Trial)
     public void setup() {
         objectMapper = new ObjectMapper();
+        manualParser = new ManualBinanceParser();
+        jsoniterParser = new JsoniterBinanceParser();
+        jacksonParser = new JacksonBinanceParser();
         symbol = new Symbol("BTCUSDT", Exchange.BINANCE);
         quotePool = new ObjectPool<>(Quote::new, 10_000);
         tradingEngine = new TradingEngine(
@@ -226,6 +238,85 @@ public class PipelineBenchmark {
         quote.setPriceScale(100_000_000);
 
         // Stage 4-6: ring buffer publish
+        tradingEngine.onQuoteUpdate(quote);
+
+        bh.consume(quote);
+        quotePool.release(quote);
+    }
+
+    // ==================== Parser Strategy Comparison Benchmarks ====================
+
+    /**
+     * Parse bookTicker using ManualBinanceParser (Option C — zero-library byte scanner).
+     * This is the fastest option and the default.
+     */
+    @Benchmark
+    public void parseTickerManual(Blackhole bh) {
+        BinanceMessageParser.TickerFields fields = manualParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
+        bh.consume(fields);
+    }
+
+    /**
+     * Parse bookTicker using JsoniterBinanceParser (Option B — jsoniter lazy tree).
+     */
+    @Benchmark
+    public void parseTickerJsoniter(Blackhole bh) {
+        BinanceMessageParser.TickerFields fields = jsoniterParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
+        bh.consume(fields);
+    }
+
+    /**
+     * Parse bookTicker using JacksonBinanceParser (baseline — full Jackson tree).
+     */
+    @Benchmark
+    public void parseTickerJackson(Blackhole bh) {
+        BinanceMessageParser.TickerFields fields = jacksonParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
+        bh.consume(fields);
+    }
+
+    /**
+     * Full pipeline with ManualBinanceParser: raw string → manual parse → pooled Quote → ring buffer.
+     * Eliminates both Jackson tree AND BigDecimal allocations.
+     */
+    @Benchmark
+    public void fullPipelineManualParser(Blackhole bh) {
+        BinanceMessageParser.TickerFields fields = manualParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
+        if (fields == null) return;
+
+        Quote quote = quotePool.acquire();
+        quote.setSymbol(symbol);
+        quote.setBidPrice(fields.bidPrice());
+        quote.setAskPrice(fields.askPrice());
+        quote.setBidSize(fields.bidSize());
+        quote.setAskSize(fields.askSize());
+        quote.setTimestamp(System.nanoTime());
+        quote.setReceivedAt(System.nanoTime());
+        quote.setPriceScale(100_000_000);
+
+        tradingEngine.onQuoteUpdate(quote);
+
+        bh.consume(quote);
+        quotePool.release(quote);
+    }
+
+    /**
+     * Full pipeline with JsoniterBinanceParser: raw string → jsoniter parse → pooled Quote → ring buffer.
+     */
+    @Benchmark
+    public void fullPipelineJsoniterParser(Blackhole bh) {
+        BinanceMessageParser.TickerFields fields = jsoniterParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
+        if (fields == null) return;
+
+        Quote quote = quotePool.acquire();
+        quote.setSymbol(symbol);
+        quote.setBidPrice(fields.bidPrice());
+        quote.setAskPrice(fields.askPrice());
+        quote.setBidSize(fields.bidSize());
+        quote.setAskSize(fields.askSize());
+        quote.setTimestamp(System.nanoTime());
+        quote.setReceivedAt(System.nanoTime());
+        quote.setPriceScale(100_000_000);
+
         tradingEngine.onQuoteUpdate(quote);
 
         bh.consume(quote);

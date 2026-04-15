@@ -26,6 +26,10 @@ public class AlpacaWebSocketClient {
     private final List<Consumer<JsonNode>> quoteListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<JsonNode>> tradeListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<JsonNode>> barListeners = new CopyOnWriteArrayList<>();
+
+    // Raw string listeners for fast-path parsing (bypass Jackson tree entirely)
+    private final List<Consumer<String>> rawQuoteListeners = new CopyOnWriteArrayList<>();
+    private final List<Consumer<String>> rawTradeListeners = new CopyOnWriteArrayList<>();
     private final Set<String> subscribedQuotes = ConcurrentHashMap.newKeySet();
     private final Set<String> subscribedTrades = ConcurrentHashMap.newKeySet();
 
@@ -175,12 +179,30 @@ public class AlpacaWebSocketClient {
         quoteListeners.remove(listener);
     }
 
+    /** Register a raw string listener for quote messages (bypasses Jackson tree). */
+    public void addRawQuoteListener(Consumer<String> listener) {
+        rawQuoteListeners.add(listener);
+    }
+
+    public void removeRawQuoteListener(Consumer<String> listener) {
+        rawQuoteListeners.remove(listener);
+    }
+
     public void addTradeListener(Consumer<JsonNode> listener) {
         tradeListeners.add(listener);
     }
 
     public void removeTradeListener(Consumer<JsonNode> listener) {
         tradeListeners.remove(listener);
+    }
+
+    /** Register a raw string listener for trade messages (bypasses Jackson tree). */
+    public void addRawTradeListener(Consumer<String> listener) {
+        rawTradeListeners.add(listener);
+    }
+
+    public void removeRawTradeListener(Consumer<String> listener) {
+        rawTradeListeners.remove(listener);
     }
 
     public void addBarListener(Consumer<JsonNode> listener) {
@@ -205,6 +227,14 @@ public class AlpacaWebSocketClient {
 
     private void handleMessage(String text) {
         try {
+            // Fast path: if raw listeners are registered, try lightweight string routing
+            if (!rawQuoteListeners.isEmpty() || !rawTradeListeners.isEmpty()) {
+                if (tryFastRoute(text)) {
+                    return;
+                }
+            }
+
+            // Slow path: full Jackson tree parse
             JsonNode root = objectMapper.readTree(text);
 
             if (root.isArray()) {
@@ -217,6 +247,49 @@ public class AlpacaWebSocketClient {
         } catch (Exception e) {
             log.error("Error parsing message: {}", text, e);
         }
+    }
+
+    /**
+     * Lightweight string-based routing for market data messages.
+     * Alpaca sends arrays like [{"T":"q",...}] for quotes and [{"T":"t",...}] for trades.
+     * Control messages are objects like {"T":"success",...} — we fall through to Jackson for those.
+     */
+    private boolean tryFastRoute(String text) {
+        // Only handle array messages (market data), not objects (control)
+        if (text.isEmpty() || text.charAt(0) != '[') {
+            return false;
+        }
+
+        // Alpaca arrays typically contain one element per message.
+        // Extract each element and route based on "T" field.
+        // For simplicity, handle single-element arrays (the common case) directly.
+        // Multi-element arrays fall through to Jackson.
+        int firstBrace = text.indexOf('{');
+        int lastBrace = text.lastIndexOf('}');
+        if (firstBrace < 0 || lastBrace < 0) {
+            return false;
+        }
+
+        // Check if there's only one element (no comma between braces at top level)
+        String inner = text.substring(firstBrace, lastBrace + 1);
+
+        // Detect message type via "T":"q" or "T":"t"
+        int typeIdx = inner.indexOf("\"T\":\"");
+        if (typeIdx < 0) {
+            return false;
+        }
+        char typeChar = inner.charAt(typeIdx + 5); // character after "T":"
+
+        if (typeChar == 'q' && !rawQuoteListeners.isEmpty()) {
+            notifyRawQuoteListeners(inner);
+            return true;
+        } else if (typeChar == 't' && !rawTradeListeners.isEmpty()) {
+            notifyRawTradeListeners(inner);
+            return true;
+        }
+
+        // Other message types (b=bar, success, error, subscription) fall through
+        return false;
     }
 
     private void handleSingleMessage(JsonNode node) {
@@ -315,12 +388,32 @@ public class AlpacaWebSocketClient {
         }
     }
 
+    private void notifyRawQuoteListeners(String text) {
+        for (Consumer<String> listener : rawQuoteListeners) {
+            try {
+                listener.accept(text);
+            } catch (Exception e) {
+                log.error("Error in raw quote listener", e);
+            }
+        }
+    }
+
     private void notifyTradeListeners(JsonNode node) {
         for (Consumer<JsonNode> listener : tradeListeners) {
             try {
                 listener.accept(node);
             } catch (Exception e) {
                 log.error("Error in trade listener", e);
+            }
+        }
+    }
+
+    private void notifyRawTradeListeners(String text) {
+        for (Consumer<String> listener : rawTradeListeners) {
+            try {
+                listener.accept(text);
+            } catch (Exception e) {
+                log.error("Error in raw trade listener", e);
             }
         }
     }

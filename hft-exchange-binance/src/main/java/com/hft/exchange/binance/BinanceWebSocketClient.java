@@ -24,6 +24,10 @@ public class BinanceWebSocketClient {
     private final List<Consumer<JsonNode>> tickerListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<JsonNode>> tradeListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<JsonNode>> depthListeners = new CopyOnWriteArrayList<>();
+
+    // Raw string listeners for fast-path parsing (bypass Jackson tree entirely)
+    private final List<Consumer<String>> rawTickerListeners = new CopyOnWriteArrayList<>();
+    private final List<Consumer<String>> rawTradeListeners = new CopyOnWriteArrayList<>();
     private final Set<String> subscribedTickers = ConcurrentHashMap.newKeySet();
     private final Set<String> subscribedTrades = ConcurrentHashMap.newKeySet();
 
@@ -155,12 +159,30 @@ public class BinanceWebSocketClient {
         tickerListeners.remove(listener);
     }
 
+    /** Register a raw string listener for bookTicker messages (bypasses Jackson tree). */
+    public void addRawTickerListener(Consumer<String> listener) {
+        rawTickerListeners.add(listener);
+    }
+
+    public void removeRawTickerListener(Consumer<String> listener) {
+        rawTickerListeners.remove(listener);
+    }
+
     public void addTradeListener(Consumer<JsonNode> listener) {
         tradeListeners.add(listener);
     }
 
     public void removeTradeListener(Consumer<JsonNode> listener) {
         tradeListeners.remove(listener);
+    }
+
+    /** Register a raw string listener for trade messages (bypasses Jackson tree). */
+    public void addRawTradeListener(Consumer<String> listener) {
+        rawTradeListeners.add(listener);
+    }
+
+    public void removeRawTradeListener(Consumer<String> listener) {
+        rawTradeListeners.remove(listener);
     }
 
     public void addDepthListener(Consumer<JsonNode> listener) {
@@ -190,6 +212,15 @@ public class BinanceWebSocketClient {
 
     void handleMessage(String text) {
         try {
+            // Fast path: if raw listeners are registered, try lightweight string routing
+            // to avoid Jackson tree allocation entirely for hot-path messages
+            if (!rawTickerListeners.isEmpty() || !rawTradeListeners.isEmpty()) {
+                if (tryFastRoute(text)) {
+                    return;
+                }
+            }
+
+            // Slow path: full Jackson tree parse for control messages or when no raw listeners
             JsonNode root = objectMapper.readTree(text);
 
             // Check if it's a subscription response
@@ -214,6 +245,40 @@ public class BinanceWebSocketClient {
         } catch (Exception e) {
             log.error("Error parsing message: {}", text, e);
         }
+    }
+
+    /**
+     * Lightweight string-based message routing that avoids Jackson tree allocation.
+     * Returns true if the message was handled via raw listeners, false to fall through to Jackson.
+     */
+    private boolean tryFastRoute(String text) {
+        // Combined stream format: {"stream":"btcusdt@bookTicker","data":{...}}
+        int streamIdx = text.indexOf("@bookTicker");
+        if (streamIdx > 0 && !rawTickerListeners.isEmpty()) {
+            notifyRawTickerListeners(text);
+            return true;
+        }
+
+        int tradeIdx = text.indexOf("@trade");
+        if (tradeIdx > 0 && !rawTradeListeners.isEmpty()) {
+            notifyRawTradeListeners(text);
+            return true;
+        }
+
+        // Direct bookTicker format: {"s":"BTCUSDT","b":"...","a":"...","B":"...","A":"..."}
+        // Detect by checking for "b":" and "a":" (bid/ask) without "stream" wrapper
+        if (streamIdx < 0 && text.indexOf("\"b\":\"") > 0 && text.indexOf("\"a\":\"") > 0
+                && !rawTickerListeners.isEmpty()) {
+            notifyRawTickerListeners(text);
+            return true;
+        }
+
+        // Control messages (result, id, error) — fall through to Jackson
+        if (text.indexOf("\"result\"") > 0 || text.indexOf("\"id\"") > 0) {
+            return false;
+        }
+
+        return false;
     }
 
     private void handleSubscriptionResponse(JsonNode node) {
@@ -270,12 +335,32 @@ public class BinanceWebSocketClient {
         }
     }
 
+    private void notifyRawTickerListeners(String text) {
+        for (Consumer<String> listener : rawTickerListeners) {
+            try {
+                listener.accept(text);
+            } catch (Exception e) {
+                log.error("Error in raw ticker listener", e);
+            }
+        }
+    }
+
     private void notifyTradeListeners(JsonNode node) {
         for (Consumer<JsonNode> listener : tradeListeners) {
             try {
                 listener.accept(node);
             } catch (Exception e) {
                 log.error("Error in trade listener", e);
+            }
+        }
+    }
+
+    private void notifyRawTradeListeners(String text) {
+        for (Consumer<String> listener : rawTradeListeners) {
+            try {
+                listener.accept(text);
+            } catch (Exception e) {
+                log.error("Error in raw trade listener", e);
             }
         }
     }
