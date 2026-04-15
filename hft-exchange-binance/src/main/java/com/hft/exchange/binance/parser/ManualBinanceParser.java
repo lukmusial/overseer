@@ -49,20 +49,17 @@ public final class ManualBinanceParser implements BinanceMessageParser {
         try {
             int searchFrom = findDataStart(json);
 
+            // Symbol needs a substring (we need the String value)
             String symbol = extractStringField(json, MARKER_SYMBOL, searchFrom);
             if (symbol == null) {
                 return null;
             }
 
-            String bidPriceStr = extractStringField(json, MARKER_BID_PRICE, searchFrom);
-            String askPriceStr = extractStringField(json, MARKER_ASK_PRICE, searchFrom);
-            String bidSizeStr = extractStringField(json, MARKER_BID_SIZE, searchFrom);
-            String askSizeStr = extractStringField(json, MARKER_ASK_SIZE, searchFrom);
-
-            long bidPrice = FastDecimalParser.parseDecimal(bidPriceStr, DECIMAL_PLACES, DEFAULT_VALUE);
-            long askPrice = FastDecimalParser.parseDecimal(askPriceStr, DECIMAL_PLACES, DEFAULT_VALUE);
-            long bidSize = FastDecimalParser.parseDecimal(bidSizeStr, DECIMAL_PLACES, DEFAULT_VALUE);
-            long askSize = FastDecimalParser.parseDecimal(askSizeStr, DECIMAL_PLACES, DEFAULT_VALUE);
+            // Price/size fields: use range-based parsing to avoid substring allocations
+            long bidPrice = extractDecimalField(json, MARKER_BID_PRICE, searchFrom);
+            long askPrice = extractDecimalField(json, MARKER_ASK_PRICE, searchFrom);
+            long bidSize = extractDecimalField(json, MARKER_BID_SIZE, searchFrom);
+            long askSize = extractDecimalField(json, MARKER_ASK_SIZE, searchFrom);
 
             return new TickerFields(symbol, bidPrice, askPrice, bidSize, askSize);
         } catch (Exception e) {
@@ -83,11 +80,8 @@ public final class ManualBinanceParser implements BinanceMessageParser {
                 return null;
             }
 
-            String priceStr = extractStringField(json, MARKER_PRICE, searchFrom);
-            String quantityStr = extractStringField(json, MARKER_QUANTITY, searchFrom);
-
-            long price = FastDecimalParser.parseDecimal(priceStr, DECIMAL_PLACES, DEFAULT_VALUE);
-            long quantity = FastDecimalParser.parseDecimal(quantityStr, DECIMAL_PLACES, DEFAULT_VALUE);
+            long price = extractDecimalField(json, MARKER_PRICE, searchFrom);
+            long quantity = extractDecimalField(json, MARKER_QUANTITY, searchFrom);
             long tradeTimeMs = extractLongField(json, MARKER_TRADE_TIME, searchFrom);
             long tradeId = extractLongField(json, MARKER_TRADE_ID, searchFrom);
             boolean isBuyerMaker = extractBooleanField(json, MARKER_IS_BUYER_MAKER, searchFrom);
@@ -119,6 +113,25 @@ public final class ManualBinanceParser implements BinanceMessageParser {
             return dataIdx + DATA_MARKER.length();
         }
         return 0;
+    }
+
+    /**
+     * Extracts a quoted decimal value and parses it directly without creating a substring.
+     * Uses {@link FastDecimalParser#parseDecimal(String, int, int, int, long)} for zero-allocation parsing.
+     *
+     * @return the parsed decimal value, or {@code 0L} if the marker is not found
+     */
+    private static long extractDecimalField(String json, String marker, int fromIndex) {
+        int markerIdx = json.indexOf(marker, fromIndex);
+        if (markerIdx < 0) {
+            return DEFAULT_VALUE;
+        }
+        int valueStart = markerIdx + marker.length();
+        int valueEnd = json.indexOf('"', valueStart);
+        if (valueEnd < 0) {
+            return DEFAULT_VALUE;
+        }
+        return FastDecimalParser.parseDecimal(json, valueStart, valueEnd, DECIMAL_PLACES, DEFAULT_VALUE);
     }
 
     /**

@@ -28,6 +28,7 @@ public class BinanceHttpClient {
     private final BinanceConfig config;
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final ThreadLocal<Mac> hmacSigner;
 
     public BinanceHttpClient(BinanceConfig config) {
         this.config = config;
@@ -39,6 +40,19 @@ public class BinanceHttpClient {
 
         this.objectMapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        // Pre-initialize HMAC signer
+        SecretKeySpec keySpec = new SecretKeySpec(
+                config.secretKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        this.hmacSigner = ThreadLocal.withInitial(() -> {
+            try {
+                Mac mac = Mac.getInstance("HmacSHA256");
+                mac.init(keySpec);
+                return mac;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to initialize HMAC signer", e);
+            }
+        });
     }
 
     public ObjectMapper getObjectMapper() {
@@ -164,10 +178,7 @@ public class BinanceHttpClient {
 
     private String sign(String data) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(
-                    config.secretKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            mac.init(secretKeySpec);
+            Mac mac = hmacSigner.get();
             byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
