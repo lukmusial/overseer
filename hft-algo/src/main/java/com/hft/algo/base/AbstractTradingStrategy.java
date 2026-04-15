@@ -5,6 +5,8 @@ import com.hft.core.model.Quote;
 import com.hft.core.model.Symbol;
 import com.hft.core.model.Trade;
 
+import org.agrona.collections.Object2LongHashMap;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -24,13 +26,18 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
 
     protected final AtomicReference<AlgorithmState> state = new AtomicReference<>(AlgorithmState.INITIALIZED);
 
-    // Position tracking
-    protected final Map<Symbol, Long> currentPositions = new ConcurrentHashMap<>();
-    protected final Map<Symbol, Long> targetPositions = new ConcurrentHashMap<>();
-    protected final Map<Symbol, Double> signals = new ConcurrentHashMap<>();
+    // Position tracking — Agrona primitive maps to avoid Long/Double autoboxing per quote.
+    // Missing value must differ from any valid stored value; Long.MIN_VALUE is never a real position.
+    private static final long MISSING_LONG = Long.MIN_VALUE;
+    private static final long MISSING_SIGNAL = Double.doubleToRawLongBits(Double.NaN);
+
+    protected final Object2LongHashMap<Symbol> currentPositions = new Object2LongHashMap<>(MISSING_LONG);
+    protected final Object2LongHashMap<Symbol> targetPositions = new Object2LongHashMap<>(MISSING_LONG);
+    // Signals stored as raw double bits in a long map (zero-cost conversion via doubleToRawLongBits)
+    protected final Object2LongHashMap<Symbol> signals = new Object2LongHashMap<>(MISSING_SIGNAL);
 
     // P&L tracking
-    protected final Map<Symbol, Long> avgEntryPrices = new ConcurrentHashMap<>();
+    protected final Object2LongHashMap<Symbol> avgEntryPrices = new Object2LongHashMap<>(MISSING_LONG);
     protected final AtomicLong totalRealizedPnl = new AtomicLong(0);
     protected final AtomicLong maxDrawdown = new AtomicLong(0);
     protected volatile long peakPnl = 0;
@@ -55,11 +62,11 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         this.symbols = new HashSet<>(symbols);
         this.parameters = parameters != null ? parameters : new StrategyParameters();
 
-        // Initialize positions
+        // Initialize positions (Object2LongHashMap: primitive long storage, no boxing)
         for (Symbol symbol : symbols) {
             currentPositions.put(symbol, 0L);
             targetPositions.put(symbol, 0L);
-            signals.put(symbol, 0.0); // Object2DoubleHashMap: stores primitive double, no boxing
+            signals.put(symbol, Double.doubleToRawLongBits(0.0));
         }
     }
 
@@ -102,7 +109,8 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
 
     @Override
     public double getSignal(Symbol symbol) {
-        return signals.getOrDefault(symbol, 0.0);
+        long bits = signals.getOrDefault(symbol, Double.doubleToRawLongBits(0.0));
+        return Double.longBitsToDouble(bits);
     }
 
     @Override
@@ -245,9 +253,9 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         // Cache quote (copy-on-store: quote may be pooled and released by the caller)
         latestQuotes.computeIfAbsent(symbol, k -> new Quote()).copyFrom(quote);
 
-        // Update signal
+        // Update signal (stored as raw double bits in long map — zero-cost, exact)
         double signal = calculateSignal(symbol, quote);
-        signals.put(symbol, signal);
+        signals.put(symbol, Double.doubleToRawLongBits(signal));
 
         // Calculate target position based on signal
         long target = calculateTargetPosition(symbol, signal);
@@ -298,7 +306,7 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         // Calculate P&L if reducing position
         int qtyScale = getQuantityScale();
         if ((previousPosition > 0 && fillQty < 0) || (previousPosition < 0 && fillQty > 0)) {
-            long avgEntry = avgEntryPrices.getOrDefault(symbol, fillPrice);
+            long avgEntry = avgEntryPrices.containsKey(symbol) ? avgEntryPrices.get(symbol) : fillPrice;
             long closingQty = Math.min(Math.abs(previousPosition), Math.abs(fillQty));
             long pnl = (long) ((double) closingQty * (fillPrice - avgEntry) / qtyScale);
             if (previousPosition < 0) {
