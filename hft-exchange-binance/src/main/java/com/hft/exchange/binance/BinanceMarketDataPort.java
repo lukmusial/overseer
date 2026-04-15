@@ -12,7 +12,7 @@ import com.hft.exchange.binance.dto.BinanceTrade;
 import com.hft.exchange.binance.parser.BinanceMessageParser;
 import com.hft.exchange.binance.parser.JacksonBinanceParser;
 import com.hft.exchange.binance.parser.ManualBinanceParser;
-import com.hft.exchange.binance.parser.JsoniterBinanceParser;
+import com.hft.exchange.binance.parser.StreamingBinanceParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,8 +60,8 @@ public class BinanceMarketDataPort implements MarketDataPort {
     // Configurable message parser strategy
     private final BinanceMessageParser messageParser;
 
-    /** Parser modes: MANUAL (fastest, default), JSONITER, JACKSON (legacy). */
-    public enum ParserMode { MANUAL, JSONITER, JACKSON }
+    /** Parser modes: MANUAL (fastest, default), STREAMING (Jackson pull-parser), JACKSON (legacy tree). */
+    public enum ParserMode { MANUAL, STREAMING, JACKSON }
 
     public BinanceMarketDataPort(BinanceHttpClient httpClient, BinanceWebSocketClient webSocketClient) {
         this(httpClient, webSocketClient, ParserMode.MANUAL);
@@ -72,7 +72,7 @@ public class BinanceMarketDataPort implements MarketDataPort {
         this.webSocketClient = webSocketClient;
         this.messageParser = switch (parserMode) {
             case MANUAL -> new ManualBinanceParser();
-            case JSONITER -> new JsoniterBinanceParser();
+            case STREAMING -> new StreamingBinanceParser();
             case JACKSON -> new JacksonBinanceParser();
         };
 

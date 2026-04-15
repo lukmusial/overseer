@@ -42,7 +42,6 @@ dependencies {
 
     // JSON processing
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
-    testImplementation("com.jsoniter:jsoniter:0.9.23")
 }
 
 tasks.test {
@@ -65,7 +64,7 @@ tasks.register<JavaExec>("jmh") {
     classpath = sourceSets["test"].runtimeClasspath
     val benchmark = project.findProperty("benchmark")?.toString() ?: ".*Benchmark.*"
     val jdk25 = "/usr/local/Cellar/openjdk/25.0.2/libexec/openjdk.jdk/Contents/Home/bin/java"
-    args = listOf(benchmark, "-f", "1", "-wi", "3", "-i", "5", "-tu", "ns", "-bm", "avgt",
+    args = listOf(benchmark, "-f", "1", "-wi", "5", "-i", "10", "-tu", "ns", "-bm", "avgt",
                   "-jvm", jdk25, "-jvmArgs", "-XX:+UseZGC -Xms1g -Xmx1g")
     // Run main JMH process with Java 25 too (it loads benchmark classes)
     executable = jdk25
