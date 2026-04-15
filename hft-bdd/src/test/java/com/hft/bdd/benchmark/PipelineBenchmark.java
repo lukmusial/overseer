@@ -9,7 +9,7 @@ import com.hft.engine.TradingEngine;
 import com.hft.engine.service.RiskManager;
 import com.hft.exchange.binance.parser.BinanceMessageParser;
 import com.hft.exchange.binance.parser.ManualBinanceParser;
-import com.hft.exchange.binance.parser.JsoniterBinanceParser;
+import com.hft.exchange.binance.parser.StreamingBinanceParser;
 import com.hft.exchange.binance.parser.JacksonBinanceParser;
 import com.lmax.disruptor.YieldingWaitStrategy;
 import org.openjdk.jmh.annotations.*;
@@ -52,14 +52,14 @@ public class PipelineBenchmark {
 
     // Parser strategies for comparison benchmarks
     private BinanceMessageParser manualParser;
-    private BinanceMessageParser jsoniterParser;
+    private BinanceMessageParser streamingParser;
     private BinanceMessageParser jacksonParser;
 
     @Setup(Level.Trial)
     public void setup() {
         objectMapper = new ObjectMapper();
         manualParser = new ManualBinanceParser();
-        jsoniterParser = new JsoniterBinanceParser();
+        streamingParser = new StreamingBinanceParser();
         jacksonParser = new JacksonBinanceParser();
         symbol = new Symbol("BTCUSDT", Exchange.BINANCE);
         quotePool = new ObjectPool<>(Quote::new, 10_000);
@@ -257,11 +257,11 @@ public class PipelineBenchmark {
     }
 
     /**
-     * Parse bookTicker using JsoniterBinanceParser (Option B — jsoniter lazy tree).
+     * Parse bookTicker using StreamingBinanceParser (Jackson pull-parser, no tree).
      */
     @Benchmark
-    public void parseTickerJsoniter(Blackhole bh) {
-        BinanceMessageParser.TickerFields fields = jsoniterParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
+    public void parseTickerStreaming(Blackhole bh) {
+        BinanceMessageParser.TickerFields fields = streamingParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
         bh.consume(fields);
     }
 
@@ -300,11 +300,11 @@ public class PipelineBenchmark {
     }
 
     /**
-     * Full pipeline with JsoniterBinanceParser: raw string → jsoniter parse → pooled Quote → ring buffer.
+     * Full pipeline with StreamingBinanceParser: raw string → Jackson streaming parse → pooled Quote → ring buffer.
      */
     @Benchmark
-    public void fullPipelineJsoniterParser(Blackhole bh) {
-        BinanceMessageParser.TickerFields fields = jsoniterParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
+    public void fullPipelineStreamingParser(Blackhole bh) {
+        BinanceMessageParser.TickerFields fields = streamingParser.parseTicker(BINANCE_BOOK_TICKER_JSON);
         if (fields == null) return;
 
         Quote quote = quotePool.acquire();

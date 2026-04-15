@@ -12,7 +12,7 @@ import com.hft.exchange.alpaca.dto.AlpacaTrade;
 import com.hft.exchange.alpaca.parser.AlpacaMessageParser;
 import com.hft.exchange.alpaca.parser.JacksonAlpacaParser;
 import com.hft.exchange.alpaca.parser.ManualAlpacaParser;
-import com.hft.exchange.alpaca.parser.JsoniterAlpacaParser;
+import com.hft.exchange.alpaca.parser.StreamingAlpacaParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,8 +60,8 @@ public class AlpacaMarketDataPort implements MarketDataPort {
     // Configurable message parser strategy
     private final AlpacaMessageParser messageParser;
 
-    /** Parser modes: MANUAL (fastest, default), JSONITER, JACKSON (legacy). */
-    public enum ParserMode { MANUAL, JSONITER, JACKSON }
+    /** Parser modes: MANUAL (fastest, default), STREAMING (Jackson pull-parser), JACKSON (legacy tree). */
+    public enum ParserMode { MANUAL, STREAMING, JACKSON }
 
     public AlpacaMarketDataPort(AlpacaHttpClient httpClient, AlpacaWebSocketClient webSocketClient) {
         this(httpClient, webSocketClient, ParserMode.MANUAL);
@@ -72,7 +72,7 @@ public class AlpacaMarketDataPort implements MarketDataPort {
         this.webSocketClient = webSocketClient;
         this.messageParser = switch (parserMode) {
             case MANUAL -> new ManualAlpacaParser();
-            case JSONITER -> new JsoniterAlpacaParser();
+            case STREAMING -> new StreamingAlpacaParser();
             case JACKSON -> new JacksonAlpacaParser();
         };
 
