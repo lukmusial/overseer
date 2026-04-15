@@ -10,6 +10,7 @@ import com.hft.core.port.MarketDataPort;
 import com.hft.exchange.alpaca.AlpacaConfig;
 import com.hft.exchange.alpaca.AlpacaHttpClient;
 import com.hft.exchange.alpaca.AlpacaMarketDataPort;
+import com.hft.exchange.alpaca.AlpacaOrderMapper;
 import com.hft.exchange.alpaca.AlpacaOrderPort;
 import com.hft.exchange.alpaca.AlpacaTradingStreamClient;
 import com.hft.exchange.alpaca.AlpacaWebSocketClient;
@@ -187,9 +188,27 @@ public class ExchangeService {
 
                     // Connect trading stream for real-time order updates (fills, cancellations)
                     AlpacaTradingStreamClient tradingStream = new AlpacaTradingStreamClient(config);
+                    tradingStream.addTradeUpdateListener(update -> {
+                        var engine = tradingService.getTradingEngine();
+                        var order = AlpacaOrderMapper.toOrder(update.order());
+                        switch (update.event()) {
+                            case "fill", "partial_fill" -> {
+                                long fillQty = update.qty() != null ? Long.parseLong(update.qty()) : 0;
+                                long fillPrice = update.price() != null
+                                        ? com.hft.core.util.FastDecimalParser.parseDecimal(update.price(), 2, 0) : 0;
+                                if (fillQty > 0 && fillPrice > 0) {
+                                    engine.onOrderFilled(order, fillQty, fillPrice);
+                                }
+                            }
+                            case "canceled", "expired", "done_for_day" -> engine.onOrderCancelled(order);
+                            case "rejected" -> engine.onOrderRejected(order, "Rejected by exchange");
+                            case "accepted", "new" -> engine.onOrderAccepted(order);
+                            default -> log.debug("Unhandled Alpaca trade update event: {}", update.event());
+                        }
+                    });
                     tradingStream.connect();
                     this.alpacaTradingStream = tradingStream;
-                    log.info("Alpaca trading stream connected");
+                    log.info("Alpaca trading stream connected and wired to engine");
                 }
 
                 connections.put("ALPACA", new ExchangeConnection("ALPACA", alpacaLabel,

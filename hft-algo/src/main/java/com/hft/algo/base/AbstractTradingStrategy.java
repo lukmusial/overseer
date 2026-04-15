@@ -59,7 +59,7 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
         for (Symbol symbol : symbols) {
             currentPositions.put(symbol, 0L);
             targetPositions.put(symbol, 0L);
-            signals.put(symbol, 0.0);
+            signals.put(symbol, 0.0); // Object2DoubleHashMap: stores primitive double, no boxing
         }
     }
 

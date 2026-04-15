@@ -36,18 +36,17 @@ public final class ManualAlpacaParser implements AlpacaMessageParser {
         }
         try {
             String symbol = extractQuotedValue(json, "\"S\":\"", 0);
-            String bpStr = extractQuotedValue(json, "\"bp\":\"", 0);
-            String apStr = extractQuotedValue(json, "\"ap\":\"", 0);
             long bidSize = extractUnquotedLong(json, "\"bs\":", 0);
             long askSize = extractUnquotedLong(json, "\"as\":", 0);
             String timestamp = extractQuotedValue(json, "\"t\":\"", 0);
 
-            if (symbol == null || bpStr == null || apStr == null || timestamp == null) {
+            if (symbol == null || timestamp == null) {
                 return null;
             }
 
-            long bidPrice = FastDecimalParser.parseDecimal(bpStr, PRICE_SCALE, 0);
-            long askPrice = FastDecimalParser.parseDecimal(apStr, PRICE_SCALE, 0);
+            // Use range-based parsing to avoid substring allocations for price fields
+            long bidPrice = extractDecimalField(json, "\"bp\":\"", 0);
+            long askPrice = extractDecimalField(json, "\"ap\":\"", 0);
 
             return new QuoteFields(symbol, bidPrice, askPrice, bidSize, askSize, timestamp);
         } catch (Exception e) {
@@ -62,14 +61,13 @@ public final class ManualAlpacaParser implements AlpacaMessageParser {
         }
         try {
             String symbol = extractQuotedValue(json, "\"S\":\"", 0);
-            String pStr = extractQuotedValue(json, "\"p\":\"", 0);
             String timestamp = extractQuotedValue(json, "\"t\":\"", 0);
 
-            if (symbol == null || pStr == null || timestamp == null) {
+            if (symbol == null || timestamp == null) {
                 return null;
             }
 
-            long price = FastDecimalParser.parseDecimal(pStr, PRICE_SCALE, 0);
+            long price = extractDecimalField(json, "\"p\":\"", 0);
 
             // For "s" (size) and "i" (trade id), we must be careful not to match
             // "S" (symbol). We search for the lowercase versions after the symbol field.
@@ -86,6 +84,22 @@ public final class ManualAlpacaParser implements AlpacaMessageParser {
     @Override
     public String name() {
         return "manual";
+    }
+
+    /**
+     * Extracts a quoted decimal value and parses it directly without creating a substring.
+     */
+    private static long extractDecimalField(String json, String key, int fromIndex) {
+        int start = json.indexOf(key, fromIndex);
+        if (start < 0) {
+            return 0L;
+        }
+        start += key.length();
+        int end = json.indexOf('"', start);
+        if (end < 0) {
+            return 0L;
+        }
+        return FastDecimalParser.parseDecimal(json, start, end, PRICE_SCALE, 0);
     }
 
     /**

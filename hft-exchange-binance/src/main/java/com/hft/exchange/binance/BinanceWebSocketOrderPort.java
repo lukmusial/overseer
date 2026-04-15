@@ -78,6 +78,9 @@ public class BinanceWebSocketOrderPort implements OrderPort {
     private volatile boolean connected = false;
     private volatile boolean shuttingDown = false;
 
+    /** Pre-initialized HMAC signer to avoid Mac.getInstance() per request. Thread-local for thread safety. */
+    private final ThreadLocal<Mac> hmacSigner;
+
     /**
      * Creates a new WebSocket-based order port.
      *
@@ -87,6 +90,18 @@ public class BinanceWebSocketOrderPort implements OrderPort {
     public BinanceWebSocketOrderPort(BinanceConfig config, BinanceHttpClient httpClient) {
         this.config = config;
         this.httpClient = httpClient;
+        // Pre-initialize HMAC signer to avoid Mac.getInstance() + init() per request (~1-5μs saved)
+        SecretKeySpec keySpec = new SecretKeySpec(
+                config.secretKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        this.hmacSigner = ThreadLocal.withInitial(() -> {
+            try {
+                Mac mac = Mac.getInstance("HmacSHA256");
+                mac.init(keySpec);
+                return mac;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to initialize HMAC signer", e);
+            }
+        });
         this.okHttpClient = new OkHttpClient.Builder()
                 .pingInterval(30, TimeUnit.SECONDS)
                 .connectTimeout(10, TimeUnit.SECONDS)
@@ -552,10 +567,7 @@ public class BinanceWebSocketOrderPort implements OrderPort {
      */
     private String sign(String data) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec keySpec = new SecretKeySpec(
-                    config.secretKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            mac.init(keySpec);
+            Mac mac = hmacSigner.get();
             byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {

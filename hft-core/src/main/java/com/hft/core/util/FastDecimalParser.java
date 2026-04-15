@@ -183,6 +183,85 @@ public final class FastDecimalParser {
     }
 
     /**
+     * Parses a decimal substring into a scaled {@code long} without creating a
+     * {@link String#substring} allocation.
+     *
+     * <p>This overload reads characters directly from the source string between
+     * {@code fromIndex} (inclusive) and {@code toIndex} (exclusive), avoiding the
+     * heap allocation that {@code s.substring(from, to)} would create. For the
+     * manual byte-scanner parsers, this eliminates 4-5 substring allocations per
+     * quote message.
+     *
+     * @param s              the source string containing the decimal value
+     * @param fromIndex      start index (inclusive)
+     * @param toIndex        end index (exclusive)
+     * @param targetDecimals the number of decimal places in the result
+     * @param defaultValue   value to return if the range is empty
+     * @return the parsed value as a scaled long, or {@code defaultValue}
+     */
+    public static long parseDecimal(String s, int fromIndex, int toIndex, int targetDecimals, long defaultValue) {
+        if (s == null || fromIndex >= toIndex || fromIndex < 0 || toIndex > s.length()) {
+            return defaultValue;
+        }
+
+        int pos = fromIndex;
+        boolean negative = false;
+        char first = s.charAt(pos);
+        if (first == '-') {
+            negative = true;
+            pos++;
+        } else if (first == '+') {
+            pos++;
+        }
+
+        if (pos >= toIndex) {
+            return defaultValue;
+        }
+
+        // Parse integer part
+        long integerPart = 0;
+        while (pos < toIndex) {
+            char c = s.charAt(pos);
+            if (c == '.') {
+                pos++;
+                break;
+            }
+            if (c < '0' || c > '9') {
+                return defaultValue;
+            }
+            integerPart = integerPart * 10 + (c - '0');
+            pos++;
+        }
+
+        // Parse fractional part
+        long fractionalPart = 0;
+        int fractionalDigits = 0;
+        while (pos < toIndex && fractionalDigits < targetDecimals) {
+            char c = s.charAt(pos);
+            if (c < '0' || c > '9') {
+                break;
+            }
+            fractionalPart = fractionalPart * 10 + (c - '0');
+            fractionalDigits++;
+            pos++;
+        }
+
+        // Pad fractional part
+        for (int i = fractionalDigits; i < targetDecimals; i++) {
+            fractionalPart *= 10;
+        }
+
+        // Compute scale
+        long scale = 1;
+        for (int i = 0; i < targetDecimals; i++) {
+            scale *= 10;
+        }
+
+        long result = integerPart * scale + fractionalPart;
+        return negative ? -result : result;
+    }
+
+    /**
      * Formats a scaled {@code long} back into a decimal string, stripping trailing
      * zeros from the fractional part.
      *
