@@ -391,11 +391,20 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
 
         // Cap quantity by max notional value to avoid risk limit violations
         // Default $500K per order, configurable via maxOrderNotional parameter (in dollars)
+        int priceScale = quote.getPriceScale();
         if (price > 0) {
             long maxNotional = parameters.getLong("maxOrderNotional", 500_000);
-            int priceScale = quote.getPriceScale();
             long maxQtyByNotional = (long) ((double) maxNotional * priceScale * quantityScale / price);
             quantity = Math.min(quantity, Math.max(maxQtyByNotional, 0));
+        }
+
+        // Enforce minimum order notional (default $10) — skip orders too small for exchange filters
+        if (price > 0 && quantity > 0) {
+            double minOrderNotional = parameters.getDouble("minOrderNotional", 10.0);
+            double notional = (double) quantity * price / ((double) priceScale * quantityScale);
+            if (notional < minOrderNotional) {
+                return;
+            }
         }
 
         if (quantity > 0) {
