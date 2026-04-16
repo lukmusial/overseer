@@ -289,6 +289,42 @@ public class PositionManager {
     }
 
     /**
+     * Reconciles a position's quantity with the actual exchange balance.
+     * Adjusts the internal position to match reality without affecting realized P&L.
+     */
+    public void reconcileQuantity(Symbol symbol, long actualQuantity) {
+        Position position = positions.get(symbol);
+        if (position == null) {
+            if (actualQuantity != 0) {
+                // Position exists on exchange but not internally — create it
+                position = getOrCreatePosition(symbol);
+                position.setQuantity(actualQuantity);
+                log.warn("Reconcile: created missing position {} qty={}", symbol, actualQuantity);
+                notifyListeners(position);
+            }
+            return;
+        }
+
+        long currentQty = position.getQuantity();
+        if (currentQty == actualQuantity) {
+            return; // Already in sync
+        }
+
+        log.warn("Reconcile: {} position drift detected: internal={} exchange={}, adjusting",
+                symbol, currentQty, actualQuantity);
+        position.setQuantity(actualQuantity);
+        if (actualQuantity == 0) {
+            position.setAverageEntryPrice(0);
+            position.setTotalCost(0);
+        }
+        if (position.getCurrentPrice() > 0) {
+            position.updateMarketValue(position.getCurrentPrice());
+        }
+        recalculatePnlCentsCache();
+        notifyListeners(position);
+    }
+
+    /**
      * Clears all positions (for testing/reset).
      */
     public void clear() {

@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -791,6 +792,62 @@ public class ExchangeService {
         } catch (Exception e) {
             log.warn("Failed to fetch account balance for {}: {}", exchange, extractErrorMessage(e));
             return null;
+        }
+    }
+
+    /**
+     * Periodically reconciles internal positions with actual exchange balances.
+     * Runs every 30 seconds. Only reconciles for non-stub exchanges with active strategies.
+     */
+    @Scheduled(fixedRate = 30_000, initialDelay = 30_000)
+    public void reconcilePositions() {
+        if (binanceClient == null) return;
+
+        try {
+            Set<String> strategyAssets = getStrategyAssets("BINANCE");
+            if (strategyAssets.isEmpty()) return;
+
+            var params = new java.util.LinkedHashMap<String, String>();
+            BinanceAccount account = binanceClient.signedGet("/api/v3/account", params, BinanceAccount.class)
+                    .get(10, TimeUnit.SECONDS);
+
+            // Build asset -> balance map from exchange
+            Map<String, Long> exchangeBalances = new java.util.HashMap<>();
+            for (BinanceAccount.Balance b : account.getBalances()) {
+                if (strategyAssets.contains(b.getAsset())) {
+                    var total = new java.math.BigDecimal(b.getFree()).add(new java.math.BigDecimal(b.getLocked()));
+                    long scaledQty = total.multiply(java.math.BigDecimal.valueOf(100_000_000))
+                            .setScale(0, java.math.RoundingMode.FLOOR).longValue();
+                    exchangeBalances.put(b.getAsset(), scaledQty);
+                }
+            }
+
+            // Reconcile only strategy symbol positions against exchange base asset balances
+            List<SymbolDto> symbols = symbolCache.get("BINANCE");
+            if (symbols == null) return;
+
+            // Collect strategy tickers
+            Set<String> strategyTickers = new java.util.HashSet<>();
+            for (var strategy : tradingService.getActiveStrategies()) {
+                for (Symbol sym : strategy.getSymbols()) {
+                    if (sym.getExchange() == Exchange.BINANCE) {
+                        strategyTickers.add(sym.getTicker());
+                    }
+                }
+            }
+
+            var positionManager = tradingService.getTradingEngine().getPositionManager();
+            for (SymbolDto sym : symbols) {
+                if (strategyTickers.contains(sym.symbol())
+                        && sym.baseAsset() != null
+                        && exchangeBalances.containsKey(sym.baseAsset())) {
+                    Symbol coreSymbol = new Symbol(sym.symbol(), Exchange.BINANCE);
+                    long exchangeQty = exchangeBalances.get(sym.baseAsset());
+                    positionManager.reconcileQuantity(coreSymbol, exchangeQty);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Position reconciliation failed: {}", e.getMessage());
         }
     }
 
