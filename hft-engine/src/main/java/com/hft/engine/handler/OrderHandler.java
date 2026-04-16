@@ -93,14 +93,20 @@ public class OrderHandler implements EventHandler<TradingEvent> {
 
         orderPort.submitOrder(order)
                 .thenAccept(submittedOrder -> {
-                    log.debug("Order submitted: {}", submittedOrder.getExchangeOrderId());
-                    orderManager.updateOrder(submittedOrder);
+                    if (submittedOrder.getStatus() == OrderStatus.REJECTED) {
+                        // Exchange or filter validation rejected — use rejectOrder to ensure persistence
+                        orderManager.rejectOrder(submittedOrder,
+                                submittedOrder.getRejectReason() != null ? submittedOrder.getRejectReason() : "Rejected by exchange");
+                    } else {
+                        log.debug("Order submitted: {}", submittedOrder.getExchangeOrderId());
+                        orderManager.updateOrder(submittedOrder);
 
-                    // If order was immediately filled, publish fill event for metrics/position tracking
-                    if (submittedOrder.getStatus() == OrderStatus.FILLED && fillCallback != null) {
-                        fillCallback.onFill(submittedOrder,
-                                submittedOrder.getFilledQuantity(),
-                                submittedOrder.getAverageFilledPrice());
+                        // If order was immediately filled, publish fill event for metrics/position tracking
+                        if (submittedOrder.getStatus() == OrderStatus.FILLED && fillCallback != null) {
+                            fillCallback.onFill(submittedOrder,
+                                    submittedOrder.getFilledQuantity(),
+                                    submittedOrder.getAverageFilledPrice());
+                        }
                     }
                 })
                 .exceptionally(e -> {
