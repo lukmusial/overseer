@@ -22,10 +22,21 @@ public class OrderHandler implements EventHandler<TradingEvent> {
     private final OrderManager orderManager;
     private final Map<Exchange, OrderPort> orderPorts;
     private volatile FillCallback fillCallback;
+    private volatile OrderResponseCallback orderResponseCallback;
 
     @FunctionalInterface
     public interface FillCallback {
         void onFill(Order order, long fillQuantity, long fillPrice);
+    }
+
+    /**
+     * Callback invoked when an exchange responds to an order (accepted, filled, rejected).
+     * Used for explicit persistence of order state changes from async exchange callbacks,
+     * since the OrderManager listener chain alone is unreliable across threads.
+     */
+    @FunctionalInterface
+    public interface OrderResponseCallback {
+        void onOrderResponse(Order order);
     }
 
     public OrderHandler(OrderManager orderManager) {
@@ -35,6 +46,10 @@ public class OrderHandler implements EventHandler<TradingEvent> {
 
     public void setFillCallback(FillCallback callback) {
         this.fillCallback = callback;
+    }
+
+    public void setOrderResponseCallback(OrderResponseCallback callback) {
+        this.orderResponseCallback = callback;
     }
 
     public void registerOrderPort(Exchange exchange, OrderPort orderPort) {
@@ -94,25 +109,26 @@ public class OrderHandler implements EventHandler<TradingEvent> {
         orderPort.submitOrder(order)
                 .thenAccept(submittedOrder -> {
                     if (submittedOrder.getStatus() == OrderStatus.REJECTED) {
-                        // Exchange or filter validation rejected — use rejectOrder to ensure persistence
                         orderManager.rejectOrder(submittedOrder,
                                 submittedOrder.getRejectReason() != null ? submittedOrder.getRejectReason() : "Rejected by exchange");
                     } else {
-                        log.debug("Order submitted: {}", submittedOrder.getExchangeOrderId());
+                        log.debug("Order response: {} status={}", submittedOrder.getClientOrderId(), submittedOrder.getStatus());
                         orderManager.updateOrder(submittedOrder);
 
-                        // If order was immediately filled, publish fill event for metrics/position tracking
                         if (submittedOrder.getStatus() == OrderStatus.FILLED && fillCallback != null) {
                             fillCallback.onFill(submittedOrder,
                                     submittedOrder.getFilledQuantity(),
                                     submittedOrder.getAverageFilledPrice());
                         }
                     }
+                    // Explicit persistence — don't rely solely on OrderManager listener chain
+                    notifyOrderResponse(submittedOrder);
                 })
                 .exceptionally(e -> {
                     Throwable cause = unwrapCause(e);
                     log.error("Order submission failed: {}", order.getClientOrderId(), cause);
                     orderManager.rejectOrder(order, cause.getMessage());
+                    notifyOrderResponse(order);
                     return null;
                 });
     }
@@ -175,6 +191,17 @@ public class OrderHandler implements EventHandler<TradingEvent> {
                     log.error("Order modification failed: {}", order.getClientOrderId(), e);
                     return null;
                 });
+    }
+
+    private void notifyOrderResponse(Order order) {
+        OrderResponseCallback callback = this.orderResponseCallback;
+        if (callback != null) {
+            try {
+                callback.onOrderResponse(order);
+            } catch (Exception e) {
+                log.error("Error in order response callback for {}", order.getClientOrderId(), e);
+            }
+        }
     }
 
     /**
