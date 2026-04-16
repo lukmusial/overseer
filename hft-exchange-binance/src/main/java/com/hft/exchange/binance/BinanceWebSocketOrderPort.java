@@ -220,10 +220,19 @@ public class BinanceWebSocketOrderPort implements OrderPort {
         }
 
         long submitTime = System.nanoTime();
+
+        // Validate against exchange filters before sending
+        BinanceSymbolFilters filters = httpClient.getSymbolFilters(order.getSymbol().getTicker());
+        String validationError = filters.validate(order.getQuantity(), order.getPrice());
+        if (validationError != null) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setRejectReason(validationError);
+            return CompletableFuture.completedFuture(order);
+        }
+
         String requestId = String.valueOf(requestIdGenerator.getAndIncrement());
 
         // Build params from order with LOT_SIZE/PRICE_FILTER rounding
-        BinanceSymbolFilters filters = httpClient.getSymbolFilters(order.getSymbol().getTicker());
         Map<String, String> rawParams = BinanceOrderMapper.toRequestParams(order, filters);
         Map<String, Object> params = new LinkedHashMap<>(rawParams);
 

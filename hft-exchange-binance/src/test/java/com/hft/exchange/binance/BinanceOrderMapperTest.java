@@ -168,7 +168,7 @@ class BinanceOrderMapperTest {
         order.setPrice(6_743_215_123_456L); // price with excess precision
 
         // stepSize=0.00001 (1000), tickSize=0.01 (1_000_000)
-        var filters = new BinanceSymbolFilters(1000, 100_000, 1_000_000);
+        var filters = new BinanceSymbolFilters(1000, 100_000, 1_000_000, 500_000_000L);
         Map<String, String> params = BinanceOrderMapper.toRequestParams(order, filters);
 
         assertEquals("0.01343", params.get("quantity"));   // rounded down: 1343000 / 10^8

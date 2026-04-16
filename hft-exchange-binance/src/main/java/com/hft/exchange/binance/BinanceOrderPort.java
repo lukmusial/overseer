@@ -31,6 +31,15 @@ public class BinanceOrderPort implements OrderPort {
     public CompletableFuture<Order> submitOrder(Order order) {
         long submitTime = System.nanoTime();
         BinanceSymbolFilters filters = httpClient.getSymbolFilters(order.getSymbol().getTicker());
+
+        // Validate against exchange filters before sending
+        String validationError = filters.validate(order.getQuantity(), order.getPrice());
+        if (validationError != null) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setRejectReason(validationError);
+            return CompletableFuture.completedFuture(order);
+        }
+
         Map<String, String> params = BinanceOrderMapper.toRequestParams(order, filters);
 
         return httpClient.signedPost("/api/v3/order", params, BinanceOrder.class)
