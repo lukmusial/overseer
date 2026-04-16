@@ -448,6 +448,13 @@ public class TradingService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Returns the raw active strategy objects (for internal use by services).
+     */
+    public Collection<TradingStrategy> getActiveStrategies() {
+        return activeStrategies.values();
+    }
+
     public Optional<StrategyDto> getStrategy(String id) {
         TradingStrategy strategy = activeStrategies.get(id);
         return strategy != null ? Optional.of(toStrategyDto(strategy)) : Optional.empty();
