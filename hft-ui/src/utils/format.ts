@@ -43,16 +43,21 @@ export function formatPnl(pnl: number, scale: number = 100): string {
 
 /**
  * Formats a quantity value given its quantity scale.
- * Divides by scale, shows appropriate decimals, strips trailing zeros.
+ * Divides by scale, shows consistent decimal places for the asset class.
+ * For crypto (scale >= 1M), shows up to 5 decimals with trailing zeros
+ * stripped, but ensures consistent precision for similar values by keeping
+ * at least as many decimals as the most significant fractional digit.
  * e.g., formatQuantity(50_000_000, 100_000_000) => "0.5"
+ *        formatQuantity(1_331_000, 100_000_000) => "0.01331"
+ *        formatQuantity(1_335_061, 100_000_000) => "0.01335"
  *        formatQuantity(100, 1) => "100"
  */
 export function formatQuantity(quantity: number, quantityScale: number = 1): string {
   if (quantityScale <= 1) return quantity.toLocaleString();
   const value = quantity / quantityScale;
-  const decimals = getDecimalsFromScale(quantityScale);
-  // Format with full precision then strip trailing zeros
-  const formatted = value.toFixed(decimals);
+  // Use 5 decimal places for crypto (scale >= 1M), full precision for others
+  const maxDecimals = quantityScale >= 1_000_000 ? 5 : getDecimalsFromScale(quantityScale);
+  const formatted = value.toFixed(maxDecimals);
   return formatted.replace(/\.?0+$/, '') || '0';
 }
 
