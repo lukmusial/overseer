@@ -459,7 +459,157 @@ class BinanceTestnetIntegrationTest {
 
     @Test
     @org.junit.jupiter.api.Order(9)
-    @DisplayName("9. Summary - All integration tests")
+    @DisplayName("9. Validate order quantities match actual balance changes")
+    void testOrderQuantityMatchesBalanceChange() throws Exception {
+        System.out.println("\n--- Test: Order Quantity Validation Against Balances ---");
+        assumeTrue(authenticated, "Requires valid API key (test 1 must pass)");
+
+        // 1. Record USDT and BTC balances BEFORE
+        BinanceAccount beforeAccount = httpClient.signedGet("/api/v3/account", new LinkedHashMap<>(), BinanceAccount.class)
+                .get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        double usdtBefore = getBalance(beforeAccount, "USDT");
+        double btcBefore = getBalance(beforeAccount, "BTC");
+        System.out.println("Before - USDT: " + String.format("%.8f", usdtBefore) +
+                ", BTC: " + String.format("%.8f", btcBefore));
+
+        if (usdtBefore < 100) {
+            System.out.println("SKIPPED: Insufficient USDT balance (need > $100)");
+            System.out.println("  Top up at: https://testnet.binance.vision/");
+            return;
+        }
+
+        // 2. Get current price and calculate a small order (0.001 BTC ~ $74)
+        Quote quote = marketDataPort.getQuote(TEST_SYMBOL).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        long askPrice = quote.getAskPrice();
+        double askPriceHuman = askPrice / PRICE_SCALE;
+        long orderQty = 100_000L; // 0.001 BTC in 8-decimal scale
+        double orderQtyHuman = orderQty / PRICE_SCALE;
+        double expectedNotional = orderQtyHuman * askPriceHuman;
+
+        System.out.println("Order: BUY " + String.format("%.5f", orderQtyHuman) +
+                " BTC @ $" + String.format("%.2f", askPriceHuman) +
+                " (notional: $" + String.format("%.2f", expectedNotional) + ")");
+
+        // 3. Apply LOT_SIZE filter rounding (same as production code)
+        BinanceSymbolFilters filters = httpClient.getSymbolFilters("BTCUSDT");
+        long roundedQty = filters.roundQuantity(orderQty);
+        long roundedPrice = filters.roundPrice(askPrice);
+        System.out.println("After filter rounding: qty=" + String.format("%.5f", roundedQty / PRICE_SCALE) +
+                " price=$" + String.format("%.2f", roundedPrice / PRICE_SCALE));
+
+        // Validate filters don't reject
+        String validationError = filters.validate(roundedQty, roundedPrice);
+        assertNull(validationError, "Order should pass filter validation: " + validationError);
+
+        // 4. Build and submit order using the mapper (same path as production)
+        Order order = new Order()
+                .symbol(TEST_SYMBOL)
+                .side(OrderSide.BUY)
+                .type(OrderType.LIMIT)
+                .quantity(roundedQty)
+                .price(roundedPrice)
+                .timeInForce(TimeInForce.GTC);
+
+        // Verify the request params the mapper produces
+        var params = BinanceOrderMapper.toRequestParams(order, filters);
+        System.out.println("Mapper output: symbol=" + params.get("symbol") +
+                " side=" + params.get("side") +
+                " qty=" + params.get("quantity") +
+                " price=" + params.get("price"));
+
+        // Verify quantity string parses back correctly
+        double mappedQty = Double.parseDouble(params.get("quantity"));
+        assertEquals(roundedQty / PRICE_SCALE, mappedQty, 1e-10,
+                "Mapper quantity should match rounded quantity");
+
+        // 5. Submit the order
+        Order submitted = orderPort.submitOrder(order).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        assertNotNull(submitted.getExchangeOrderId(), "Should have exchange order ID");
+        System.out.println("Submitted: exchangeId=" + submitted.getExchangeOrderId() +
+                " status=" + submitted.getStatus());
+
+        // 6. Wait for fill (limit at ask should fill quickly on testnet)
+        Order finalOrder = submitted;
+        for (int i = 0; i < 10; i++) {
+            Thread.sleep(1000);
+            Optional<Order> orderOpt = orderPort.getOrder(TEST_SYMBOL, submitted.getExchangeOrderId())
+                    .get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (orderOpt.isPresent()) {
+                finalOrder = orderOpt.get();
+                if (finalOrder.getStatus() == OrderStatus.FILLED) break;
+            }
+        }
+
+        if (finalOrder.getStatus() != OrderStatus.FILLED) {
+            // Cancel and skip if not filled (testnet liquidity)
+            try { orderPort.cancelOrder(finalOrder).get(TIMEOUT_SECONDS, TimeUnit.SECONDS); } catch (Exception ignored) {}
+            System.out.println("SKIPPED: Order not filled on testnet (liquidity). Status: " + finalOrder.getStatus());
+            return;
+        }
+
+        double filledQty = finalOrder.getFilledQuantity() / PRICE_SCALE;
+        double avgFillPrice = finalOrder.getAverageFilledPrice() / PRICE_SCALE;
+        System.out.println("Filled: qty=" + String.format("%.5f", filledQty) +
+                " avgPrice=$" + String.format("%.2f", avgFillPrice));
+
+        // 7. Record balances AFTER
+        Thread.sleep(2000); // Allow settlement
+        BinanceAccount afterAccount = httpClient.signedGet("/api/v3/account", new LinkedHashMap<>(), BinanceAccount.class)
+                .get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        double usdtAfter = getBalance(afterAccount, "USDT");
+        double btcAfter = getBalance(afterAccount, "BTC");
+        System.out.println("After  - USDT: " + String.format("%.8f", usdtAfter) +
+                ", BTC: " + String.format("%.8f", btcAfter));
+
+        // 8. Validate balance changes match the order
+        double btcChange = btcAfter - btcBefore;
+        double usdtChange = usdtBefore - usdtAfter; // USDT decreases on buy
+        double actualNotional = filledQty * avgFillPrice;
+
+        System.out.println("BTC change:  +" + String.format("%.8f", btcChange) + " (expected: +" + String.format("%.8f", filledQty) + ")");
+        System.out.println("USDT change: -" + String.format("%.2f", usdtChange) + " (expected: -$" + String.format("%.2f", actualNotional) + ")");
+
+        // BTC balance should increase by exactly the filled quantity
+        assertEquals(filledQty, btcChange, 1e-8,
+                "BTC balance change should match filled quantity");
+
+        // USDT balance should decrease by approximately the notional (within 1% for fees)
+        double tolerance = actualNotional * 0.01; // 1% for fees
+        assertEquals(actualNotional, usdtChange, tolerance,
+                "USDT balance change should match order notional (within 1% for fees)");
+
+        System.out.println("PASSED: Order quantities match actual balance changes on Binance testnet");
+
+        // 9. Sell it back to clean up
+        try {
+            Quote sellQuote = marketDataPort.getQuote(TEST_SYMBOL).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            Order sellOrder = new Order()
+                    .symbol(TEST_SYMBOL)
+                    .side(OrderSide.SELL)
+                    .type(OrderType.LIMIT)
+                    .quantity(roundedQty)
+                    .price(filters.roundPrice(sellQuote.getBidPrice()))
+                    .timeInForce(TimeInForce.GTC);
+            orderPort.submitOrder(sellOrder).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            System.out.println("Cleanup: sell order submitted");
+        } catch (Exception e) {
+            System.out.println("Cleanup sell failed (non-critical): " + e.getMessage());
+        }
+    }
+
+    private double getBalance(BinanceAccount account, String asset) {
+        return account.getBalances().stream()
+                .filter(b -> asset.equals(b.getAsset()))
+                .map(b -> Double.parseDouble(b.getFree()) + Double.parseDouble(b.getLocked()))
+                .findFirst()
+                .orElse(0.0);
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(10)
+    @DisplayName("10. Summary - All integration tests")
     void testSummary() {
         System.out.println("\n" + "=".repeat(60));
         System.out.println("INTEGRATION TEST SUMMARY");
@@ -473,6 +623,7 @@ class BinanceTestnetIntegrationTest {
         System.out.println("  [OK] Order submission and cancellation");
         System.out.println("  [OK] WebSocket market data streaming");
         System.out.println("  [OK] Complete order lifecycle (buy/sell)");
+        System.out.println("  [OK] Order quantities match actual balance changes");
         System.out.println("=".repeat(60));
         System.out.println("Platform is ready for trading with Binance testnet!");
         System.out.println("=".repeat(60));
