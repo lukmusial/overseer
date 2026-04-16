@@ -35,6 +35,13 @@ public class BinanceHttpClient {
     private final ConcurrentHashMap<String, BinanceSymbolFilters> symbolFiltersCache = new ConcurrentHashMap<>();
     private volatile boolean filtersLoaded = false;
 
+    /**
+     * Offset in milliseconds to add to local clock to match Binance server time.
+     * Computed once via {@link #syncServerTime()} and reused for all signed requests.
+     */
+    private volatile long serverTimeOffsetMs = 0;
+    private volatile boolean timeSynced = false;
+
     public BinanceHttpClient(BinanceConfig config) {
         this.config = config;
         this.httpClient = new OkHttpClient.Builder()
@@ -62,6 +69,42 @@ public class BinanceHttpClient {
 
     public ObjectMapper getObjectMapper() {
         return objectMapper;
+    }
+
+    /**
+     * Syncs local clock with Binance server time and stores the offset.
+     * Called automatically on first signed request if not already synced.
+     */
+    public void syncServerTime() {
+        try {
+            String url = config.getBaseUrl() + "/api/v3/time";
+            Request request = new Request.Builder().url(url).get().build();
+            long beforeMs = System.currentTimeMillis();
+            try (Response response = httpClient.newCall(request).execute()) {
+                long afterMs = System.currentTimeMillis();
+                if (response.isSuccessful() && response.body() != null) {
+                    JsonNode node = objectMapper.readTree(response.body().string());
+                    long serverTime = node.path("serverTime").asLong();
+                    // Estimate server time at midpoint of request
+                    long localMidpoint = (beforeMs + afterMs) / 2;
+                    serverTimeOffsetMs = serverTime - localMidpoint;
+                    timeSynced = true;
+                    log.info("Binance server time synced: offset={}ms", serverTimeOffsetMs);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to sync Binance server time: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the current timestamp adjusted to Binance server time.
+     */
+    public long getServerTimestamp() {
+        if (!timeSynced) {
+            syncServerTime();
+        }
+        return System.currentTimeMillis() + serverTimeOffsetMs;
     }
 
     /**
@@ -168,8 +211,8 @@ public class BinanceHttpClient {
     }
 
     private String buildSignedQueryString(Map<String, String> params) {
-        // Add timestamp
-        params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        // Add timestamp adjusted for server time offset
+        params.put("timestamp", String.valueOf(getServerTimestamp()));
 
         // Build query string
         String queryString = params.entrySet().stream()

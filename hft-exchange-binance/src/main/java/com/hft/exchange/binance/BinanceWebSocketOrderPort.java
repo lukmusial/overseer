@@ -590,7 +590,7 @@ public class BinanceWebSocketOrderPort implements OrderPort {
      */
     private Map<String, Object> signParams(Map<String, Object> params) {
         params.put("apiKey", config.apiKey());
-        params.put("timestamp", System.currentTimeMillis());
+        params.put("timestamp", httpClient.getServerTimestamp());
 
         // Build alphabetically sorted query string for signing
         String queryString = params.entrySet().stream()
