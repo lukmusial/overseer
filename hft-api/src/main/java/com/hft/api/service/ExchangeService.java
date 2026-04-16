@@ -1,6 +1,7 @@
 package com.hft.api.service;
 
 import com.hft.api.config.ExchangeProperties;
+import com.hft.api.dto.AccountBalanceDto;
 import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.QuoteDto;
 import com.hft.api.dto.SymbolDto;
@@ -668,6 +669,53 @@ public class ExchangeService {
         Throwable cause = e.getCause() != null ? e.getCause() : e;
         String msg = cause.getMessage();
         return msg != null ? msg : cause.getClass().getSimpleName();
+    }
+
+    /**
+     * Returns account balance information for the specified exchange.
+     * Returns null if the exchange is in stub mode or credentials are unavailable.
+     */
+    public AccountBalanceDto getAccountBalance(String exchange) {
+        try {
+            return switch (exchange.toUpperCase()) {
+                case "ALPACA" -> {
+                    if (alpacaClient == null) yield null;
+                    AlpacaAccount account = alpacaClient.get("/v2/account", AlpacaAccount.class)
+                            .get(10, TimeUnit.SECONDS);
+                    List<AccountBalanceDto.BalanceEntry> entries = List.of(
+                            new AccountBalanceDto.BalanceEntry("cash", account.getCash(), "0", account.getCash()),
+                            new AccountBalanceDto.BalanceEntry("equity", account.getEquity(), "0", account.getEquity()),
+                            new AccountBalanceDto.BalanceEntry("buyingPower", account.getBuyingPower(), "0", account.getBuyingPower()),
+                            new AccountBalanceDto.BalanceEntry("portfolioValue", account.getPortfolioValue(), "0", account.getPortfolioValue())
+                    );
+                    yield new AccountBalanceDto("ALPACA", entries);
+                }
+                case "BINANCE" -> {
+                    if (binanceClient == null) yield null;
+                    var params = new java.util.LinkedHashMap<String, String>();
+                    BinanceAccount account = binanceClient.signedGet("/api/v3/account", params, BinanceAccount.class)
+                            .get(10, TimeUnit.SECONDS);
+                    List<AccountBalanceDto.BalanceEntry> entries = account.getBalances().stream()
+                            .filter(b -> {
+                                double free = Double.parseDouble(b.getFree());
+                                double locked = Double.parseDouble(b.getLocked());
+                                return free != 0 || locked != 0;
+                            })
+                            .map(b -> {
+                                double free = Double.parseDouble(b.getFree());
+                                double locked = Double.parseDouble(b.getLocked());
+                                String total = String.valueOf(free + locked);
+                                return new AccountBalanceDto.BalanceEntry(b.getAsset(), b.getFree(), b.getLocked(), total);
+                            })
+                            .collect(Collectors.toList());
+                    yield new AccountBalanceDto("BINANCE", entries);
+                }
+                default -> null;
+            };
+        } catch (Exception e) {
+            log.warn("Failed to fetch account balance for {}: {}", exchange, extractErrorMessage(e));
+            return null;
+        }
     }
 
     @PreDestroy
