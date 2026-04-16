@@ -48,7 +48,7 @@ public class ChronicleAuditLog implements AuditLog {
     }
 
     @Override
-    public void log(AuditEvent event) {
+    public synchronized void log(AuditEvent event) {
         AuditEventWire wire = AuditEventWire.from(event);
 
         appender.writeDocument(w -> w.write("event").marshallable(wire));

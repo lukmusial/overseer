@@ -78,7 +78,7 @@ public class ChroniclePositionSnapshotStore implements PositionSnapshotStore {
     }
 
     @Override
-    public void saveSnapshot(Position position, long timestampNanos) {
+    public synchronized void saveSnapshot(Position position, long timestampNanos) {
         PositionSnapshotWire wire = PositionSnapshotWire.from(position, timestampNanos);
 
         appender.writeDocument(w -> w.write("position").marshallable(wire));

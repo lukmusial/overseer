@@ -61,7 +61,7 @@ public class ChronicleTradeJournal implements TradeJournal {
     }
 
     @Override
-    public void record(Trade trade) {
+    public synchronized void record(Trade trade) {
         TradeWire wire = TradeWire.from(trade);
 
         appender.writeDocument(w -> w.write("trade").marshallable(wire));

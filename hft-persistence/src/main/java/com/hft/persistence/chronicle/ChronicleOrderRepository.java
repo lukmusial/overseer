@@ -75,7 +75,7 @@ public class ChronicleOrderRepository implements OrderRepository {
     }
 
     @Override
-    public void save(Order order) {
+    public synchronized void save(Order order) {
         OrderWire wire = OrderWire.from(order);
 
         appender.writeDocument(w -> w.write("order").marshallable(wire));
