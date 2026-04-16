@@ -222,8 +222,9 @@ public class BinanceWebSocketOrderPort implements OrderPort {
         long submitTime = System.nanoTime();
         String requestId = String.valueOf(requestIdGenerator.getAndIncrement());
 
-        // Build params from order
-        Map<String, String> rawParams = BinanceOrderMapper.toRequestParams(order);
+        // Build params from order with LOT_SIZE/PRICE_FILTER rounding
+        BinanceSymbolFilters filters = httpClient.getSymbolFilters(order.getSymbol().getTicker());
+        Map<String, String> rawParams = BinanceOrderMapper.toRequestParams(order, filters);
         Map<String, Object> params = new LinkedHashMap<>(rawParams);
 
         // Sign the params (adds apiKey, timestamp, signature)
@@ -544,17 +545,20 @@ public class BinanceWebSocketOrderPort implements OrderPort {
         int code = errorNode.path("code").asInt(0);
         String msg = errorNode.path("msg").asText("Unknown error");
 
-        BinanceApiException exception = new BinanceApiException(code, msg);
         log.error("Order error from exchange: code={}, msg={}, clientOrderId={}",
                 code, msg, pending.originalOrder.getClientOrderId());
 
-        // Mark order as rejected for submission failures
+        // Mark order as rejected and complete normally — the OrderHandler will
+        // process the REJECTED status via updateOrder, preserving the clean reject reason
         Order order = pending.originalOrder;
         order.setStatus(OrderStatus.REJECTED);
-        order.setRejectReason(msg);
+        order.setRejectReason("Binance error " + code + ": " + msg);
+        order.setAcceptedAt(System.nanoTime());
         notifyListeners(order, OrderStatus.PENDING, OrderStatus.REJECTED);
 
-        pending.future.completeExceptionally(exception);
+        @SuppressWarnings("unchecked")
+        CompletableFuture<Order> orderFuture = (CompletableFuture<Order>) (CompletableFuture<?>) pending.future;
+        orderFuture.complete(order);
     }
 
     // ==================== Internal: Signing ====================

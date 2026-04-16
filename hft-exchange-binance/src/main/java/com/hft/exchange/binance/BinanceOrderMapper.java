@@ -66,14 +66,21 @@ public class BinanceOrderMapper {
     }
 
     /**
-     * Builds request parameters for a new order.
+     * Builds request parameters for a new order (no filter rounding).
      */
     public static Map<String, String> toRequestParams(Order order) {
+        return toRequestParams(order, BinanceSymbolFilters.DEFAULT);
+    }
+
+    /**
+     * Builds request parameters for a new order, applying LOT_SIZE and PRICE_FILTER rounding.
+     */
+    public static Map<String, String> toRequestParams(Order order, BinanceSymbolFilters filters) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("symbol", order.getSymbol().getTicker());
         params.put("side", formatSide(order.getSide()));
         params.put("type", formatType(order.getType()));
-        params.put("quantity", formatQuantity(order.getQuantity()));
+        params.put("quantity", formatQuantity(filters.roundQuantity(order.getQuantity())));
         params.put("newClientOrderId", String.valueOf(order.getClientOrderId()));
 
         if (order.getTimeInForce() != null && order.getType() == OrderType.LIMIT) {
@@ -81,11 +88,11 @@ public class BinanceOrderMapper {
         }
 
         if (order.getType() == OrderType.LIMIT || order.getType() == OrderType.STOP_LIMIT) {
-            params.put("price", formatPrice(order.getPrice()));
+            params.put("price", formatPrice(filters.roundPrice(order.getPrice())));
         }
 
         if (order.getType() == OrderType.STOP || order.getType() == OrderType.STOP_LIMIT) {
-            params.put("stopPrice", formatPrice(order.getStopPrice()));
+            params.put("stopPrice", formatPrice(filters.roundPrice(order.getStopPrice())));
         }
 
         return params;

@@ -158,6 +158,24 @@ class BinanceOrderMapperTest {
     }
 
     @Test
+    void shouldRoundQuantityAndPriceWithFilters() {
+        Order order = new Order();
+        order.setSymbol(BTCUSDT);
+        order.setSide(OrderSide.BUY);
+        order.setType(OrderType.LIMIT);
+        order.setTimeInForce(TimeInForce.GTC);
+        order.setQuantity(1_343_175); // 0.01343175 BTC — not aligned to stepSize
+        order.setPrice(6_743_215_123_456L); // price with excess precision
+
+        // stepSize=0.00001 (1000), tickSize=0.01 (1_000_000)
+        var filters = new BinanceSymbolFilters(1000, 100_000, 1_000_000);
+        Map<String, String> params = BinanceOrderMapper.toRequestParams(order, filters);
+
+        assertEquals("0.01343", params.get("quantity"));   // rounded down: 1343000 / 10^8
+        assertEquals("67432.15", params.get("price"));     // rounded: 6743215000000 / 10^8
+    }
+
+    @Test
     void shouldIncludeStopPriceForStopOrders() {
         Order order = new Order();
         order.setSymbol(BTCUSDT);
