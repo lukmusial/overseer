@@ -329,7 +329,7 @@ public class BinanceHttpClient {
                         JsonNode filters = sym.path("filters");
                         if (!filters.isArray()) continue;
 
-                        long stepSize = 1, minQty = 0, tickSize = 1;
+                        long stepSize = 1, minQty = 0, tickSize = 1, minNotional = 0;
                         for (JsonNode filter : filters) {
                             String filterType = filter.path("filterType").asText();
                             if ("LOT_SIZE".equals(filterType)) {
@@ -340,9 +340,12 @@ public class BinanceHttpClient {
                             } else if ("PRICE_FILTER".equals(filterType)) {
                                 tickSize = FastDecimalParser.parseDecimal(
                                         filter.path("tickSize").asText("0.00000001"), 8);
+                            } else if ("NOTIONAL".equals(filterType) || "MIN_NOTIONAL".equals(filterType)) {
+                                minNotional = FastDecimalParser.parseDecimal(
+                                        filter.path("minNotional").asText("0"), 8);
                             }
                         }
-                        symbolFiltersCache.put(ticker, new BinanceSymbolFilters(stepSize, minQty, tickSize));
+                        symbolFiltersCache.put(ticker, new BinanceSymbolFilters(stepSize, minQty, tickSize, minNotional));
                     }
                     log.info("Loaded symbol filters for {} symbols", symbolFiltersCache.size());
                 }
