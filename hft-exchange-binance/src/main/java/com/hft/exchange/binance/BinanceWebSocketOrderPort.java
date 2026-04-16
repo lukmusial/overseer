@@ -520,6 +520,8 @@ public class BinanceWebSocketOrderPort implements OrderPort {
             result.setClientOrderId(pending.originalOrder.getClientOrderId());
             result.setSubmittedAt(pending.submitTime);
             result.setAcceptedAt(System.nanoTime());
+            result.setPriceScale(pending.originalOrder.getPriceScale());
+            result.strategyId(pending.originalOrder.getStrategyId());
 
             OrderStatus previousStatus = pending.originalOrder.getStatus();
             log.debug("Order response received: clientOrderId={}, exchangeOrderId={}, status={}",
