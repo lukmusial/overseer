@@ -27,7 +27,7 @@ public class ChroniclePositionSnapshotStore implements PositionSnapshotStore {
     private static final Logger log = LoggerFactory.getLogger(ChroniclePositionSnapshotStore.class);
 
     private final ChronicleQueue queue;
-    private final ExcerptAppender appender;
+    private final ThreadLocal<ExcerptAppender> appender;
 
     // In-memory indices
     private final Map<Symbol, PositionSnapshot> latestBySymbol = new ConcurrentHashMap<>();
@@ -45,7 +45,7 @@ public class ChroniclePositionSnapshotStore implements PositionSnapshotStore {
 
         this.queue = ChronicleQueue.singleBuilder(basePath.resolve("positions"))
                 .build();
-        this.appender = queue.createAppender();
+        this.appender = ThreadLocal.withInitial(queue::createAppender);
 
         rebuildIndex();
 
@@ -78,10 +78,10 @@ public class ChroniclePositionSnapshotStore implements PositionSnapshotStore {
     }
 
     @Override
-    public synchronized void saveSnapshot(Position position, long timestampNanos) {
+    public void saveSnapshot(Position position, long timestampNanos) {
         PositionSnapshotWire wire = PositionSnapshotWire.from(position, timestampNanos);
 
-        appender.writeDocument(w -> w.write("position").marshallable(wire));
+        appender.get().writeDocument(w -> w.write("position").marshallable(wire));
 
         PositionSnapshot snapshot = wire.toSnapshot();
         Symbol symbol = position.getSymbol();

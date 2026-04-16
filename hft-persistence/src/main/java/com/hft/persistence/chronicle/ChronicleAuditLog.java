@@ -29,7 +29,7 @@ public class ChronicleAuditLog implements AuditLog {
     private static final Logger log = LoggerFactory.getLogger(ChronicleAuditLog.class);
 
     private final ChronicleQueue queue;
-    private final ExcerptAppender appender;
+    private final ThreadLocal<ExcerptAppender> appender;
     private final Deque<AuditEvent> recentEvents = new ConcurrentLinkedDeque<>();
     private final int maxRecentEvents;
 
@@ -42,16 +42,16 @@ public class ChronicleAuditLog implements AuditLog {
 
         this.queue = ChronicleQueue.singleBuilder(basePath.resolve("audit"))
                 .build();
-        this.appender = queue.createAppender();
+        this.appender = ThreadLocal.withInitial(queue::createAppender);
 
         log.info("Chronicle audit log initialized at {}", basePath);
     }
 
     @Override
-    public synchronized void log(AuditEvent event) {
+    public void log(AuditEvent event) {
         AuditEventWire wire = AuditEventWire.from(event);
 
-        appender.writeDocument(w -> w.write("event").marshallable(wire));
+        appender.get().writeDocument(w -> w.write("event").marshallable(wire));
 
         // Keep recent events in memory
         recentEvents.addFirst(event);

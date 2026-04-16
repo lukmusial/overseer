@@ -28,7 +28,7 @@ public class ChronicleOrderRepository implements OrderRepository {
     private static final Logger log = LoggerFactory.getLogger(ChronicleOrderRepository.class);
 
     private final ChronicleQueue queue;
-    private final ExcerptAppender appender;
+    private final ThreadLocal<ExcerptAppender> appender;
 
     // In-memory indices for fast lookups
     private final Map<Long, Order> ordersByClientId = new ConcurrentHashMap<>();
@@ -45,7 +45,7 @@ public class ChronicleOrderRepository implements OrderRepository {
 
         this.queue = ChronicleQueue.singleBuilder(basePath.resolve("orders"))
                 .build();
-        this.appender = queue.createAppender();
+        this.appender = ThreadLocal.withInitial(queue::createAppender);
 
         // Rebuild in-memory index from queue
         rebuildIndex();
@@ -75,10 +75,10 @@ public class ChronicleOrderRepository implements OrderRepository {
     }
 
     @Override
-    public synchronized void save(Order order) {
+    public void save(Order order) {
         OrderWire wire = OrderWire.from(order);
 
-        appender.writeDocument(w -> w.write("order").marshallable(wire));
+        appender.get().writeDocument(w -> w.write("order").marshallable(wire));
 
         // Update in-memory index
         Order existing = ordersByClientId.put(order.getClientOrderId(), order);
