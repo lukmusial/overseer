@@ -5,6 +5,7 @@ import com.hft.api.dto.AccountBalanceDto;
 import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.QuoteDto;
 import com.hft.api.dto.SymbolDto;
+import com.hft.algo.base.TradingStrategy;
 import com.hft.core.model.Exchange;
 import com.hft.core.model.Symbol;
 import com.hft.core.port.MarketDataPort;
@@ -695,11 +696,19 @@ public class ExchangeService {
                     var params = new java.util.LinkedHashMap<String, String>();
                     BinanceAccount account = binanceClient.signedGet("/api/v3/account", params, BinanceAccount.class)
                             .get(10, TimeUnit.SECONDS);
+
+                    // Derive relevant assets from strategy symbols
+                    Set<String> relevantAssets = getStrategyAssets("BINANCE");
+
                     List<AccountBalanceDto.BalanceEntry> entries = account.getBalances().stream()
                             .filter(b -> {
-                                double free = Double.parseDouble(b.getFree());
-                                double locked = Double.parseDouble(b.getLocked());
-                                return free != 0 || locked != 0;
+                                if (relevantAssets.isEmpty()) {
+                                    // No strategies — show all non-zero balances
+                                    double free = Double.parseDouble(b.getFree());
+                                    double locked = Double.parseDouble(b.getLocked());
+                                    return free != 0 || locked != 0;
+                                }
+                                return relevantAssets.contains(b.getAsset());
                             })
                             .map(b -> {
                                 double free = Double.parseDouble(b.getFree());
@@ -716,6 +725,53 @@ public class ExchangeService {
             log.warn("Failed to fetch account balance for {}: {}", exchange, extractErrorMessage(e));
             return null;
         }
+    }
+
+    /**
+     * Derives the set of base and quote assets from active strategy symbols for an exchange.
+     * E.g., strategy on BTCUSDT returns {"BTC", "USDT"}.
+     * Uses the symbol cache to look up baseAsset/quoteAsset.
+     */
+    private Set<String> getStrategyAssets(String exchange) {
+        Set<String> assets = new java.util.HashSet<>();
+
+        // Collect tickers from active strategies for this exchange
+        Set<String> tickers = new java.util.HashSet<>();
+        Exchange exchangeEnum;
+        try {
+            exchangeEnum = Exchange.valueOf(exchange);
+        } catch (IllegalArgumentException e) {
+            return assets;
+        }
+
+        for (var strategy : tradingService.getActiveStrategies()) {
+            for (Symbol sym : strategy.getSymbols()) {
+                if (sym.getExchange() == exchangeEnum) {
+                    tickers.add(sym.getTicker());
+                }
+            }
+        }
+
+        if (tickers.isEmpty()) {
+            return assets;
+        }
+
+        // Look up base/quote assets from the symbol cache
+        List<SymbolDto> symbols = symbolCache.getOrDefault(exchange, List.of());
+        for (SymbolDto sym : symbols) {
+            if (tickers.contains(sym.symbol())) {
+                if (sym.baseAsset() != null) assets.add(sym.baseAsset());
+                if (sym.quoteAsset() != null) assets.add(sym.quoteAsset());
+            }
+        }
+
+        // Fallback: if symbol cache doesn't have entries (e.g., not yet fetched),
+        // include all tickers as-is (best effort)
+        if (assets.isEmpty() && !tickers.isEmpty()) {
+            assets.addAll(tickers);
+        }
+
+        return assets;
     }
 
     @PreDestroy
