@@ -38,6 +38,9 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -88,6 +91,9 @@ public class ExchangeService {
     // Cached symbols
     private final Map<String, List<SymbolDto>> symbolCache = new ConcurrentHashMap<>();
 
+    private static final Path MODE_FILE = Paths.get(
+            System.getProperty("user.home"), ".hft-client", "exchange-modes.properties");
+
     public ExchangeService(ExchangeProperties properties, Environment environment,
                            SimpMessagingTemplate messagingTemplate, @Lazy TradingService tradingService,
                            @Lazy StubMarketDataService stubMarketDataService,
@@ -103,6 +109,9 @@ public class ExchangeService {
     @PostConstruct
     public void initialize() {
         log.info("Initializing exchange connections");
+
+        // Restore persisted exchange modes from previous session
+        loadPersistedModes();
 
         // Initialize Alpaca connection
         if (properties.getAlpaca().isEnabled()) {
@@ -511,6 +520,7 @@ public class ExchangeService {
                 symbolCache.remove(key);
                 chartDataService.clearCache();
                 properties.getAlpaca().setMode(newMode);
+                persistMode(key, newMode);
                 initializeAlpaca();
                 yield getExchangeStatus(key);
             }
@@ -532,11 +542,68 @@ public class ExchangeService {
                 symbolCache.remove(key);
                 chartDataService.clearCache();
                 properties.getBinance().setMode(newMode);
+                persistMode(key, newMode);
                 initializeBinance();
                 yield getExchangeStatus(key);
             }
             default -> null;
         };
+    }
+
+    /**
+     * Restores exchange modes from ~/.hft-client/exchange-modes.properties.
+     * If a persisted mode differs from the default (stub), loads credentials
+     * and applies the persisted mode so it survives app restarts.
+     */
+    private void loadPersistedModes() {
+        if (!Files.exists(MODE_FILE)) return;
+
+        Properties modes = new Properties();
+        try (var is = Files.newInputStream(MODE_FILE)) {
+            modes.load(is);
+        } catch (IOException e) {
+            log.warn("Failed to load persisted exchange modes: {}", e.getMessage());
+            return;
+        }
+
+        String alpacaMode = modes.getProperty("ALPACA");
+        if (alpacaMode != null && !"stub".equals(alpacaMode)) {
+            log.info("Restoring Alpaca mode from previous session: {}", alpacaMode);
+            loadLocalCredentials();
+            properties.getAlpaca().setMode(alpacaMode);
+        }
+
+        String binanceMode = modes.getProperty("BINANCE");
+        if (binanceMode != null && !"stub".equals(binanceMode)) {
+            log.info("Restoring Binance mode from previous session: {}", binanceMode);
+            loadLocalCredentials();
+            properties.getBinance().setMode(binanceMode);
+        }
+    }
+
+    /**
+     * Persists the exchange mode to disk so it survives app restarts.
+     */
+    private void persistMode(String exchange, String mode) {
+        try {
+            // Load existing modes
+            Properties modes = new Properties();
+            if (Files.exists(MODE_FILE)) {
+                try (var is = Files.newInputStream(MODE_FILE)) {
+                    modes.load(is);
+                }
+            }
+
+            modes.setProperty(exchange, mode);
+
+            // Write back
+            Files.createDirectories(MODE_FILE.getParent());
+            try (var os = Files.newOutputStream(MODE_FILE)) {
+                modes.store(os, "Exchange modes - persisted across restarts");
+            }
+        } catch (IOException e) {
+            log.warn("Failed to persist exchange mode for {}: {}", exchange, e.getMessage());
+        }
     }
 
     /**
