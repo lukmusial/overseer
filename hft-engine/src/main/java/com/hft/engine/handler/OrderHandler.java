@@ -104,8 +104,10 @@ public class OrderHandler implements EventHandler<TradingEvent> {
                     }
                 })
                 .exceptionally(e -> {
-                    log.error("Order submission failed: {}", order.getClientOrderId(), e);
-                    orderManager.rejectOrder(order, e.getMessage());
+                    Throwable cause = e instanceof java.util.concurrent.CompletionException && e.getCause() != null
+                            ? e.getCause() : e;
+                    log.error("Order submission failed: {}", order.getClientOrderId(), cause);
+                    orderManager.rejectOrder(order, cause.getMessage());
                     return null;
                 });
     }

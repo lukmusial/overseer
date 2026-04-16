@@ -280,10 +280,18 @@ public class ExchangeService {
 
                     // Register WebSocket order port for low-latency order submission
                     BinanceWebSocketOrderPort wsOrderPort = new BinanceWebSocketOrderPort(config, binanceClient);
-                    wsOrderPort.connect();
-                    tradingService.getTradingEngine().registerExchange(Exchange.BINANCE, wsOrderPort);
-                    this.binanceWsOrderPort = wsOrderPort;
-                    log.info("Binance WebSocket order port registered");
+                    try {
+                        wsOrderPort.connect().get(10, TimeUnit.SECONDS);
+                        tradingService.getTradingEngine().registerExchange(Exchange.BINANCE, wsOrderPort);
+                        this.binanceWsOrderPort = wsOrderPort;
+                        log.info("Binance WebSocket order port registered");
+                    } catch (Exception e) {
+                        log.warn("Binance WebSocket order port connection failed, falling back to REST order port: {}",
+                                extractErrorMessage(e));
+                        BinanceOrderPort restOrderPort = new BinanceOrderPort(binanceClient);
+                        tradingService.getTradingEngine().registerExchange(Exchange.BINANCE, restOrderPort);
+                        log.info("Binance REST order port registered (fallback)");
+                    }
                 }
 
                 connections.put("BINANCE", new ExchangeConnection("BINANCE", binanceLabel,
@@ -505,6 +513,10 @@ public class ExchangeService {
                 yield getExchangeStatus(key);
             }
             case "BINANCE" -> {
+                if (binanceWsOrderPort != null) {
+                    binanceWsOrderPort.disconnect();
+                    binanceWsOrderPort = null;
+                }
                 if (binanceWsClient != null) {
                     binanceWsClient.disconnect();
                     binanceWsClient = null;
