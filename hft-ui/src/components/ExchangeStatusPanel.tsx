@@ -35,6 +35,8 @@ export function ExchangeStatusPanel({ exchanges, onSwitchMode }: Props) {
 
   useEffect(() => {
     fetchBalances();
+    const interval = setInterval(fetchBalances, 60_000);
+    return () => clearInterval(interval);
   }, [fetchBalances]);
 
   const handleModeChange = async (exchange: string, newMode: string) => {
