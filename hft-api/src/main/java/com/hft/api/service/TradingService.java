@@ -63,6 +63,7 @@ public class TradingService {
         this.persistenceManager = persistenceManager;
         registerOrderPersistenceListener();
         registerPositionPersistenceListener();
+        registerOrderResponseCallback();
     }
 
     /**
@@ -92,6 +93,21 @@ public class TradingService {
                 persistenceManager.saveOrder(order);
             } catch (Exception e) {
                 log.error("Failed to persist order {}: {}", order.getClientOrderId(), e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Explicit persistence callback for exchange order responses.
+     * This fires directly from the OrderHandler's thenAccept/exceptionally callbacks,
+     * guaranteeing persistence even if the OrderManager listener chain fails.
+     */
+    private void registerOrderResponseCallback() {
+        tradingEngine.setOrderResponseCallback(order -> {
+            try {
+                persistenceManager.saveOrder(order);
+            } catch (Exception e) {
+                log.error("Failed to persist order response {}: {}", order.getClientOrderId(), e.getMessage());
             }
         });
     }
