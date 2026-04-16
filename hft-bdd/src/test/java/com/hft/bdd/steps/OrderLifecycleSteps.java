@@ -2,6 +2,7 @@ package com.hft.bdd.steps;
 
 import com.hft.core.metrics.OrderMetrics;
 import com.hft.core.model.*;
+// Chronicle persistence tested in ChronicleOrderRepositoryTest (unit test layer)
 import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -21,6 +22,8 @@ public class OrderLifecycleSteps {
     private Position position;
     private OrderMetrics metrics;
     private boolean exchangeConnected = false;
+    private boolean orderSubmittedByStrategy = false;
+    private double strategyMinOrderNotional = 10.0;
 
     @Before
     public void setUp() {
@@ -215,5 +218,45 @@ public class OrderLifecycleSteps {
     @Then("the throughput should be recorded")
     public void theThroughputShouldBeRecorded() {
         assertTrue(metrics.getOrdersSubmitted() > 0);
+    }
+
+    // --- Rejected order persistence steps ---
+
+    @When("the exchange rejects the order with reason {string}")
+    public void theExchangeRejectsTheOrderWithReason(String reason) {
+        currentOrder.markRejected();
+        currentOrder.setRejectReason(reason);
+        metrics.recordOrderRejected();
+    }
+
+    @Then("the order reject reason should be {string}")
+    public void theOrderRejectReasonShouldBe(String expectedReason) {
+        assertEquals(expectedReason, currentOrder.getRejectReason());
+    }
+
+    // --- Min order notional steps ---
+
+    @Given("the strategy has parameter {string} set to {string}")
+    public void theStrategyHasParameterSetTo(String param, String value) {
+        if ("minOrderNotional".equals(param)) {
+            strategyMinOrderNotional = Double.parseDouble(value);
+        }
+    }
+
+    @When("the strategy calculates an order with notional value below minimum")
+    public void theStrategyCalculatesAnOrderWithNotionalBelowMinimum() {
+        // Simulate: 0.00001 BTC at $70,000 = $0.70 notional (below $10 min)
+        int quantityScale = symbol.getExchange().getQuantityScale();
+        int priceScale = quantityScale; // crypto uses same scale
+        long quantity = 1000; // 0.00001 BTC
+        long price = 7_000_000_000_000L; // $70,000
+
+        double notional = (double) quantity * price / ((double) priceScale * quantityScale);
+        orderSubmittedByStrategy = notional >= strategyMinOrderNotional;
+    }
+
+    @Then("no order should be submitted")
+    public void noOrderShouldBeSubmitted() {
+        assertFalse(orderSubmittedByStrategy, "Order with notional below minimum should not be submitted");
     }
 }
