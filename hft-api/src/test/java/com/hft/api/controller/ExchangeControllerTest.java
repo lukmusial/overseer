@@ -1,5 +1,6 @@
 package com.hft.api.controller;
 
+import com.hft.api.dto.AccountBalanceDto;
 import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.SymbolDto;
 import com.hft.api.service.ChartDataService;
@@ -171,5 +172,46 @@ class ExchangeControllerTest {
                         .contentType("application/json")
                         .content("{\"mode\":\"\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getAccountBalance_returnsBalance() throws Exception {
+        AccountBalanceDto balance = new AccountBalanceDto("ALPACA", List.of(
+                new AccountBalanceDto.BalanceEntry("cash", "10000.00", "0", "10000.00"),
+                new AccountBalanceDto.BalanceEntry("equity", "15000.00", "0", "15000.00")
+        ));
+        when(exchangeService.getAccountBalance("ALPACA")).thenReturn(balance);
+
+        mockMvc.perform(get("/api/exchanges/ALPACA/account"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exchange").value("ALPACA"))
+                .andExpect(jsonPath("$.balances.length()").value(2))
+                .andExpect(jsonPath("$.balances[0].asset").value("cash"))
+                .andExpect(jsonPath("$.balances[0].total").value("10000.00"))
+                .andExpect(jsonPath("$.balances[1].asset").value("equity"));
+    }
+
+    @Test
+    void getAccountBalance_stubMode_returnsNotFound() throws Exception {
+        when(exchangeService.getAccountBalance("ALPACA")).thenReturn(null);
+
+        mockMvc.perform(get("/api/exchanges/ALPACA/account"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getAccountBalance_caseInsensitive() throws Exception {
+        AccountBalanceDto balance = new AccountBalanceDto("BINANCE", List.of(
+                new AccountBalanceDto.BalanceEntry("BTC", "0.5", "0.1", "0.6")
+        ));
+        when(exchangeService.getAccountBalance("BINANCE")).thenReturn(balance);
+
+        mockMvc.perform(get("/api/exchanges/binance/account"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exchange").value("BINANCE"))
+                .andExpect(jsonPath("$.balances[0].asset").value("BTC"))
+                .andExpect(jsonPath("$.balances[0].free").value("0.5"))
+                .andExpect(jsonPath("$.balances[0].locked").value("0.1"))
+                .andExpect(jsonPath("$.balances[0].total").value("0.6"));
     }
 }

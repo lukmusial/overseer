@@ -1,5 +1,6 @@
 package com.hft.api.controller;
 
+import com.hft.api.dto.AccountBalanceDto;
 import com.hft.api.dto.ExchangeModeRequest;
 import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.SymbolDto;
@@ -60,6 +61,18 @@ public class ExchangeController {
         // Clear chart data cache so next request fetches fresh data in the new mode
         chartDataService.clearCache();
         return ResponseEntity.ok(status);
+    }
+
+    /**
+     * Returns account balance information for a specific exchange.
+     */
+    @GetMapping("/{exchange}/account")
+    public ResponseEntity<AccountBalanceDto> getAccountBalance(@PathVariable String exchange) {
+        AccountBalanceDto balance = exchangeService.getAccountBalance(exchange.toUpperCase());
+        if (balance == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(balance);
     }
 
     /**

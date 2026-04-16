@@ -821,6 +821,34 @@ tr:hover {
   color: var(--pip-red);
 }
 
+.exchange-balances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  margin-left: 1rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--pip-border-dim);
+}
+
+.balance-item {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.2rem 0.4rem;
+  background: var(--pip-bg-dark);
+  border: 1px solid var(--pip-border-dim);
+  font-size: 0.75rem;
+}
+
+.balance-asset {
+  color: var(--pip-green-dim);
+  text-transform: uppercase;
+}
+
+.balance-value {
+  color: var(--pip-green-bright);
+}
+
 /* ═══ CANDLESTICK CHART ═══ */
 .candlestick-chart, .chart-panel {
   background: var(--pip-bg);
