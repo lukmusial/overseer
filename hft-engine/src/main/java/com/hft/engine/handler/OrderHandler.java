@@ -104,8 +104,7 @@ public class OrderHandler implements EventHandler<TradingEvent> {
                     }
                 })
                 .exceptionally(e -> {
-                    Throwable cause = e instanceof java.util.concurrent.CompletionException && e.getCause() != null
-                            ? e.getCause() : e;
+                    Throwable cause = unwrapCause(e);
                     log.error("Order submission failed: {}", order.getClientOrderId(), cause);
                     orderManager.rejectOrder(order, cause.getMessage());
                     return null;
@@ -170,5 +169,17 @@ public class OrderHandler implements EventHandler<TradingEvent> {
                     log.error("Order modification failed: {}", order.getClientOrderId(), e);
                     return null;
                 });
+    }
+
+    /**
+     * Unwraps CompletionException/ExecutionException wrappers to get the root cause.
+     */
+    private static Throwable unwrapCause(Throwable t) {
+        while ((t instanceof java.util.concurrent.CompletionException
+                || t instanceof java.util.concurrent.ExecutionException)
+                && t.getCause() != null) {
+            t = t.getCause();
+        }
+        return t;
     }
 }
