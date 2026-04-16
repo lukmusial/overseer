@@ -778,9 +778,9 @@ public class ExchangeService {
                                 return relevantAssets.contains(b.getAsset());
                             })
                             .map(b -> {
-                                double free = Double.parseDouble(b.getFree());
-                                double locked = Double.parseDouble(b.getLocked());
-                                String total = String.valueOf(free + locked);
+                                var free = new java.math.BigDecimal(b.getFree());
+                                var locked = new java.math.BigDecimal(b.getLocked());
+                                String total = free.add(locked).stripTrailingZeros().toPlainString();
                                 return new AccountBalanceDto.BalanceEntry(b.getAsset(), b.getFree(), b.getLocked(), total);
                             })
                             .collect(Collectors.toList());
@@ -823,19 +823,16 @@ public class ExchangeService {
             return assets;
         }
 
-        // Look up base/quote assets from the symbol cache
-        List<SymbolDto> symbols = symbolCache.getOrDefault(exchange, List.of());
+        // Look up base/quote assets from the symbol cache (populate if needed)
+        List<SymbolDto> symbols = symbolCache.get(exchange);
+        if (symbols == null || symbols.isEmpty()) {
+            symbols = getSymbols(exchange);
+        }
         for (SymbolDto sym : symbols) {
             if (tickers.contains(sym.symbol())) {
                 if (sym.baseAsset() != null) assets.add(sym.baseAsset());
                 if (sym.quoteAsset() != null) assets.add(sym.quoteAsset());
             }
-        }
-
-        // Fallback: if symbol cache doesn't have entries (e.g., not yet fetched),
-        // include all tickers as-is (best effort)
-        if (assets.isEmpty() && !tickers.isEmpty()) {
-            assets.addAll(tickers);
         }
 
         return assets;
