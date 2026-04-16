@@ -273,6 +273,10 @@ public class TradingService {
         order.setQuantity(request.quantity());
         order.setPrice(request.price());
         order.setStopPrice(request.stopPrice());
+        // Set price scale based on exchange (crypto uses 8 decimals, stocks use 2)
+        order.setPriceScale(symbol.getExchange() == Exchange.BINANCE
+                || symbol.getExchange() == Exchange.BINANCE_TESTNET
+                ? 100_000_000 : 100);
         if (request.timeInForce() != null) {
             order.setTimeInForce(request.timeInForce());
         }
