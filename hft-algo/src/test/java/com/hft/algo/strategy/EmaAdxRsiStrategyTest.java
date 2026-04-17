@@ -16,6 +16,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.hft.algo.base.OrderRequest;
+import org.mockito.ArgumentCaptor;
+
 @ExtendWith(MockitoExtension.class)
 class EmaAdxRsiStrategyTest {
 
@@ -265,6 +268,116 @@ class EmaAdxRsiStrategyTest {
 
         // The order should be skipped because max notional ($729) is below $5000 custom minimum
         verify(context, never()).submitOrder(any());
+    }
+
+    @Test
+    void shouldThrottleOrdersWithinCooldownPeriod() {
+        // Use a strategy with short indicator periods so signals trigger quickly,
+        // and a 1-second cooldown (the default).
+        var params = new StrategyParameters();
+        params.set("fastEmaPeriod", 3);
+        params.set("slowEmaPeriod", 5);
+        params.set("adxPeriod", 5);
+        params.set("adxThreshold", 10.0);
+        params.set("rsiPeriod", 5);
+        params.set("rsiBullThreshold", 40.0);
+        params.set("rsiBearThreshold", 60.0);
+        params.set("maxPositionSize", 0.01);
+        params.set("maxOrderSize", 0.01);
+        params.set("orderCooldownSeconds", 1.0); // explicit default
+
+        EmaAdxRsiStrategy throttleStrategy = new EmaAdxRsiStrategy(Set.of(testSymbol), params);
+        throttleStrategy.initialize(context);
+        throttleStrategy.start();
+
+        // Feed a strong uptrend to generate buy signals — all within 1 second (no wait)
+        for (int i = 0; i < 30; i++) {
+            long price = 7_000_000_000_000L + (i * 10_000_000_000L);
+            throttleStrategy.onQuote(createBinanceQuote(price));
+        }
+
+        // Despite many quotes generating signals, cooldown should limit to at most 1 order
+        verify(context, atMost(1)).submitOrder(any());
+    }
+
+    @Test
+    void shouldAllowOrderAfterCooldownExpires() throws InterruptedException {
+        // Use a very short cooldown so the test doesn't take long
+        var params = new StrategyParameters();
+        params.set("fastEmaPeriod", 3);
+        params.set("slowEmaPeriod", 5);
+        params.set("adxPeriod", 5);
+        params.set("adxThreshold", 10.0);
+        params.set("rsiPeriod", 5);
+        params.set("rsiBullThreshold", 40.0);
+        params.set("rsiBearThreshold", 60.0);
+        params.set("maxPositionSize", 0.01);
+        params.set("maxOrderSize", 0.01);
+        params.set("orderCooldownSeconds", 0.05); // 50ms cooldown
+
+        EmaAdxRsiStrategy cooldownStrategy = new EmaAdxRsiStrategy(Set.of(testSymbol), params);
+        cooldownStrategy.initialize(context);
+        cooldownStrategy.start();
+
+        // Phase 1: generate first order via uptrend
+        for (int i = 0; i < 30; i++) {
+            long price = 7_000_000_000_000L + (i * 10_000_000_000L);
+            cooldownStrategy.onQuote(createBinanceQuote(price));
+        }
+        // At least one order should have been submitted
+        verify(context, atLeastOnce()).submitOrder(any());
+        int firstCount = mockingDetails(context).getInvocations().stream()
+                .filter(inv -> inv.getMethod().getName().equals("submitOrder"))
+                .toList().size();
+
+        // Wait for cooldown to expire
+        Thread.sleep(100);
+
+        // Phase 2: continue feeding quotes to trigger another order
+        for (int i = 30; i < 40; i++) {
+            long price = 7_000_000_000_000L + (i * 10_000_000_000L);
+            cooldownStrategy.onQuote(createBinanceQuote(price));
+        }
+
+        // Should have at least one more order after cooldown expired
+        int totalCount = mockingDetails(context).getInvocations().stream()
+                .filter(inv -> inv.getMethod().getName().equals("submitOrder"))
+                .toList().size();
+        assertTrue(totalCount > firstCount,
+                "Expected more orders after cooldown expired, got firstCount=" + firstCount + " totalCount=" + totalCount);
+    }
+
+    @Test
+    void shouldUseIocTimeInForce() {
+        // Use a strategy that will generate orders
+        var params = new StrategyParameters();
+        params.set("fastEmaPeriod", 3);
+        params.set("slowEmaPeriod", 5);
+        params.set("adxPeriod", 5);
+        params.set("adxThreshold", 10.0);
+        params.set("rsiPeriod", 5);
+        params.set("rsiBullThreshold", 40.0);
+        params.set("rsiBearThreshold", 60.0);
+        params.set("maxPositionSize", 0.01);
+        params.set("maxOrderSize", 0.01);
+
+        EmaAdxRsiStrategy iocStrategy = new EmaAdxRsiStrategy(Set.of(testSymbol), params);
+        iocStrategy.initialize(context);
+        iocStrategy.start();
+
+        // Feed a strong uptrend to trigger an order submission
+        for (int i = 0; i < 30; i++) {
+            long price = 7_000_000_000_000L + (i * 10_000_000_000L);
+            iocStrategy.onQuote(createBinanceQuote(price));
+        }
+
+        // Capture the submitted OrderRequest and verify IOC time-in-force
+        ArgumentCaptor<OrderRequest> captor = ArgumentCaptor.forClass(OrderRequest.class);
+        verify(context, atLeastOnce()).submitOrder(captor.capture());
+
+        OrderRequest submittedOrder = captor.getValue();
+        assertEquals(TimeInForce.IOC, submittedOrder.getTimeInForce(),
+                "Strategy orders should use IOC time-in-force");
     }
 
     private Quote createBinanceQuote(long midPrice) {

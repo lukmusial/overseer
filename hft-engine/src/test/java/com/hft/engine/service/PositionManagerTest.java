@@ -332,6 +332,69 @@ class PositionManagerTest {
         assertEquals(200_000L, totalPnlCents, "Total P&L should be $2,000 in cents");
     }
 
+    @Test
+    void reconcileQuantity_shouldSetCorrectScalesForBinance() {
+        Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
+
+        // Create a position first so reconcile updates it
+        positionManager.getOrCreatePosition(btc);
+        positionManager.reconcileQuantity(btc, 100_000_000L); // 1 BTC
+
+        Position position = positionManager.getPosition(btc);
+        assertNotNull(position);
+        assertEquals(100_000_000, position.getQuantityScale(),
+                "Binance quantityScale should be 100_000_000");
+        assertEquals(100_000_000, position.getPriceScale(),
+                "Binance priceScale should be 100_000_000");
+        assertEquals(100_000_000L, position.getQuantity());
+    }
+
+    @Test
+    void reconcileQuantity_shouldDetectAndCorrectDrift() {
+        Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
+
+        // Set up a position with quantity 1000 (internal)
+        Position position = positionManager.getOrCreatePosition(btc);
+        position.setQuantity(1000L);
+
+        // Reconcile to actual exchange quantity of 500
+        positionManager.reconcileQuantity(btc, 500L);
+
+        assertEquals(500L, positionManager.getPosition(btc).getQuantity(),
+                "Position quantity should be corrected to match exchange");
+    }
+
+    @Test
+    void reconcileQuantity_shouldCreatePositionWhenMissing() {
+        Symbol btc = new Symbol("BTCUSDT", Exchange.BINANCE);
+
+        // No position exists yet — reconcile should create one
+        assertNull(positionManager.getPosition(btc));
+
+        positionManager.reconcileQuantity(btc, 50_000_000L); // 0.5 BTC
+
+        Position position = positionManager.getPosition(btc);
+        assertNotNull(position, "Position should be created during reconciliation");
+        assertEquals(50_000_000L, position.getQuantity());
+        assertEquals(100_000_000, position.getQuantityScale());
+        assertEquals(100_000_000, position.getPriceScale());
+    }
+
+    @Test
+    void reconcileQuantity_shouldSetCorrectScalesForAlpaca() {
+        Symbol aapl = new Symbol("AAPL", Exchange.ALPACA);
+
+        positionManager.reconcileQuantity(aapl, 100L);
+
+        Position position = positionManager.getPosition(aapl);
+        assertNotNull(position);
+        assertEquals(1, position.getQuantityScale(),
+                "Alpaca quantityScale should be 1");
+        assertEquals(100, position.getPriceScale(),
+                "Alpaca priceScale should be 100 (cents)");
+        assertEquals(100L, position.getQuantity());
+    }
+
     private Trade createTrade(Symbol symbol, OrderSide side, long quantity, long price) {
         return createTrade(symbol, side, quantity, price, 100);
     }
