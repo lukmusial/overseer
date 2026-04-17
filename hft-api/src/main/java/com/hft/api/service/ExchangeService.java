@@ -843,6 +843,18 @@ public class ExchangeService {
                         && exchangeBalances.containsKey(sym.baseAsset())) {
                     Symbol coreSymbol = new Symbol(sym.symbol(), Exchange.BINANCE);
                     long exchangeQty = exchangeBalances.get(sym.baseAsset());
+                    var position = positionManager.getPosition(coreSymbol);
+                    long internalQty = position != null ? position.getQuantity() : 0;
+                    if (internalQty != exchangeQty) {
+                        double internalHuman = internalQty / 100_000_000.0;
+                        double exchangeHuman = exchangeQty / 100_000_000.0;
+                        String msg = String.format(
+                                "Position drift on %s: internal=%.8f, exchange=%.8f — reconciled to exchange value",
+                                sym.symbol(), internalHuman, exchangeHuman);
+                        log.warn(msg);
+                        messagingTemplate.convertAndSend("/topic/notifications",
+                                Map.of("type", "POSITION_DRIFT", "message", msg, "timestamp", System.currentTimeMillis()));
+                    }
                     positionManager.reconcileQuantity(coreSymbol, exchangeQty);
                 }
             }
