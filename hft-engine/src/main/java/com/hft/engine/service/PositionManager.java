@@ -293,17 +293,27 @@ public class PositionManager {
      * Adjusts the internal position to match reality without affecting realized P&L.
      */
     public void reconcileQuantity(Symbol symbol, long actualQuantity) {
+        // Derive scales from exchange
+        int quantityScale = symbol.getExchange().getQuantityScale();
+        int priceScale = quantityScale > 1 ? quantityScale : 100; // crypto uses same scale for both
+
         Position position = positions.get(symbol);
         if (position == null) {
             if (actualQuantity != 0) {
                 // Position exists on exchange but not internally — create it
                 position = getOrCreatePosition(symbol);
+                position.setQuantityScale(quantityScale);
+                position.setPriceScale(priceScale);
                 position.setQuantity(actualQuantity);
                 log.warn("Reconcile: created missing position {} qty={}", symbol, actualQuantity);
                 notifyListeners(position);
             }
             return;
         }
+
+        // Ensure scales are correct (may have been created with defaults)
+        position.setQuantityScale(quantityScale);
+        position.setPriceScale(priceScale);
 
         long currentQty = position.getQuantity();
         if (currentQty == actualQuantity) {
