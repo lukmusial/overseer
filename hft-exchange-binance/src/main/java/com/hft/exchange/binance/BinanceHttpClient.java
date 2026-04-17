@@ -34,6 +34,7 @@ public class BinanceHttpClient {
     private final ThreadLocal<Mac> hmacSigner;
     private final ConcurrentHashMap<String, BinanceSymbolFilters> symbolFiltersCache = new ConcurrentHashMap<>();
     private volatile boolean filtersLoaded = false;
+    private final BinanceOrderRateLimiter orderRateLimiter = new BinanceOrderRateLimiter();
 
     /**
      * Offset in milliseconds to add to local clock to match Binance server time.
@@ -69,6 +70,13 @@ public class BinanceHttpClient {
 
     public ObjectMapper getObjectMapper() {
         return objectMapper;
+    }
+
+    /**
+     * Returns the shared order rate limiter (50 orders per 10 seconds).
+     */
+    public BinanceOrderRateLimiter getOrderRateLimiter() {
+        return orderRateLimiter;
     }
 
     /**

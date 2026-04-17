@@ -29,6 +29,9 @@ class BinanceWebSocketOrderPortTest {
     @BeforeEach
     void setUp() {
         config = BinanceConfig.testnet("test-api-key", "test-secret-key");
+        // Stub rate limiter to always allow (tests focus on other validation)
+        BinanceOrderRateLimiter rateLimiter = new BinanceOrderRateLimiter();
+        lenient().when(httpClient.getOrderRateLimiter()).thenReturn(rateLimiter);
         port = new BinanceWebSocketOrderPort(config, httpClient);
     }
 

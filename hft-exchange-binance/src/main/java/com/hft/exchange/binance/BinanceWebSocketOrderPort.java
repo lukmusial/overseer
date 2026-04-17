@@ -219,6 +219,13 @@ public class BinanceWebSocketOrderPort implements OrderPort {
                     new IllegalStateException("Not connected to Binance WebSocket API"));
         }
 
+        // Check rate limit before sending
+        if (!httpClient.getOrderRateLimiter().tryAcquire()) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setRejectReason("Rate limit exceeded (50 orders/10s)");
+            return CompletableFuture.completedFuture(order);
+        }
+
         long submitTime = System.nanoTime();
 
         // Validate against exchange filters before sending

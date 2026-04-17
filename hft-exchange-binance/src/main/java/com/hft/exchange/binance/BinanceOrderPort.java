@@ -29,6 +29,13 @@ public class BinanceOrderPort implements OrderPort {
 
     @Override
     public CompletableFuture<Order> submitOrder(Order order) {
+        // Check rate limit before sending
+        if (!httpClient.getOrderRateLimiter().tryAcquire()) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setRejectReason("Rate limit exceeded (50 orders/10s)");
+            return CompletableFuture.completedFuture(order);
+        }
+
         long submitTime = System.nanoTime();
         BinanceSymbolFilters filters = httpClient.getSymbolFilters(order.getSymbol().getTicker());
 
