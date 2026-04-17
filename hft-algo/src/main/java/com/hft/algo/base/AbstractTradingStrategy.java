@@ -10,6 +10,7 @@ import org.agrona.collections.Object2LongHashMap;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -47,6 +48,7 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
     protected final Map<Symbol, Quote> latestQuotes = new ConcurrentHashMap<>();
 
     // Execution tracking
+    private final Map<Symbol, Long> lastOrderTimeMs = new ConcurrentHashMap<>();
     protected final AtomicLong ordersSubmitted = new AtomicLong(0);
     protected final AtomicLong filledOrders = new AtomicLong(0);
     protected final AtomicLong cancelledOrders = new AtomicLong(0);
@@ -376,6 +378,14 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
             return;
         }
 
+        // Enforce per-symbol order cooldown (default 1 second) to avoid exchange rate limits
+        long nowMs = System.currentTimeMillis();
+        long cooldownMs = (long) (parameters.getDouble("orderCooldownSeconds", 1.0) * 1000);
+        Long lastTime = lastOrderTimeMs.get(symbol);
+        if (lastTime != null && nowMs - lastTime < cooldownMs) {
+            return;
+        }
+
         Quote quote = latestQuotes.get(symbol);
         if (quote == null) {
             return;
@@ -419,6 +429,7 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
                     .build();
 
             context.submitOrder(request);
+            lastOrderTimeMs.put(symbol, System.currentTimeMillis());
             ordersSubmitted.incrementAndGet();
         }
     }
