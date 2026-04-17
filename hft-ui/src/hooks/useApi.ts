@@ -7,6 +7,7 @@ import type {
   CreateOrderRequest,
   CreateStrategyRequest,
   ExchangeStatus,
+  AccountBalance,
   TradingSymbol,
   ChartData,
   RiskLimits,
@@ -150,6 +151,14 @@ export function useApi() {
     return fetchJson<ExchangeStatus[]>(`${API_BASE}/exchanges/status`);
   }, []);
 
+  const getAccountBalance = useCallback(async (exchange: string): Promise<AccountBalance | null> => {
+    try {
+      return await fetchJson<AccountBalance>(`${API_BASE}/exchanges/${exchange}/account`);
+    } catch {
+      return null;
+    }
+  }, []);
+
   const switchMode = useCallback(async (exchange: string, mode: string): Promise<ExchangeStatus> => {
     return fetchJson<ExchangeStatus>(`${API_BASE}/exchanges/${exchange}/mode`, {
       method: 'PUT',
@@ -209,6 +218,7 @@ export function useApi() {
     stopStrategy,
     removeStrategy,
     getExchangeStatus,
+    getAccountBalance,
     switchMode,
     getSymbols,
     getStrategyTypes,

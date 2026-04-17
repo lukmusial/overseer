@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import type { ExchangeStatus } from '../types/api';
+import { useState, useEffect, useCallback } from 'react';
+import type { ExchangeStatus, AccountBalance } from '../types/api';
 import { EXCHANGE_MODES } from '../types/api';
+import { useApi } from '../hooks/useApi';
 
 interface Props {
   exchanges: ExchangeStatus[];
@@ -20,6 +21,23 @@ function formatLastHeartbeat(timestamp: number | null): string {
 export function ExchangeStatusPanel({ exchanges, onSwitchMode }: Props) {
   const [switchingExchange, setSwitchingExchange] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [balances, setBalances] = useState<Record<string, AccountBalance | null>>({});
+  const { getAccountBalance } = useApi();
+
+  const fetchBalances = useCallback(async () => {
+    for (const ex of exchanges) {
+      if (ex.authenticated && ex.mode !== 'stub') {
+        const balance = await getAccountBalance(ex.exchange);
+        setBalances((prev) => ({ ...prev, [ex.exchange]: balance }));
+      }
+    }
+  }, [exchanges, getAccountBalance]);
+
+  useEffect(() => {
+    fetchBalances();
+    const interval = setInterval(fetchBalances, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchBalances]);
 
   const handleModeChange = async (exchange: string, newMode: string) => {
     if (!onSwitchMode) return;
@@ -100,6 +118,16 @@ export function ExchangeStatusPanel({ exchanges, onSwitchMode }: Props) {
                   </div>
                 )}
               </div>
+              {balances[exchange.exchange] && (
+                <div className="exchange-balances">
+                  {balances[exchange.exchange]!.balances.map((b) => (
+                    <div key={b.asset} className="balance-item">
+                      <span className="balance-asset">{b.asset}</span>
+                      <span className="balance-value">{b.total}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

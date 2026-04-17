@@ -2,6 +2,7 @@
 
 val okhttpVersion: String by project
 val jacksonVersion: String by project
+val jsoniterVersion: String by project
 
 dependencies {
     implementation(project(":hft-core"))

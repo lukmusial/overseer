@@ -13,6 +13,9 @@ public record BinanceConfig(
     public static final String TESTNET_BASE_URL = "https://testnet.binance.vision";
     public static final String LIVE_STREAM_URL = "wss://stream.binance.com:9443";
     public static final String TESTNET_STREAM_URL = "wss://stream.testnet.binance.vision";
+    // WebSocket API for trading (order placement/cancellation)
+    public static final String LIVE_WS_API_URL = "wss://ws-api.binance.com:443/ws-api/v3";
+    public static final String TESTNET_WS_API_URL = "wss://testnet.binance.vision/ws-api/v3";
 
     public BinanceConfig {
         if (apiKey == null || apiKey.isBlank()) {
@@ -49,5 +52,12 @@ public record BinanceConfig(
      */
     public String getStreamUrl() {
         return testnet ? TESTNET_STREAM_URL : LIVE_STREAM_URL;
+    }
+
+    /**
+     * Returns the WebSocket API URL for trading operations (order placement/cancellation).
+     */
+    public String getWsApiUrl() {
+        return testnet ? TESTNET_WS_API_URL : LIVE_WS_API_URL;
     }
 }

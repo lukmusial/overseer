@@ -8,6 +8,8 @@ import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.hft.core.util.FastDecimalParser;
+
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
@@ -15,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -28,6 +31,16 @@ public class BinanceHttpClient {
     private final BinanceConfig config;
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final ThreadLocal<Mac> hmacSigner;
+    private final ConcurrentHashMap<String, BinanceSymbolFilters> symbolFiltersCache = new ConcurrentHashMap<>();
+    private volatile boolean filtersLoaded = false;
+
+    /**
+     * Offset in milliseconds to add to local clock to match Binance server time.
+     * Computed once via {@link #syncServerTime()} and reused for all signed requests.
+     */
+    private volatile long serverTimeOffsetMs = 0;
+    private volatile boolean timeSynced = false;
 
     public BinanceHttpClient(BinanceConfig config) {
         this.config = config;
@@ -39,10 +52,59 @@ public class BinanceHttpClient {
 
         this.objectMapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        // Pre-initialize HMAC signer
+        SecretKeySpec keySpec = new SecretKeySpec(
+                config.secretKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        this.hmacSigner = ThreadLocal.withInitial(() -> {
+            try {
+                Mac mac = Mac.getInstance("HmacSHA256");
+                mac.init(keySpec);
+                return mac;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to initialize HMAC signer", e);
+            }
+        });
     }
 
     public ObjectMapper getObjectMapper() {
         return objectMapper;
+    }
+
+    /**
+     * Syncs local clock with Binance server time and stores the offset.
+     * Called automatically on first signed request if not already synced.
+     */
+    public void syncServerTime() {
+        try {
+            String url = config.getBaseUrl() + "/api/v3/time";
+            Request request = new Request.Builder().url(url).get().build();
+            long beforeMs = System.currentTimeMillis();
+            try (Response response = httpClient.newCall(request).execute()) {
+                long afterMs = System.currentTimeMillis();
+                if (response.isSuccessful() && response.body() != null) {
+                    JsonNode node = objectMapper.readTree(response.body().string());
+                    long serverTime = node.path("serverTime").asLong();
+                    // Estimate server time at midpoint of request
+                    long localMidpoint = (beforeMs + afterMs) / 2;
+                    serverTimeOffsetMs = serverTime - localMidpoint;
+                    timeSynced = true;
+                    log.info("Binance server time synced: offset={}ms", serverTimeOffsetMs);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to sync Binance server time: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the current timestamp adjusted to Binance server time.
+     */
+    public long getServerTimestamp() {
+        if (!timeSynced) {
+            syncServerTime();
+        }
+        return System.currentTimeMillis() + serverTimeOffsetMs;
     }
 
     /**
@@ -149,8 +211,8 @@ public class BinanceHttpClient {
     }
 
     private String buildSignedQueryString(Map<String, String> params) {
-        // Add timestamp
-        params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        // Add timestamp adjusted for server time offset
+        params.put("timestamp", String.valueOf(getServerTimestamp()));
 
         // Build query string
         String queryString = params.entrySet().stream()
@@ -164,10 +226,7 @@ public class BinanceHttpClient {
 
     private String sign(String data) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(
-                    config.secretKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            mac.init(secretKeySpec);
+            Mac mac = hmacSigner.get();
             byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
@@ -233,6 +292,68 @@ public class BinanceHttpClient {
      */
     public CompletableFuture<BinanceExchangeInfo> getExchangeInfo() {
         return publicGet("/api/v3/exchangeInfo", BinanceExchangeInfo.class);
+    }
+
+    /**
+     * Returns the cached symbol filters for the given ticker.
+     * Loads exchange info on first call (blocking).
+     */
+    public BinanceSymbolFilters getSymbolFilters(String ticker) {
+        if (!filtersLoaded) {
+            loadSymbolFilters();
+        }
+        return symbolFiltersCache.getOrDefault(ticker, BinanceSymbolFilters.DEFAULT);
+    }
+
+    /**
+     * Loads symbol filters from exchange info and caches them.
+     * Parses LOT_SIZE and PRICE_FILTER from each symbol's filters array.
+     */
+    private void loadSymbolFilters() {
+        try {
+            String url = config.getBaseUrl() + "/api/v3/exchangeInfo";
+            Request request = new Request.Builder().url(url).get().build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    log.warn("Failed to load exchange info for symbol filters: {}", response.code());
+                    filtersLoaded = true;
+                    return;
+                }
+
+                JsonNode root = objectMapper.readTree(response.body().string());
+                JsonNode symbols = root.path("symbols");
+                if (symbols.isArray()) {
+                    for (JsonNode sym : symbols) {
+                        String ticker = sym.path("symbol").asText();
+                        JsonNode filters = sym.path("filters");
+                        if (!filters.isArray()) continue;
+
+                        long stepSize = 1, minQty = 0, tickSize = 1, minNotional = 0;
+                        for (JsonNode filter : filters) {
+                            String filterType = filter.path("filterType").asText();
+                            if ("LOT_SIZE".equals(filterType)) {
+                                stepSize = FastDecimalParser.parseDecimal(
+                                        filter.path("stepSize").asText("0.00000001"), 8);
+                                minQty = FastDecimalParser.parseDecimal(
+                                        filter.path("minQty").asText("0"), 8);
+                            } else if ("PRICE_FILTER".equals(filterType)) {
+                                tickSize = FastDecimalParser.parseDecimal(
+                                        filter.path("tickSize").asText("0.00000001"), 8);
+                            } else if ("NOTIONAL".equals(filterType) || "MIN_NOTIONAL".equals(filterType)) {
+                                minNotional = FastDecimalParser.parseDecimal(
+                                        filter.path("minNotional").asText("0"), 8);
+                            }
+                        }
+                        symbolFiltersCache.put(ticker, new BinanceSymbolFilters(stepSize, minQty, tickSize, minNotional));
+                    }
+                    log.info("Loaded symbol filters for {} symbols", symbolFiltersCache.size());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load symbol filters: {}", e.getMessage());
+        }
+        filtersLoaded = true;
     }
 
     /**

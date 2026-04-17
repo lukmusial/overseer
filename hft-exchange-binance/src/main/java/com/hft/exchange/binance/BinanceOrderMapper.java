@@ -1,6 +1,7 @@
 package com.hft.exchange.binance;
 
 import com.hft.core.model.*;
+import com.hft.core.util.FastDecimalParser;
 import com.hft.exchange.binance.dto.BinanceOrder;
 
 import java.math.BigDecimal;
@@ -65,14 +66,21 @@ public class BinanceOrderMapper {
     }
 
     /**
-     * Builds request parameters for a new order.
+     * Builds request parameters for a new order (no filter rounding).
      */
     public static Map<String, String> toRequestParams(Order order) {
+        return toRequestParams(order, BinanceSymbolFilters.DEFAULT);
+    }
+
+    /**
+     * Builds request parameters for a new order, applying LOT_SIZE and PRICE_FILTER rounding.
+     */
+    public static Map<String, String> toRequestParams(Order order, BinanceSymbolFilters filters) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("symbol", order.getSymbol().getTicker());
         params.put("side", formatSide(order.getSide()));
         params.put("type", formatType(order.getType()));
-        params.put("quantity", formatQuantity(order.getQuantity()));
+        params.put("quantity", formatQuantity(filters.roundQuantity(order.getQuantity())));
         params.put("newClientOrderId", String.valueOf(order.getClientOrderId()));
 
         if (order.getTimeInForce() != null && order.getType() == OrderType.LIMIT) {
@@ -80,11 +88,11 @@ public class BinanceOrderMapper {
         }
 
         if (order.getType() == OrderType.LIMIT || order.getType() == OrderType.STOP_LIMIT) {
-            params.put("price", formatPrice(order.getPrice()));
+            params.put("price", formatPrice(filters.roundPrice(order.getPrice())));
         }
 
         if (order.getType() == OrderType.STOP || order.getType() == OrderType.STOP_LIMIT) {
-            params.put("stopPrice", formatPrice(order.getStopPrice()));
+            params.put("stopPrice", formatPrice(filters.roundPrice(order.getStopPrice())));
         }
 
         return params;
@@ -159,25 +167,18 @@ public class BinanceOrderMapper {
     }
 
     private static long parsePrice(String price) {
-        if (price == null || price.isBlank()) return 0;
-        BigDecimal bd = new BigDecimal(price);
-        return bd.multiply(BigDecimal.valueOf(PRICE_SCALE)).longValue();
+        return FastDecimalParser.parseDecimal(price, 8, 0);
     }
 
     private static long parseQuantity(String qty) {
-        if (qty == null || qty.isBlank()) return 0;
-        BigDecimal bd = new BigDecimal(qty);
-        // Quantity typically in whole units, scale by 100_000_000 for sub-unit precision
-        return bd.multiply(BigDecimal.valueOf(100_000_000)).longValue();
+        return FastDecimalParser.parseDecimal(qty, 8, 0);
     }
 
     private static String formatPrice(long price) {
-        BigDecimal bd = BigDecimal.valueOf(price).divide(BigDecimal.valueOf(PRICE_SCALE));
-        return bd.stripTrailingZeros().toPlainString();
+        return FastDecimalParser.formatDecimal(price, 8);
     }
 
     private static String formatQuantity(long quantity) {
-        BigDecimal bd = BigDecimal.valueOf(quantity).divide(BigDecimal.valueOf(100_000_000));
-        return bd.stripTrailingZeros().toPlainString();
+        return FastDecimalParser.formatDecimal(quantity, 8);
     }
 }

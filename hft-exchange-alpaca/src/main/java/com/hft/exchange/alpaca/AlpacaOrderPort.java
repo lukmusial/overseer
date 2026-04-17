@@ -40,6 +40,8 @@ public class AlpacaOrderPort implements OrderPort {
                     result.setClientOrderId(order.getClientOrderId());
                     result.setSubmittedAt(submitTime);
                     result.setAcceptedAt(System.nanoTime());
+                    result.setPriceScale(order.getPriceScale());
+                    result.strategyId(order.getStrategyId());
 
                     log.debug("Order submitted: {} -> {}", order.getClientOrderId(), result.getExchangeOrderId());
                     notifyListeners(result, OrderStatus.PENDING, result.getStatus());

@@ -54,6 +54,19 @@ Feature: Order Lifecycle Management
     Then the order should be in "REJECTED" status
     And the rejection should be recorded in metrics
 
+  Scenario: Rejected order preserves reject reason
+    Given I have a symbol "AAPL" on exchange "ALPACA"
+    And I submit a market order to buy 100 shares
+    When the exchange rejects the order with reason "Insufficient balance"
+    Then the order should be in "REJECTED" status
+    And the order reject reason should be "Insufficient balance"
+
+  Scenario: Order below minimum notional is not submitted
+    Given I have a symbol "BTCUSDT" on exchange "BINANCE"
+    And the strategy has parameter "minOrderNotional" set to "10.0"
+    When the strategy calculates an order with notional value below minimum
+    Then no order should be submitted
+
   @performance
   Scenario: High volume order submission
     Given I have a symbol "AAPL" on exchange "ALPACA"

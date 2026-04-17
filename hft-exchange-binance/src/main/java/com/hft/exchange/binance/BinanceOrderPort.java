@@ -30,7 +30,17 @@ public class BinanceOrderPort implements OrderPort {
     @Override
     public CompletableFuture<Order> submitOrder(Order order) {
         long submitTime = System.nanoTime();
-        Map<String, String> params = BinanceOrderMapper.toRequestParams(order);
+        BinanceSymbolFilters filters = httpClient.getSymbolFilters(order.getSymbol().getTicker());
+
+        // Validate against exchange filters before sending
+        String validationError = filters.validate(order.getQuantity(), order.getPrice());
+        if (validationError != null) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setRejectReason(validationError);
+            return CompletableFuture.completedFuture(order);
+        }
+
+        Map<String, String> params = BinanceOrderMapper.toRequestParams(order, filters);
 
         return httpClient.signedPost("/api/v3/order", params, BinanceOrder.class)
                 .thenApply(binanceOrder -> {
@@ -38,17 +48,12 @@ public class BinanceOrderPort implements OrderPort {
                     result.setClientOrderId(order.getClientOrderId());
                     result.setSubmittedAt(submitTime);
                     result.setAcceptedAt(System.nanoTime());
+                    result.setPriceScale(order.getPriceScale());
+                    result.strategyId(order.getStrategyId());
 
                     log.debug("Order submitted: {} -> {}", order.getClientOrderId(), result.getExchangeOrderId());
                     notifyListeners(result, OrderStatus.PENDING, result.getStatus());
                     return result;
-                })
-                .exceptionally(e -> {
-                    log.error("Failed to submit order: {}", order.getClientOrderId(), e);
-                    order.setStatus(OrderStatus.REJECTED);
-                    order.setRejectReason(e.getMessage());
-                    notifyListeners(order, OrderStatus.PENDING, OrderStatus.REJECTED);
-                    throw new RuntimeException(e);
                 });
     }
 

@@ -9,10 +9,15 @@ import com.hft.core.model.Trade;
 import com.hft.core.port.MarketDataPort;
 import com.hft.exchange.alpaca.dto.AlpacaQuote;
 import com.hft.exchange.alpaca.dto.AlpacaTrade;
+import com.hft.exchange.alpaca.parser.AlpacaMessageParser;
+import com.hft.exchange.alpaca.parser.JacksonAlpacaParser;
+import com.hft.exchange.alpaca.parser.ManualAlpacaParser;
+import com.hft.exchange.alpaca.parser.StreamingAlpacaParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
+import com.hft.core.model.ObjectPool;
+import com.hft.core.util.FastDecimalParser;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -46,13 +51,42 @@ public class AlpacaMarketDataPort implements MarketDataPort {
     // Last known sequence numbers per symbol
     private final Map<String, Long> lastSequence = new ConcurrentHashMap<>();
 
+    // Symbol cache to avoid per-quote Symbol allocation + hash computation
+    private final Map<String, Symbol> symbolCache = new ConcurrentHashMap<>();
+
+    // Quote pool to avoid per-quote heap allocation
+    private final ObjectPool<Quote> quotePool = new ObjectPool<>(Quote::new, 256);
+
+    // Configurable message parser strategy
+    private final AlpacaMessageParser messageParser;
+
+    /** Parser modes: MANUAL (fastest, default), STREAMING (Jackson pull-parser), JACKSON (legacy tree). */
+    public enum ParserMode { MANUAL, STREAMING, JACKSON }
+
     public AlpacaMarketDataPort(AlpacaHttpClient httpClient, AlpacaWebSocketClient webSocketClient) {
+        this(httpClient, webSocketClient, ParserMode.MANUAL);
+    }
+
+    public AlpacaMarketDataPort(AlpacaHttpClient httpClient, AlpacaWebSocketClient webSocketClient, ParserMode parserMode) {
         this.httpClient = httpClient;
         this.webSocketClient = webSocketClient;
+        this.messageParser = switch (parserMode) {
+            case MANUAL -> new ManualAlpacaParser();
+            case STREAMING -> new StreamingAlpacaParser();
+            case JACKSON -> new JacksonAlpacaParser();
+        };
 
-        // Register for WebSocket callbacks
-        webSocketClient.addQuoteListener(this::handleQuoteMessage);
-        webSocketClient.addTradeListener(this::handleTradeMessage);
+        if (parserMode == ParserMode.JACKSON) {
+            // Legacy path: use Jackson JsonNode listeners
+            webSocketClient.addQuoteListener(this::handleQuoteMessage);
+            webSocketClient.addTradeListener(this::handleTradeMessage);
+        } else {
+            // Fast path: use raw string listeners (bypass Jackson tree in WebSocket client)
+            webSocketClient.addRawQuoteListener(this::handleRawQuoteMessage);
+            webSocketClient.addRawTradeListener(this::handleRawTradeMessage);
+        }
+
+        log.info("AlpacaMarketDataPort using {} parser", messageParser.name());
     }
 
     @Override
@@ -166,9 +200,9 @@ public class AlpacaMarketDataPort implements MarketDataPort {
 
         try {
             String ticker = node.path("S").asText();
-            Symbol symbol = new Symbol(ticker, Exchange.ALPACA);
+            Symbol symbol = symbolCache.computeIfAbsent(ticker, t -> new Symbol(t, Exchange.ALPACA));
 
-            Quote quote = new Quote();
+            Quote quote = quotePool.acquire();
             quote.setSymbol(symbol);
             quote.setBidPrice(parsePrice(node.path("bp").asText()));
             quote.setAskPrice(parsePrice(node.path("ap").asText()));
@@ -196,6 +230,7 @@ public class AlpacaMarketDataPort implements MarketDataPort {
             }
 
             notifyQuoteListeners(quote);
+            quotePool.release(quote);
         } catch (Exception e) {
             log.error("Error processing quote message", e);
         }
@@ -207,7 +242,7 @@ public class AlpacaMarketDataPort implements MarketDataPort {
 
         try {
             String ticker = node.path("S").asText();
-            Symbol symbol = new Symbol(ticker, Exchange.ALPACA);
+            Symbol symbol = symbolCache.computeIfAbsent(ticker, t -> new Symbol(t, Exchange.ALPACA));
 
             Trade trade = new Trade();
             trade.setSymbol(symbol);
@@ -241,6 +276,96 @@ public class AlpacaMarketDataPort implements MarketDataPort {
         }
     }
 
+    /**
+     * Fast-path handler for raw quote messages (bypasses Jackson tree entirely).
+     */
+    private void handleRawQuoteMessage(String rawJson) {
+        long receiveTime = System.nanoTime();
+        quotesReceived.incrementAndGet();
+
+        try {
+            AlpacaMessageParser.QuoteFields fields = messageParser.parseQuote(rawJson);
+            if (fields == null) {
+                log.warn("Failed to parse raw quote message");
+                return;
+            }
+
+            Symbol symbol = symbolCache.computeIfAbsent(fields.symbol(), t -> new Symbol(t, Exchange.ALPACA));
+
+            Quote quote = quotePool.acquire();
+            quote.setSymbol(symbol);
+            quote.setBidPrice(fields.bidPrice());
+            quote.setAskPrice(fields.askPrice());
+            quote.setBidSize(fields.bidSize());
+            quote.setAskSize(fields.askSize());
+
+            if (fields.timestamp() != null && !fields.timestamp().isEmpty()) {
+                Instant instant = Instant.parse(fields.timestamp());
+                quote.setTimestamp(instant.toEpochMilli() * 1_000_000);
+            }
+
+            quote.setReceivedAt(receiveTime);
+
+            if (quote.getTimestamp() > 0) {
+                long latency = receiveTime - quote.getTimestamp();
+                quoteLatency.record(latency);
+                if (latency > 1_000_000_000L) {
+                    staleQuoteCount.incrementAndGet();
+                }
+            }
+
+            notifyQuoteListeners(quote);
+            quotePool.release(quote);
+        } catch (Exception e) {
+            log.error("Error processing raw quote message", e);
+        }
+    }
+
+    /**
+     * Fast-path handler for raw trade messages.
+     */
+    private void handleRawTradeMessage(String rawJson) {
+        long receiveTime = System.nanoTime();
+        tradesReceived.incrementAndGet();
+
+        try {
+            AlpacaMessageParser.TradeFields fields = messageParser.parseTrade(rawJson);
+            if (fields == null) {
+                log.warn("Failed to parse raw trade message");
+                return;
+            }
+
+            String ticker = fields.symbol();
+            Symbol symbol = symbolCache.computeIfAbsent(ticker, t -> new Symbol(t, Exchange.ALPACA));
+
+            Trade trade = new Trade();
+            trade.setSymbol(symbol);
+            trade.setPrice(fields.price());
+            trade.setQuantity(fields.quantity());
+
+            if (fields.timestamp() != null && !fields.timestamp().isEmpty()) {
+                Instant instant = Instant.parse(fields.timestamp());
+                trade.setExecutedAt(instant.toEpochMilli() * 1_000_000);
+            }
+
+            long tradeId = fields.tradeId();
+            Long lastId = lastSequence.get(ticker);
+            if (lastId != null && tradeId <= lastId) {
+                outOfSequenceCount.incrementAndGet();
+            }
+            lastSequence.put(ticker, tradeId);
+
+            if (trade.getExecutedAt() > 0) {
+                long latency = receiveTime - trade.getExecutedAt();
+                tradeLatency.record(latency);
+            }
+
+            notifyTradeListeners(trade);
+        } catch (Exception e) {
+            log.error("Error processing raw trade message", e);
+        }
+    }
+
     private Quote convertQuote(Symbol symbol, AlpacaQuote alpacaQuote) {
         Quote quote = new Quote();
         quote.setSymbol(symbol);
@@ -271,9 +396,7 @@ public class AlpacaMarketDataPort implements MarketDataPort {
     }
 
     private long parsePrice(String price) {
-        if (price == null || price.isBlank()) return 0;
-        BigDecimal bd = new BigDecimal(price);
-        return bd.multiply(BigDecimal.valueOf(PRICE_SCALE)).longValue();
+        return FastDecimalParser.parseDecimal(price, 2, 0);
     }
 
     private void notifyQuoteListeners(Quote quote) {

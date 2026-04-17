@@ -2,12 +2,15 @@ package com.hft.algo.strategy;
 
 import com.hft.algo.base.AlgorithmContext;
 import com.hft.algo.base.AlgorithmState;
+import com.hft.algo.base.StrategyParameters;
 import com.hft.core.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -167,6 +170,112 @@ class EmaAdxRsiStrategyTest {
         EmaAdxRsiStrategy defaultStrategy = new EmaAdxRsiStrategy(java.util.Set.of(testSymbol));
         defaultStrategy.initialize(context);
         assertEquals(AlgorithmState.INITIALIZED, defaultStrategy.getState());
+    }
+
+    @Test
+    void shouldSkipOrderWhenNotionalBelowMinimum() {
+        // BINANCE: quantityScale=100_000_000, priceScale=100_000_000
+        // BTC price range: $70k-$72.9k (7e12 to 7.29e12 in scaled units)
+        // maxPositionSize = 0.00001 BTC -> target = 1000 (scaled) at signal 1.0
+        // Max notional = 1000 * 7.29e12 / (1e8 * 1e8) = $0.73 < $10 default minimum
+        var params = new StrategyParameters();
+        params.set("fastEmaPeriod", 3);
+        params.set("slowEmaPeriod", 5);
+        params.set("adxPeriod", 5);
+        params.set("adxThreshold", 10.0);   // Low threshold so ADX triggers easily
+        params.set("rsiPeriod", 5);
+        params.set("rsiBullThreshold", 40.0); // Low so RSI confirms easily
+        params.set("rsiBearThreshold", 60.0);
+        params.set("maxPositionSize", 0.00001); // Tiny position: 1000 scaled units
+        params.set("maxOrderSize", 0.00001);
+
+        EmaAdxRsiStrategy smallStrategy = new EmaAdxRsiStrategy(Set.of(testSymbol), params);
+        smallStrategy.initialize(context);
+        smallStrategy.start();
+
+        // Feed a strong uptrend to generate a buy signal ($70k -> $72.9k, +$100/step)
+        for (int i = 0; i < 30; i++) {
+            long price = 7_000_000_000_000L + (i * 10_000_000_000L);
+            smallStrategy.onQuote(createBinanceQuote(price));
+        }
+
+        // The order should be skipped because notional ($0.73 max) is below $10
+        verify(context, never()).submitOrder(any());
+    }
+
+    @Test
+    void shouldSubmitOrderWhenNotionalAboveMinimum() {
+        // BINANCE: quantityScale=100_000_000, priceScale=100_000_000
+        // BTC price range: $70k-$72.9k
+        // maxPositionSize = 0.01 BTC -> target = 1_000_000 (scaled) at signal 1.0
+        // Min notional at $70k = 1_000_000 * 7e12 / 1e16 = $700 >> $10 minimum
+        // Even at signal 0.1: 100_000 * 7e12 / 1e16 = $70 > $10
+        var params = new StrategyParameters();
+        params.set("fastEmaPeriod", 3);
+        params.set("slowEmaPeriod", 5);
+        params.set("adxPeriod", 5);
+        params.set("adxThreshold", 10.0);
+        params.set("rsiPeriod", 5);
+        params.set("rsiBullThreshold", 40.0);
+        params.set("rsiBearThreshold", 60.0);
+        params.set("maxPositionSize", 0.01); // 1_000_000 scaled units
+        params.set("maxOrderSize", 0.01);
+
+        EmaAdxRsiStrategy largeStrategy = new EmaAdxRsiStrategy(Set.of(testSymbol), params);
+        largeStrategy.initialize(context);
+        largeStrategy.start();
+
+        // Feed a strong uptrend to generate a buy signal ($70k -> $72.9k, +$100/step)
+        for (int i = 0; i < 30; i++) {
+            long price = 7_000_000_000_000L + (i * 10_000_000_000L);
+            largeStrategy.onQuote(createBinanceQuote(price));
+        }
+
+        // The order should be submitted because notional well exceeds $10
+        verify(context, atLeastOnce()).submitOrder(any());
+    }
+
+    @Test
+    void shouldRespectCustomMinOrderNotional() {
+        // Same position size as "above minimum" test (0.01 BTC = 1_000_000 scaled)
+        // which passes the default $10 minimum.
+        // Set minOrderNotional = 5000.0 so orders are skipped.
+        // Max notional at $72.9k = 1_000_000 * 7.29e12 / 1e16 = $729 < $5000 -> skip
+        var params = new StrategyParameters();
+        params.set("fastEmaPeriod", 3);
+        params.set("slowEmaPeriod", 5);
+        params.set("adxPeriod", 5);
+        params.set("adxThreshold", 10.0);
+        params.set("rsiPeriod", 5);
+        params.set("rsiBullThreshold", 40.0);
+        params.set("rsiBearThreshold", 60.0);
+        params.set("maxPositionSize", 0.01); // 1_000_000 scaled units
+        params.set("maxOrderSize", 0.01);
+        params.set("minOrderNotional", 5000.0); // Custom: $5000 minimum
+
+        EmaAdxRsiStrategy customStrategy = new EmaAdxRsiStrategy(Set.of(testSymbol), params);
+        customStrategy.initialize(context);
+        customStrategy.start();
+
+        // Feed a strong uptrend to generate a buy signal ($70k -> $72.9k, +$100/step)
+        for (int i = 0; i < 30; i++) {
+            long price = 7_000_000_000_000L + (i * 10_000_000_000L);
+            customStrategy.onQuote(createBinanceQuote(price));
+        }
+
+        // The order should be skipped because max notional ($729) is below $5000 custom minimum
+        verify(context, never()).submitOrder(any());
+    }
+
+    private Quote createBinanceQuote(long midPrice) {
+        Quote quote = new Quote();
+        quote.setSymbol(testSymbol);
+        quote.setBidPrice(midPrice - 50_000_000L); // $0.50 spread
+        quote.setAskPrice(midPrice + 50_000_000L);
+        quote.setBidSize(100_000_000L);
+        quote.setAskSize(100_000_000L);
+        quote.setPriceScale(100_000_000);
+        return quote;
     }
 
     private Quote createQuote(long midPrice) {
