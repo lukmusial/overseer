@@ -3,6 +3,7 @@ package com.hft.algo.base;
 import com.hft.core.model.OrderSide;
 import com.hft.core.model.Quote;
 import com.hft.core.model.Symbol;
+import com.hft.core.model.TimeInForce;
 import com.hft.core.model.Trade;
 
 import org.agrona.collections.Object2LongHashMap;
@@ -413,6 +414,7 @@ public abstract class AbstractTradingStrategy implements TradingStrategy {
                     .side(side)
                     .quantity(quantity)
                     .price(price)
+                    .timeInForce(TimeInForce.IOC)
                     .algorithmId(id)
                     .build();
 
