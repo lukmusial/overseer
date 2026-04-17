@@ -3,6 +3,7 @@ package com.hft.algo.base;
 import com.hft.core.model.OrderSide;
 import com.hft.core.model.Quote;
 import com.hft.core.model.Symbol;
+import com.hft.core.model.TimeInForce;
 import com.hft.core.model.Trade;
 
 import java.util.UUID;
@@ -274,6 +275,7 @@ public abstract class AbstractExecutionAlgorithm implements ExecutionAlgorithm {
                 .side(side)
                 .quantity(quantity)
                 .price(price)
+                .timeInForce(TimeInForce.IOC)
                 .algorithmId(id)
                 .build();
 
