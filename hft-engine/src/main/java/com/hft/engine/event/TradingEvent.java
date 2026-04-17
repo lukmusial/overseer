@@ -5,42 +5,55 @@ import com.hft.core.model.*;
 /**
  * Main event type for the trading engine disruptor.
  * Mutable and reusable to avoid allocations.
+ *
+ * <p>Field layout is optimized for cache line efficiency:
+ * <ul>
+ *   <li>First cache line (~64 bytes): Hot fields accessed on every event — type, timestamp,
+ *       clientOrderId, symbol, side, orderType, price, quantity, priceScale</li>
+ *   <li>Second cache line: Order lifecycle fields — timeInForce, stopPrice, filledQuantity,
+ *       filledPrice, status, strategyId, exchangeOrderId</li>
+ *   <li>Third cache line: Quote/trade data and rarely-used fields</li>
+ * </ul>
+ *
+ * <p>Padding fields at the end prevent false sharing between adjacent ring buffer slots
+ * when the producer and consumer cores operate on neighboring events.
  */
 public class TradingEvent {
-    private EventType type;
-    private long sequenceId;
-    private long timestampNanos;
+    // === Cache line 1: Hot fields (accessed on every event type) ===
+    private EventType type;           // 4 bytes (enum reference compressed)
+    private int priceScale = 100;     // 4 bytes
+    private long timestampNanos;      // 8 bytes
+    private long clientOrderId;       // 8 bytes
+    private Symbol symbol;            // 8 bytes (reference)
+    private OrderSide side;           // 4 bytes
+    private OrderType orderType;      // 4 bytes
+    private long price;               // 8 bytes
+    private long quantity;            // 8 bytes
+    // ~56 bytes + object header (~16 bytes) = ~72 bytes
 
-    // Order data
-    private long clientOrderId;
-    private String exchangeOrderId;
-    private Symbol symbol;
-    private OrderSide side;
-    private OrderType orderType;
-    private OrderStatus status;
-    private TimeInForce timeInForce;
-    private long price;
+    // === Cache line 2: Order lifecycle fields ===
     private long stopPrice;
-    private long quantity;
     private long filledQuantity;
     private long filledPrice;
+    private OrderStatus status;
+    private TimeInForce timeInForce;
+    private String exchangeOrderId;
+    private String strategyId;
     private String rejectReason;
+    private long sequenceId;
 
-    // Quote data
+    // === Cache line 3: Quote/trade data ===
     private long bidPrice;
     private long askPrice;
     private long bidSize;
     private long askSize;
-
-    // Trade/Fill data
     private long tradeId;
     private long commission;
 
-    // Price scaling
-    private int priceScale = 100;
-
-    // Strategy reference
-    private String strategyId;
+    // === Padding to prevent false sharing between adjacent ring buffer slots ===
+    // Each slot should not share a cache line with its neighbor.
+    @SuppressWarnings("unused")
+    private long p1, p2, p3, p4, p5, p6;
 
     public void reset() {
         type = null;

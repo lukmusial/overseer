@@ -3,6 +3,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { ExchangeStatusPanel } from './ExchangeStatusPanel';
 import type { ExchangeStatus } from '../types/api';
 
+vi.mock('../hooks/useApi', () => ({
+  useApi: () => ({
+    getAccountBalance: vi.fn().mockResolvedValue(null),
+  }),
+}));
+
 const mockExchanges: ExchangeStatus[] = [
   {
     exchange: 'ALPACA',

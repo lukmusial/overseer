@@ -22,6 +22,7 @@ type CancelState = 'idle' | 'cancelling' | 'success' | 'error';
 
 export function OrderList({ orders, strategies, onCancel, maxOrders, showViewAll, onViewAll }: Props) {
   const [cancelStates, setCancelStates] = useState<Record<number, CancelState>>({});
+  const [expandedReasons, setExpandedReasons] = useState<Set<number>>(new Set());
 
   const handleCancel = useCallback(async (orderId: number) => {
     setCancelStates(prev => ({ ...prev, [orderId]: 'cancelling' }));
@@ -150,7 +151,23 @@ export function OrderList({ orders, strategies, onCancel, maxOrders, showViewAll
                   {order.status}
                 </span>
               </td>
-              <td className="reject-reason" title={order.rejectReason || undefined}>
+              <td
+                className={`reject-reason${expandedReasons.has(order.clientOrderId) ? ' expanded' : ''}`}
+                title={order.rejectReason || undefined}
+                onClick={() => {
+                  if (order.rejectReason) {
+                    setExpandedReasons(prev => {
+                      const next = new Set(prev);
+                      if (next.has(order.clientOrderId)) {
+                        next.delete(order.clientOrderId);
+                      } else {
+                        next.add(order.clientOrderId);
+                      }
+                      return next;
+                    });
+                  }
+                }}
+              >
                 {order.rejectReason || '-'}
               </td>
               <td className="actions-cell">

@@ -21,9 +21,13 @@ public class PositionManager {
     private final Map<Symbol, Position> positions;
     private final List<Consumer<Position>> positionListeners;
 
-    // Aggregate P&L tracking
+    // Aggregate P&L tracking (raw scaled units)
     private volatile long totalRealizedPnl;
     private volatile long totalUnrealizedPnl;
+
+    // Incrementally maintained P&L in cents (scale 100) for O(1) risk checks
+    private volatile long cachedRealizedPnlCents;
+    private volatile long cachedUnrealizedPnlCents;
 
     public PositionManager() {
         this.positions = new ConcurrentHashMap<>();
@@ -59,8 +63,13 @@ public class PositionManager {
         position.applyTrade(trade);
         long newRealizedPnl = position.getRealizedPnl();
 
-        // Update aggregate P&L
-        totalRealizedPnl += (newRealizedPnl - previousRealizedPnl);
+        // Update aggregate P&L (raw units)
+        long realizedDelta = newRealizedPnl - previousRealizedPnl;
+        totalRealizedPnl += realizedDelta;
+
+        // Update incremental cents cache: convert delta from position's scale to cents
+        int priceScale = position.getPriceScale();
+        cachedRealizedPnlCents += realizedDelta * 100 / priceScale;
 
         log.debug("Trade applied: {} {} {} @ {} -> Position: {} qty, realized P&L: {}",
                 trade.getSymbol(), trade.getSide(), trade.getQuantity(), trade.getPrice(),
@@ -79,8 +88,13 @@ public class PositionManager {
             position.updateMarketValue(marketPrice);
             long newUnrealized = position.getUnrealizedPnl();
 
-            // Update aggregate unrealized P&L
-            totalUnrealizedPnl += (newUnrealized - previousUnrealized);
+            // Update aggregate unrealized P&L (raw units)
+            long unrealizedDelta = newUnrealized - previousUnrealized;
+            totalUnrealizedPnl += unrealizedDelta;
+
+            // Update incremental cents cache
+            int priceScale = position.getPriceScale();
+            cachedUnrealizedPnlCents += unrealizedDelta * 100 / priceScale;
 
             notifyListeners(position);
         }
@@ -137,37 +151,41 @@ public class PositionManager {
 
     /**
      * Gets total realized P&L across all positions converted to cents (scale 100).
-     * Properly handles positions with different price scales.
+     * O(1) — uses incrementally maintained cache updated in applyTrade().
      */
     public long getTotalRealizedPnlCents() {
-        long totalCents = 0;
-        for (Position position : positions.values()) {
-            // Convert from position's scale to cents (scale 100)
-            // P&L / priceScale * 100 = P&L * 100 / priceScale
-            totalCents += position.getRealizedPnl() * 100 / position.getPriceScale();
-        }
-        return totalCents;
+        return cachedRealizedPnlCents;
     }
 
     /**
      * Gets total unrealized P&L across all positions converted to cents (scale 100).
-     * Properly handles positions with different price scales.
+     * O(1) — uses incrementally maintained cache updated in updateMarketValue().
      */
     public long getTotalUnrealizedPnlCents() {
-        long totalCents = 0;
-        for (Position position : positions.values()) {
-            // Convert from position's scale to cents (scale 100)
-            totalCents += position.getUnrealizedPnl() * 100 / position.getPriceScale();
-        }
-        return totalCents;
+        return cachedUnrealizedPnlCents;
     }
 
     /**
      * Gets total P&L (realized + unrealized) converted to cents (scale 100).
-     * Use this for risk limit comparisons where limits are in cents.
+     * O(1) — uses incrementally maintained caches for hot-path risk checks.
      */
     public long getTotalPnlCents() {
-        return getTotalRealizedPnlCents() + getTotalUnrealizedPnlCents();
+        return cachedRealizedPnlCents + cachedUnrealizedPnlCents;
+    }
+
+    /**
+     * Recalculates the P&L cents caches from scratch by iterating all positions.
+     * Use after bulk position restoration or to correct any accumulated rounding drift.
+     */
+    public void recalculatePnlCentsCache() {
+        long realizedCents = 0;
+        long unrealizedCents = 0;
+        for (Position position : positions.values()) {
+            realizedCents += position.getRealizedPnl() * 100 / position.getPriceScale();
+            unrealizedCents += position.getUnrealizedPnl() * 100 / position.getPriceScale();
+        }
+        cachedRealizedPnlCents = realizedCents;
+        cachedUnrealizedPnlCents = unrealizedCents;
     }
 
     /**
@@ -265,7 +283,45 @@ public class PositionManager {
         if (currentPrice > 0) {
             position.updateMarketValue(currentPrice);
         }
+        // Recalculate cents caches after each restoration to stay consistent
+        recalculatePnlCentsCache();
         log.info("Restored position: {} qty={} avgEntry={}", symbol, quantity, avgEntryPrice);
+    }
+
+    /**
+     * Reconciles a position's quantity with the actual exchange balance.
+     * Adjusts the internal position to match reality without affecting realized P&L.
+     */
+    public void reconcileQuantity(Symbol symbol, long actualQuantity) {
+        Position position = positions.get(symbol);
+        if (position == null) {
+            if (actualQuantity != 0) {
+                // Position exists on exchange but not internally — create it
+                position = getOrCreatePosition(symbol);
+                position.setQuantity(actualQuantity);
+                log.warn("Reconcile: created missing position {} qty={}", symbol, actualQuantity);
+                notifyListeners(position);
+            }
+            return;
+        }
+
+        long currentQty = position.getQuantity();
+        if (currentQty == actualQuantity) {
+            return; // Already in sync
+        }
+
+        log.warn("Reconcile: {} position drift detected: internal={} exchange={}, adjusting",
+                symbol, currentQty, actualQuantity);
+        position.setQuantity(actualQuantity);
+        if (actualQuantity == 0) {
+            position.setAverageEntryPrice(0);
+            position.setTotalCost(0);
+        }
+        if (position.getCurrentPrice() > 0) {
+            position.updateMarketValue(position.getCurrentPrice());
+        }
+        recalculatePnlCentsCache();
+        notifyListeners(position);
     }
 
     /**
@@ -275,6 +331,8 @@ public class PositionManager {
         positions.clear();
         totalRealizedPnl = 0;
         totalUnrealizedPnl = 0;
+        cachedRealizedPnlCents = 0;
+        cachedUnrealizedPnlCents = 0;
     }
 
     /**

@@ -14,6 +14,9 @@ public record AlpacaConfig(
     public static final String PAPER_TRADING_URL = "https://paper-api.alpaca.markets";
     public static final String MARKET_DATA_URL = "https://data.alpaca.markets";
     public static final String STREAM_URL = "wss://stream.data.alpaca.markets";
+    // Trading stream for real-time order updates (fills, cancellations)
+    public static final String LIVE_TRADING_STREAM_URL = "wss://api.alpaca.markets/stream";
+    public static final String PAPER_TRADING_STREAM_URL = "wss://paper-api.alpaca.markets/stream";
 
     public AlpacaConfig {
         if (apiKey == null || apiKey.isBlank()) {
@@ -60,5 +63,12 @@ public record AlpacaConfig(
      */
     public String getStreamUrl() {
         return STREAM_URL + "/v2/" + dataFeed;
+    }
+
+    /**
+     * Returns the WebSocket URL for trading updates stream (order fills, cancellations).
+     */
+    public String getTradingStreamUrl() {
+        return paperTrading ? PAPER_TRADING_STREAM_URL : LIVE_TRADING_STREAM_URL;
     }
 }

@@ -31,6 +31,7 @@ export function OrderHistory({ strategies }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedReasons, setExpandedReasons] = useState<Set<number>>(new Set());
 
   // Filters
   const [strategyId, setStrategyId] = useState('');
@@ -189,7 +190,23 @@ export function OrderHistory({ strategies }: Props) {
                         {order.status}
                       </span>
                     </td>
-                    <td className="reject-reason" title={order.rejectReason || undefined}>
+                    <td
+                      className={`reject-reason${expandedReasons.has(order.clientOrderId) ? ' expanded' : ''}`}
+                      title={order.rejectReason || undefined}
+                      onClick={() => {
+                        if (order.rejectReason) {
+                          setExpandedReasons(prev => {
+                            const next = new Set(prev);
+                            if (next.has(order.clientOrderId)) {
+                              next.delete(order.clientOrderId);
+                            } else {
+                              next.add(order.clientOrderId);
+                            }
+                            return next;
+                          });
+                        }
+                      }}
+                    >
                       {order.rejectReason || '-'}
                     </td>
                     <td>{order.createdAt > 0 ? new Date(order.createdAt).toLocaleString() : '-'}</td>

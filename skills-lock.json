@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "hft-quant-expert": {
+      "source": "kasyap1234/delta-go",
+      "sourceType": "github",
+      "computedHash": "fd38747f818735c22104888f993b8d6f929259a6e04ee58bed39142d7be86321"
+    }
+  }
+}

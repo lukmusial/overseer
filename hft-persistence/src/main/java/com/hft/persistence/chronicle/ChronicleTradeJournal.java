@@ -31,7 +31,7 @@ public class ChronicleTradeJournal implements TradeJournal {
     private static final Logger log = LoggerFactory.getLogger(ChronicleTradeJournal.class);
 
     private final ChronicleQueue queue;
-    private final ExcerptAppender appender;
+    private final ThreadLocal<ExcerptAppender> appender;
     private final AtomicLong tradeCount = new AtomicLong();
     private final Deque<Trade> recentTrades = new ConcurrentLinkedDeque<>();
     private final int maxRecentTrades;
@@ -47,7 +47,7 @@ public class ChronicleTradeJournal implements TradeJournal {
 
         this.queue = ChronicleQueue.singleBuilder(basePath.resolve("trades"))
                 .build();
-        this.appender = queue.createAppender();
+        this.appender = ThreadLocal.withInitial(queue::createAppender);
 
         // Count existing trades
         try (ExcerptTailer tailer = queue.createTailer()) {
@@ -64,7 +64,7 @@ public class ChronicleTradeJournal implements TradeJournal {
     public void record(Trade trade) {
         TradeWire wire = TradeWire.from(trade);
 
-        appender.writeDocument(w -> w.write("trade").marshallable(wire));
+        appender.get().writeDocument(w -> w.write("trade").marshallable(wire));
 
         tradeCount.incrementAndGet();
 

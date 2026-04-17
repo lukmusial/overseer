@@ -238,6 +238,10 @@ public class TradingEngine {
         return orderManager;
     }
 
+    public void setOrderResponseCallback(OrderHandler.OrderResponseCallback callback) {
+        orderHandler.setOrderResponseCallback(callback);
+    }
+
     public PositionManager getPositionManager() {
         return positionManager;
     }

@@ -120,6 +120,17 @@ describe('format utilities', () => {
       expect(formatQuantity(10_000_000, 100_000_000)).toBe('0.1');
     });
 
+    it('caps crypto quantity at 5 decimals', () => {
+      // 0.01335061 should display as 0.01335 (5 decimal max for crypto)
+      expect(formatQuantity(1_335_061, 100_000_000)).toBe('0.01335');
+    });
+
+    it('shows consistent precision for similar crypto quantities', () => {
+      // Both rounded and unrounded should show same number of significant digits
+      expect(formatQuantity(1_331_000, 100_000_000)).toBe('0.01331');
+      expect(formatQuantity(1_335_061, 100_000_000)).toBe('0.01335');
+    });
+
     it('defaults to scale 1 when not provided', () => {
       expect(formatQuantity(42)).toBe('42');
     });

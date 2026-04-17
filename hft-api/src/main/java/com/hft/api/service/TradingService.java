@@ -63,6 +63,7 @@ public class TradingService {
         this.persistenceManager = persistenceManager;
         registerOrderPersistenceListener();
         registerPositionPersistenceListener();
+        registerOrderResponseCallback();
     }
 
     /**
@@ -92,6 +93,21 @@ public class TradingService {
                 persistenceManager.saveOrder(order);
             } catch (Exception e) {
                 log.error("Failed to persist order {}: {}", order.getClientOrderId(), e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Explicit persistence callback for exchange order responses.
+     * This fires directly from the OrderHandler's thenAccept/exceptionally callbacks,
+     * guaranteeing persistence even if the OrderManager listener chain fails.
+     */
+    private void registerOrderResponseCallback() {
+        tradingEngine.setOrderResponseCallback(order -> {
+            try {
+                persistenceManager.saveOrder(order);
+            } catch (Exception e) {
+                log.error("Failed to persist order response {}: {}", order.getClientOrderId(), e.getMessage());
             }
         });
     }
@@ -257,6 +273,10 @@ public class TradingService {
         order.setQuantity(request.quantity());
         order.setPrice(request.price());
         order.setStopPrice(request.stopPrice());
+        // Set price scale based on exchange (crypto uses 8 decimals, stocks use 2)
+        order.setPriceScale(symbol.getExchange() == Exchange.BINANCE
+                || symbol.getExchange() == Exchange.BINANCE_TESTNET
+                ? 100_000_000 : 100);
         if (request.timeInForce() != null) {
             order.setTimeInForce(request.timeInForce());
         }
@@ -430,6 +450,13 @@ public class TradingService {
         return activeStrategies.values().stream()
                 .map(this::toStrategyDto)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns the raw active strategy objects (for internal use by services).
+     */
+    public Collection<TradingStrategy> getActiveStrategies() {
+        return activeStrategies.values();
     }
 
     public Optional<StrategyDto> getStrategy(String id) {

@@ -258,6 +258,17 @@ public abstract class AbstractExecutionAlgorithm implements ExecutionAlgorithm {
             }
         }
 
+        // Enforce minimum order notional (default $10) — skip orders too small for exchange filters
+        if (price > 0) {
+            int qtyScale = symbol.getExchange().getQuantityScale();
+            Quote quote = context.getQuote(symbol);
+            int pScale = quote != null ? quote.getPriceScale() : 100;
+            double notional = (double) quantity * price / ((double) pScale * qtyScale);
+            if (notional < 10.0) {
+                return;
+            }
+        }
+
         OrderRequest request = OrderRequest.builder()
                 .symbol(symbol)
                 .side(side)

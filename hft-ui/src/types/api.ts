@@ -111,6 +111,18 @@ export interface ExchangeStatus {
   errorMessage: string | null;
 }
 
+export interface AccountBalance {
+  exchange: string;
+  balances: BalanceEntry[];
+}
+
+export interface BalanceEntry {
+  asset: string;
+  free: string;
+  locked: string;
+  total: string;
+}
+
 export interface TradingSymbol {
   symbol: string;
   name: string;
