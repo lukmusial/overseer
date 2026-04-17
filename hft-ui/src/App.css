@@ -1698,6 +1698,65 @@ td.actions-cell > *:last-child {
   background: var(--pip-green);
 }
 
+/* ═══ NOTIFICATIONS ═══ */
+.notification-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.notification-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid;
+  font-size: 0.8rem;
+  animation: notification-fade-in 0.3s ease;
+}
+
+@keyframes notification-fade-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.notification-position_drift {
+  background: rgba(240, 168, 0, 0.15);
+  border-color: var(--pip-amber);
+  color: var(--pip-amber);
+}
+
+.notification-info {
+  background: var(--pip-green-subtle);
+  border-color: var(--pip-green);
+  color: var(--pip-green);
+}
+
+.notification-error {
+  background: rgba(240, 72, 72, 0.15);
+  border-color: var(--pip-red);
+  color: var(--pip-red);
+}
+
+.notification-message {
+  flex: 1;
+}
+
+.notification-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 0.3rem;
+  opacity: 0.6;
+}
+
+.notification-dismiss:hover {
+  opacity: 1;
+}
+
 /* ═══ SELECTION STYLING ═══ */
 ::selection {
   background: var(--pip-green);

@@ -20,6 +20,7 @@ import type {
   CreateStrategyRequest,
   ExchangeStatus as ExchangeStatusType,
   RiskLimits,
+  Notification,
 } from './types/api';
 import './App.css';
 
@@ -39,6 +40,7 @@ export default function App() {
   const [riskLimits, setRiskLimits] = useState<RiskLimits | null>(null);
   const [chartExchange, setChartExchange] = useState(() => localStorage.getItem('chartExchange') || '');
   const [chartSymbol, setChartSymbol] = useState(() => localStorage.getItem('chartSymbol') || '');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Persist chart selection to localStorage
   useEffect(() => { localStorage.setItem('chartExchange', chartExchange); }, [chartExchange]);
@@ -148,11 +150,19 @@ export default function App() {
       });
     });
 
+    const unsubNotifications = subscribe<Notification>('/topic/notifications', (notification) => {
+      setNotifications((prev) => [notification, ...prev].slice(0, 20));
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.timestamp !== notification.timestamp));
+      }, 30000);
+    });
+
     return () => {
       unsubStatus();
       unsubOrders();
       unsubPositions();
       unsubStrategies();
+      unsubNotifications();
     };
   }, [connected, subscribe]);
 
@@ -270,6 +280,16 @@ export default function App() {
         <OrderHistory strategies={strategies} onBack={() => setShowOrderHistory(false)} />
       ) : (
       <main>
+        {notifications.length > 0 && (
+          <div className="notification-banner">
+            {notifications.map((n) => (
+              <div key={n.timestamp} className={`notification-item notification-${n.type.toLowerCase()}`}>
+                <span className="notification-message">{n.message}</span>
+                <button className="notification-dismiss" onClick={() => setNotifications(prev => prev.filter(x => x.timestamp !== n.timestamp))}>x</button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="grid">
           <div className="col-left">
             <EngineStatus
