@@ -70,10 +70,23 @@ tasks.register<JavaExec>("jmh") {
     // No -bm or -f override — each benchmark class declares its own @BenchmarkMode
     // and @Fork so SampleTime percentiles and fork-level variance are preserved where
     // they matter.
+    // Chronicle Queue needs the same --add-exports / --add-opens that hft-app's
+    // bootRun uses; any benchmark that touches the persistence layer will fail
+    // without these on modern JDKs.
+    val chronicleJvmArgs = listOf(
+            "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+            "--add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.util=ALL-UNNAMED"
+    ).joinToString(" ")
     args = listOf(benchmark, "-wi", "5", "-i", "10", "-tu", "ns",
                   "-jvm", jdk25,
                   "-jvmArgs",
-                  "-XX:+UseZGC -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -Xms2g -Xmx2g")
+                  "-XX:+UseZGC -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -Xms2g -Xmx2g " + chronicleJvmArgs)
     // Run main JMH process with Java 25 too (it loads benchmark classes)
     executable = jdk25
     dependsOn("testClasses")
