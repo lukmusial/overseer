@@ -57,6 +57,12 @@ public class TradingEngine {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile long startTimeMillis = 0;
 
+    // Monotonic counter updated by a permanent terminal handler; used by warmUp() to
+    // wait for the handler chain to drain, and available to any caller that wants to
+    // observe "consumer is caught up" without taking on Disruptor internals.
+    private final java.util.concurrent.atomic.AtomicLong lastProcessedSequence =
+            new java.util.concurrent.atomic.AtomicLong(-1);
+
     // Event translators for zero-allocation publishing
     private static final EventTranslatorOneArg<TradingEvent, Order> NEW_ORDER_TRANSLATOR =
             (event, sequence, order) -> event.populateNewOrder(order);
@@ -122,6 +128,11 @@ public class TradingEngine {
                 .then(positionHandler)
                 .then(metricsHandler);
 
+        // Permanent post-metrics tracker — lets warmUp() and callers observe drain.
+        // Runs in parallel with any benchmark-installed terminal handler.
+        disruptor.after(metricsHandler).handleEventsWith(
+                (event, sequence, endOfBatch) -> lastProcessedSequence.set(sequence));
+
         this.ringBuffer = disruptor.getRingBuffer();
 
         log.info("TradingEngine initialized with ring buffer size: {}, wait strategy: {}, thread factory: {}",
@@ -154,6 +165,62 @@ public class TradingEngine {
             riskManager.enableTrading();
             log.info("TradingEngine started");
         }
+    }
+
+    /**
+     * Pushes N synthetic quote events through the full handler chain so the JIT
+     * compiler has something to chew on before real market data hits the engine.
+     *
+     * <p>The synthetic quotes use a dedicated {@code __WARMUP__} symbol that is
+     * not subscribed by any strategy and not routed to any exchange — handlers
+     * therefore do their normal work but touch no real state: risk checks find
+     * no position, the order handler sees no order, position handler updates
+     * mark-to-market on a position that doesn't exist.
+     *
+     * <p>Blocks until the last warmup event has been processed by the full
+     * handler chain.
+     *
+     * @param iterations how many synthetic quotes to push; 0 or negative is a no-op.
+     */
+    public void warmUp(int iterations) {
+        if (iterations <= 0) {
+            return;
+        }
+        if (!running.get()) {
+            throw new IllegalStateException("TradingEngine must be started before warmUp()");
+        }
+
+        Symbol warmSymbol = new Symbol("__WARMUP__", Exchange.BINANCE);
+        Quote warmQuote = new Quote();
+        warmQuote.setSymbol(warmSymbol);
+        warmQuote.setBidPrice(10_000L);
+        warmQuote.setAskPrice(10_001L);
+        warmQuote.setBidSize(1L);
+        warmQuote.setAskSize(1L);
+        warmQuote.setPriceScale(100);
+
+        long startNanos = System.nanoTime();
+        long targetSequence = -1;
+        for (int i = 0; i < iterations; i++) {
+            long now = System.nanoTime();
+            warmQuote.setTimestamp(now);
+            warmQuote.setReceivedAt(now);
+            targetSequence = ringBuffer.next();
+            try {
+                TradingEvent event = ringBuffer.get(targetSequence);
+                event.populateQuoteUpdate(warmQuote);
+            } finally {
+                ringBuffer.publish(targetSequence);
+            }
+        }
+
+        // Spin until the post-metrics tracker observes our final sequence.
+        while (lastProcessedSequence.get() < targetSequence) {
+            Thread.onSpinWait();
+        }
+
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        log.info("JIT warmup: {} synthetic quotes processed in {} ms", iterations, elapsedMs);
     }
 
     /**

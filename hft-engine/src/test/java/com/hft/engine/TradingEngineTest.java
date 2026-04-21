@@ -393,4 +393,44 @@ class TradingEngineTest {
         order.setType(OrderType.LIMIT);
         return order;
     }
+
+    // === JIT warmup ===
+
+    @Test
+    void warmUp_beforeStart_throws() {
+        assertFalse(engine.isRunning());
+        assertThrows(IllegalStateException.class, () -> engine.warmUp(10));
+    }
+
+    @Test
+    void warmUp_zeroIterations_isNoOp() {
+        engine.start();
+        long cursorBefore = engine.getCursor();
+        engine.warmUp(0);
+        engine.warmUp(-5);
+        assertEquals(cursorBefore, engine.getCursor(),
+                "warmUp(<=0) must not publish any events");
+    }
+
+    @Test
+    void warmUp_leavesNoOrdersOrNonFlatPositions() {
+        engine.start();
+        engine.warmUp(500);
+
+        assertEquals(0, engine.getOrderManager().getOrderCount(),
+                "warmup must not submit any orders");
+        assertEquals(0, engine.getPositionManager().getActivePositions().size(),
+                "warmup must not leave non-flat positions");
+        assertEquals(0, engine.getOrderMetrics().getOrdersSubmitted(),
+                "warmup must not bump order metrics");
+    }
+
+    @Test
+    void warmUp_advancesCursorByExactIterationCount() {
+        engine.start();
+        long cursorBefore = engine.getCursor();
+        engine.warmUp(100);
+        // Cursor is zero-based and increments per publish; starting from -1, +100 events -> cursor = cursorBefore + 100
+        assertEquals(cursorBefore + 100, engine.getCursor());
+    }
 }

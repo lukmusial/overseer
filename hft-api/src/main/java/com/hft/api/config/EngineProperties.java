@@ -24,6 +24,7 @@ public class EngineProperties {
     private int ringBufferSize = 65536;
     private boolean pinConsumerThread = false;
     private AffinityStrategyType consumerAffinityStrategy = AffinityStrategyType.ANY;
+    private int jitWarmupIterations = 10_000;
 
     public enum WaitStrategyType {
         BUSY_SPIN,
@@ -84,5 +85,13 @@ public class EngineProperties {
 
     public void setConsumerAffinityStrategy(AffinityStrategyType consumerAffinityStrategy) {
         this.consumerAffinityStrategy = consumerAffinityStrategy;
+    }
+
+    public int getJitWarmupIterations() {
+        return jitWarmupIterations;
+    }
+
+    public void setJitWarmupIterations(int jitWarmupIterations) {
+        this.jitWarmupIterations = jitWarmupIterations;
     }
 }
