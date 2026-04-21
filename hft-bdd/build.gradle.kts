@@ -64,8 +64,16 @@ tasks.register<JavaExec>("jmh") {
     classpath = sourceSets["test"].runtimeClasspath
     val benchmark = project.findProperty("benchmark")?.toString() ?: ".*Benchmark.*"
     val jdk25 = "/usr/local/Cellar/openjdk/25.0.2/libexec/openjdk.jdk/Contents/Home/bin/java"
-    args = listOf(benchmark, "-f", "1", "-wi", "5", "-i", "10", "-tu", "ns", "-bm", "avgt",
-                  "-jvm", jdk25, "-jvmArgs", "-XX:+UseZGC -Xms1g -Xmx1g")
+    // Production-representative low-latency JVM args so before/after comparisons are
+    // meaningful: pre-touch heap, disable explicit GC, ZGC. Kept identical across all
+    // benchmark runs so the affinity variable isn't confounded by GC settings.
+    // No -bm or -f override — each benchmark class declares its own @BenchmarkMode
+    // and @Fork so SampleTime percentiles and fork-level variance are preserved where
+    // they matter.
+    args = listOf(benchmark, "-wi", "5", "-i", "10", "-tu", "ns",
+                  "-jvm", jdk25,
+                  "-jvmArgs",
+                  "-XX:+UseZGC -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -Xms2g -Xmx2g")
     // Run main JMH process with Java 25 too (it loads benchmark classes)
     executable = jdk25
     dependsOn("testClasses")
