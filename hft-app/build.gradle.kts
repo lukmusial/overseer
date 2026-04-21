@@ -78,12 +78,17 @@ tasks.bootJar {
     mainClass.set("com.hft.app.HftApplication")
 }
 
-// Low-latency JVM configuration for bootRun
+// Low-latency JVM configuration for bootRun.
+// Kept in sync with the JMH benchmark's JVM args so production matches the
+// environment in which we measure latency.
 tasks.bootRun {
     jvmArgs = listOf(
         "--enable-preview",
         "-XX:+UseZGC",
-        "-XX:+AlwaysPreTouch",
+        "-XX:+AlwaysPreTouch",          // page-in heap at start — no first-touch stalls
+        "-XX:+DisableExplicitGC",       // ignore any stray System.gc() from dependencies
+        "-XX:+UseNUMA",                 // Linux NUMA-aware allocation; no-op elsewhere
+        "-Djava.lang.Integer.IntegerCache.high=65536",  // wider Integer cache for long clientOrderIds
         "-Xms2g",
         "-Xmx2g",
         // Chronicle Queue requirements for module system
