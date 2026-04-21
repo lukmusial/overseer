@@ -12,16 +12,18 @@ import com.hft.engine.handler.RiskHandler;
 import com.hft.engine.service.OrderManager;
 import com.hft.engine.service.PositionManager;
 import com.hft.engine.service.RiskManager;
+import com.hft.engine.thread.PinnedThreadFactory;
 import com.lmax.disruptor.BusySpinWaitStrategy;
+import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorOneArg;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.util.DaemonThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -81,6 +83,11 @@ public class TradingEngine {
     }
 
     public TradingEngine(RiskManager.RiskLimits riskLimits, int ringBufferSize, WaitStrategy waitStrategy) {
+        this(riskLimits, ringBufferSize, waitStrategy, new PinnedThreadFactory("disruptor-consumer"));
+    }
+
+    public TradingEngine(RiskManager.RiskLimits riskLimits, int ringBufferSize, WaitStrategy waitStrategy,
+                         ThreadFactory threadFactory) {
         // Initialize services
         this.orderManager = new OrderManager();
         this.positionManager = new PositionManager();
@@ -95,11 +102,12 @@ public class TradingEngine {
         this.riskHandler = new RiskHandler(riskManager);
         this.metricsHandler = new MetricsHandler(orderMetrics);
 
-        // Create disruptor with configurable wait strategy
+        // Create disruptor with configurable wait strategy + thread factory.
+        // The thread factory controls whether the Disruptor consumer thread is pinned to a CPU core.
         this.disruptor = new Disruptor<>(
                 TradingEventFactory.INSTANCE,
                 ringBufferSize,
-                DaemonThreadFactory.INSTANCE,
+                threadFactory,
                 ProducerType.MULTI,
                 waitStrategy
         );
@@ -116,8 +124,24 @@ public class TradingEngine {
 
         this.ringBuffer = disruptor.getRingBuffer();
 
-        log.info("TradingEngine initialized with ring buffer size: {}, wait strategy: {}",
-                ringBufferSize, waitStrategy.getClass().getSimpleName());
+        log.info("TradingEngine initialized with ring buffer size: {}, wait strategy: {}, thread factory: {}",
+                ringBufferSize, waitStrategy.getClass().getSimpleName(),
+                threadFactory.getClass().getSimpleName());
+    }
+
+    /**
+     * Appends a handler to the end of the Disruptor chain (after MetricsHandler).
+     * Intended for latency benchmarks and test observability — must be called before start().
+     *
+     * <p>The appended handler sees every event that has already been processed by the full
+     * production chain, so observing its execution is a proxy for "the consumer thread has
+     * finished with this event."
+     */
+    public void addTerminalHandler(EventHandler<com.hft.engine.event.TradingEvent> handler) {
+        if (running.get()) {
+            throw new IllegalStateException("Cannot add terminal handler after engine is started");
+        }
+        disruptor.after(metricsHandler).handleEventsWith(handler);
     }
 
     /**
