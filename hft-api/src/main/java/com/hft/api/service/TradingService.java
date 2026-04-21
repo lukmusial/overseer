@@ -43,22 +43,34 @@ public class TradingService {
     @Autowired
     public TradingService(RiskLimitsProperties riskLimitsProperties, EngineProperties engineProperties) {
         this(PersistenceManager.chronicle(), riskLimitsProperties.toRiskLimits(),
-                engineProperties.getRingBufferSize(), engineProperties.toWaitStrategy());
+                engineProperties.getRingBufferSize(), engineProperties.toWaitStrategy(),
+                engineProperties.toConsumerThreadFactory());
     }
 
     /**
      * Constructor for testing - allows injecting custom persistence and risk limits.
      */
     public TradingService(PersistenceManager persistenceManager, RiskManager.RiskLimits riskLimits) {
-        this(persistenceManager, riskLimits, 1024 * 64, new com.lmax.disruptor.BusySpinWaitStrategy());
+        this(persistenceManager, riskLimits, 1024 * 64, new com.lmax.disruptor.BusySpinWaitStrategy(),
+                new com.hft.engine.thread.PinnedThreadFactory("disruptor-consumer"));
     }
 
     /**
-     * Full constructor with all engine parameters.
+     * Full constructor with all engine parameters (backwards-compatible — defaults to unpinned factory).
      */
     public TradingService(PersistenceManager persistenceManager, RiskManager.RiskLimits riskLimits,
                           int ringBufferSize, com.lmax.disruptor.WaitStrategy waitStrategy) {
-        this.tradingEngine = new TradingEngine(riskLimits, ringBufferSize, waitStrategy);
+        this(persistenceManager, riskLimits, ringBufferSize, waitStrategy,
+                new com.hft.engine.thread.PinnedThreadFactory("disruptor-consumer"));
+    }
+
+    /**
+     * Full constructor with explicit thread factory (used for affinity pinning).
+     */
+    public TradingService(PersistenceManager persistenceManager, RiskManager.RiskLimits riskLimits,
+                          int ringBufferSize, com.lmax.disruptor.WaitStrategy waitStrategy,
+                          java.util.concurrent.ThreadFactory threadFactory) {
+        this.tradingEngine = new TradingEngine(riskLimits, ringBufferSize, waitStrategy, threadFactory);
         this.algorithmContext = new TradingEngineAlgorithmContext(tradingEngine);
         this.persistenceManager = persistenceManager;
         registerOrderPersistenceListener();
