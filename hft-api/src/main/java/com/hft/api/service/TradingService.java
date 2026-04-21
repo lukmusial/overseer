@@ -8,6 +8,7 @@ import com.hft.algo.strategy.*;
 import com.hft.api.config.EngineProperties;
 import com.hft.api.config.RiskLimitsProperties;
 import com.hft.api.dto.*;
+import com.hft.api.persistence.AsyncPositionPersister;
 import com.hft.core.model.*;
 import com.hft.engine.TradingEngine;
 import com.hft.engine.service.PositionManager;
@@ -36,6 +37,8 @@ public class TradingService {
     private final TradingEngineAlgorithmContext algorithmContext;
     private final PersistenceManager persistenceManager;
     private final Map<String, TradingStrategy> activeStrategies = new ConcurrentHashMap<>();
+    private final int jitWarmupIterations;
+    private final AsyncPositionPersister positionPersister;
 
     /**
      * Spring-managed constructor with risk limits and engine config from configuration.
@@ -44,7 +47,8 @@ public class TradingService {
     public TradingService(RiskLimitsProperties riskLimitsProperties, EngineProperties engineProperties) {
         this(PersistenceManager.chronicle(), riskLimitsProperties.toRiskLimits(),
                 engineProperties.getRingBufferSize(), engineProperties.toWaitStrategy(),
-                engineProperties.toConsumerThreadFactory());
+                engineProperties.toConsumerThreadFactory(),
+                engineProperties.getJitWarmupIterations());
     }
 
     /**
@@ -66,13 +70,27 @@ public class TradingService {
 
     /**
      * Full constructor with explicit thread factory (used for affinity pinning).
+     * JIT warmup is disabled by default in this path — non-Spring callers opt in via
+     * the overload that takes an iteration count.
      */
     public TradingService(PersistenceManager persistenceManager, RiskManager.RiskLimits riskLimits,
                           int ringBufferSize, com.lmax.disruptor.WaitStrategy waitStrategy,
                           java.util.concurrent.ThreadFactory threadFactory) {
+        this(persistenceManager, riskLimits, ringBufferSize, waitStrategy, threadFactory, 0);
+    }
+
+    /**
+     * Full constructor with explicit thread factory and JIT warmup iteration count.
+     */
+    public TradingService(PersistenceManager persistenceManager, RiskManager.RiskLimits riskLimits,
+                          int ringBufferSize, com.lmax.disruptor.WaitStrategy waitStrategy,
+                          java.util.concurrent.ThreadFactory threadFactory,
+                          int jitWarmupIterations) {
         this.tradingEngine = new TradingEngine(riskLimits, ringBufferSize, waitStrategy, threadFactory);
         this.algorithmContext = new TradingEngineAlgorithmContext(tradingEngine);
         this.persistenceManager = persistenceManager;
+        this.jitWarmupIterations = jitWarmupIterations;
+        this.positionPersister = new AsyncPositionPersister(persistenceManager.getPositionStore());
         registerOrderPersistenceListener();
         registerPositionPersistenceListener();
         registerOrderResponseCallback();
@@ -95,6 +113,8 @@ public class TradingService {
     @PreDestroy
     public void shutdown() {
         log.info("Shutting down TradingService, flushing persistence...");
+        // Drain any pending position snapshots before closing the store.
+        positionPersister.close();
         persistenceManager.flush();
         persistenceManager.close();
     }
@@ -125,13 +145,12 @@ public class TradingService {
     }
 
     private void registerPositionPersistenceListener() {
-        tradingEngine.getPositionManager().addPositionListener(position -> {
-            try {
-                persistenceManager.getPositionStore().saveSnapshot(position, System.nanoTime());
-            } catch (Exception e) {
-                log.error("Failed to persist position {}: {}", position.getSymbol(), e.getMessage());
-            }
-        });
+        // Hot path: the PositionManager listener fires on the Disruptor consumer
+        // thread for every non-flat quote update. AsyncPositionPersister snapshots
+        // the position fields synchronously (cheap getter reads) then hands off to
+        // a dedicated daemon thread for the actual Chronicle write, so page-fault
+        // or fsync spikes no longer land on the trading hot thread.
+        tradingEngine.getPositionManager().addPositionListener(positionPersister::submit);
     }
 
     private void loadPersistedPositions() {
@@ -240,6 +259,9 @@ public class TradingService {
 
     public void startEngine() {
         tradingEngine.start();
+        if (jitWarmupIterations > 0) {
+            tradingEngine.warmUp(jitWarmupIterations);
+        }
         log.info("Trading engine started");
     }
 
