@@ -1,14 +1,13 @@
 package com.hft.engine.service;
 
 import com.hft.core.model.*;
+import com.hft.core.util.ListenerSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
@@ -19,7 +18,9 @@ public class PositionManager {
     private static final Logger log = LoggerFactory.getLogger(PositionManager.class);
 
     private final Map<Symbol, Position> positions;
-    private final List<Consumer<Position>> positionListeners;
+    private final ListenerSet<Position> positionListeners;
+    private final ListenerSet.ExceptionSink logError =
+            (listener, cause) -> log.error("Error in position listener", cause);
 
     // Aggregate P&L tracking (raw scaled units)
     private volatile long totalRealizedPnl;
@@ -31,7 +32,7 @@ public class PositionManager {
 
     public PositionManager() {
         this.positions = new ConcurrentHashMap<>();
-        this.positionListeners = new CopyOnWriteArrayList<>();
+        this.positionListeners = new ListenerSet<>();
     }
 
     /**
@@ -239,13 +240,7 @@ public class PositionManager {
     }
 
     private void notifyListeners(Position position) {
-        for (Consumer<Position> listener : positionListeners) {
-            try {
-                listener.accept(position);
-            } catch (Exception e) {
-                log.error("Error in position listener", e);
-            }
-        }
+        positionListeners.notify(position, logError);
     }
 
     /**
