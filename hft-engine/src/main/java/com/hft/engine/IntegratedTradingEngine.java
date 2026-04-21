@@ -11,6 +11,7 @@ import com.hft.engine.handler.PositionHandler;
 import com.hft.engine.risk.RiskContextAdapter;
 import com.hft.engine.service.OrderManager;
 import com.hft.engine.service.PositionManager;
+import com.hft.engine.thread.PinnedThreadFactory;
 import com.hft.persistence.PersistenceManager;
 import com.hft.risk.*;
 import com.hft.risk.rules.StandardRules;
@@ -20,11 +21,11 @@ import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.util.DaemonThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -100,6 +101,16 @@ public class IntegratedTradingEngine implements AutoCloseable {
      */
     public IntegratedTradingEngine(RiskLimits riskLimits, PersistenceManager persistence, int ringBufferSize,
                                    WaitStrategy waitStrategy) {
+        this(riskLimits, persistence, ringBufferSize, waitStrategy,
+                new PinnedThreadFactory("integrated-disruptor-consumer"));
+    }
+
+    /**
+     * Creates a new integrated trading engine with full configuration, custom wait strategy,
+     * and explicit thread factory (used to pin the Disruptor consumer to a CPU core).
+     */
+    public IntegratedTradingEngine(RiskLimits riskLimits, PersistenceManager persistence, int ringBufferSize,
+                                   WaitStrategy waitStrategy, ThreadFactory threadFactory) {
         // Initialize services
         this.orderManager = new OrderManager();
         this.positionManager = new PositionManager();
@@ -119,11 +130,12 @@ public class IntegratedTradingEngine implements AutoCloseable {
         this.positionHandler = new PositionHandler(positionManager);
         this.metricsHandler = new MetricsHandler(orderMetrics);
 
-        // Create disruptor with configurable wait strategy
+        // Create disruptor with configurable wait strategy + thread factory.
+        // The thread factory controls whether the Disruptor consumer thread is pinned to a CPU core.
         this.disruptor = new Disruptor<>(
                 TradingEventFactory.INSTANCE,
                 ringBufferSize,
-                DaemonThreadFactory.INSTANCE,
+                threadFactory,
                 ProducerType.MULTI,
                 waitStrategy
         );
