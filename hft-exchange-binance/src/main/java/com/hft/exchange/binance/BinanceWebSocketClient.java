@@ -2,6 +2,7 @@ package com.hft.exchange.binance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hft.core.util.ListenerSet;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,13 +22,16 @@ public class BinanceWebSocketClient {
     private final BinanceConfig config;
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final List<Consumer<JsonNode>> tickerListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<JsonNode>> tradeListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<JsonNode>> depthListeners = new CopyOnWriteArrayList<>();
+    private final ListenerSet<JsonNode> tickerListeners = new ListenerSet<>();
+    private final ListenerSet<JsonNode> tradeListeners = new ListenerSet<>();
+    private final ListenerSet<JsonNode> depthListeners = new ListenerSet<>();
 
     // Raw string listeners for fast-path parsing (bypass Jackson tree entirely)
-    private final List<Consumer<String>> rawTickerListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<String>> rawTradeListeners = new CopyOnWriteArrayList<>();
+    private final ListenerSet<String> rawTickerListeners = new ListenerSet<>();
+    private final ListenerSet<String> rawTradeListeners = new ListenerSet<>();
+
+    private final ListenerSet.ExceptionSink logError =
+            (listener, cause) -> log.error("Error in websocket listener", cause);
     private final Set<String> subscribedTickers = ConcurrentHashMap.newKeySet();
     private final Set<String> subscribedTrades = ConcurrentHashMap.newKeySet();
 
@@ -326,52 +330,22 @@ public class BinanceWebSocketClient {
     }
 
     private void notifyTickerListeners(JsonNode node) {
-        for (Consumer<JsonNode> listener : tickerListeners) {
-            try {
-                listener.accept(node);
-            } catch (Exception e) {
-                log.error("Error in ticker listener", e);
-            }
-        }
+        tickerListeners.notify(node, logError);
     }
 
     private void notifyRawTickerListeners(String text) {
-        for (Consumer<String> listener : rawTickerListeners) {
-            try {
-                listener.accept(text);
-            } catch (Exception e) {
-                log.error("Error in raw ticker listener", e);
-            }
-        }
+        rawTickerListeners.notify(text, logError);
     }
 
     private void notifyTradeListeners(JsonNode node) {
-        for (Consumer<JsonNode> listener : tradeListeners) {
-            try {
-                listener.accept(node);
-            } catch (Exception e) {
-                log.error("Error in trade listener", e);
-            }
-        }
+        tradeListeners.notify(node, logError);
     }
 
     private void notifyRawTradeListeners(String text) {
-        for (Consumer<String> listener : rawTradeListeners) {
-            try {
-                listener.accept(text);
-            } catch (Exception e) {
-                log.error("Error in raw trade listener", e);
-            }
-        }
+        rawTradeListeners.notify(text, logError);
     }
 
     private void notifyDepthListeners(JsonNode node) {
-        for (Consumer<JsonNode> listener : depthListeners) {
-            try {
-                listener.accept(node);
-            } catch (Exception e) {
-                log.error("Error in depth listener", e);
-            }
-        }
+        depthListeners.notify(node, logError);
     }
 }
