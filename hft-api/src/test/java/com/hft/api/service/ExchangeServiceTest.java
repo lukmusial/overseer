@@ -5,11 +5,14 @@ import com.hft.api.dto.ExchangeStatusDto;
 import com.hft.api.dto.StrategyDto;
 import com.hft.api.dto.SymbolDto;
 import com.hft.engine.TradingEngine;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,8 +29,16 @@ class ExchangeServiceTest {
     private StubMarketDataService stubMarketDataService;
     private ChartDataService chartDataService;
 
+    @TempDir
+    Path tempDir;
+
     @BeforeEach
     void setUp() {
+        // Redirect the persisted-mode file to a per-test temp location so switchMode()
+        // calls don't leak into ~/.hft-client/ and pollute subsequent tests or runs.
+        System.setProperty(ExchangeService.MODE_FILE_SYSTEM_PROPERTY,
+                tempDir.resolve("exchange-modes.properties").toString());
+
         properties = new ExchangeProperties();
 
         // Configure Alpaca in stub mode
@@ -56,6 +67,11 @@ class ExchangeServiceTest {
 
         exchangeService = new ExchangeService(properties, new StandardEnvironment(), messagingTemplate, tradingService, stubMarketDataService, chartDataService);
         exchangeService.initialize();
+    }
+
+    @AfterEach
+    void tearDown() {
+        System.clearProperty(ExchangeService.MODE_FILE_SYSTEM_PROPERTY);
     }
 
     @Test

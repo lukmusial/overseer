@@ -1,5 +1,7 @@
 package com.hft.api.config;
 
+import com.hft.engine.thread.AffinityStrategyType;
+import com.hft.engine.thread.PinnedThreadFactory;
 import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.BusySpinWaitStrategy;
 import com.lmax.disruptor.SleepingWaitStrategy;
@@ -66,5 +68,28 @@ class EnginePropertiesTest {
         var props = new EngineProperties();
         props.setRingBufferSize(1024);
         assertEquals(1024, props.getRingBufferSize());
+    }
+
+    @Test
+    void pinConsumerThreadDefaultsOff() {
+        var props = new EngineProperties();
+        assertFalse(props.isPinConsumerThread());
+        assertEquals(AffinityStrategyType.ANY, props.getConsumerAffinityStrategy());
+    }
+
+    @Test
+    void threadFactoryReflectsPinSetting() {
+        var off = new EngineProperties();
+        var factoryOff = (PinnedThreadFactory) off.toConsumerThreadFactory();
+        assertFalse(factoryOff.isPinningRequested());
+        assertFalse(factoryOff.isPinningActive());
+
+        var on = new EngineProperties();
+        on.setPinConsumerThread(true);
+        on.setConsumerAffinityStrategy(AffinityStrategyType.SAME_CORE);
+        var factoryOn = (PinnedThreadFactory) on.toConsumerThreadFactory();
+        assertTrue(factoryOn.isPinningRequested());
+        // isPinningActive depends on platform: true on Linux, may be false elsewhere
+        // if the AffinityThreadFactory initializer fails — we just assert the request was honoured.
     }
 }
