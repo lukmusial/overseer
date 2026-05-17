@@ -92,8 +92,11 @@ public class ExchangeService {
     // Cached symbols
     private final Map<String, List<SymbolDto>> symbolCache = new ConcurrentHashMap<>();
 
-    private static final Path MODE_FILE = Paths.get(
-            System.getProperty("user.home"), ".hft-client", "exchange-modes.properties");
+    // System property override so tests can redirect persisted-mode storage to a
+    // temp directory and avoid polluting ~/.hft-client/ between runs.
+    static final String MODE_FILE_SYSTEM_PROPERTY = "hft.exchange.modes.file";
+
+    private final Path modeFile;
 
     public ExchangeService(ExchangeProperties properties, Environment environment,
                            SimpMessagingTemplate messagingTemplate, @Lazy TradingService tradingService,
@@ -105,6 +108,15 @@ public class ExchangeService {
         this.tradingService = tradingService;
         this.stubMarketDataService = stubMarketDataService;
         this.chartDataService = chartDataService;
+        this.modeFile = resolveModeFile();
+    }
+
+    private static Path resolveModeFile() {
+        String override = System.getProperty(MODE_FILE_SYSTEM_PROPERTY);
+        if (override != null && !override.isBlank()) {
+            return Paths.get(override);
+        }
+        return Paths.get(System.getProperty("user.home"), ".hft-client", "exchange-modes.properties");
     }
 
     @PostConstruct
@@ -557,10 +569,10 @@ public class ExchangeService {
      * and applies the persisted mode so it survives app restarts.
      */
     private void loadPersistedModes() {
-        if (!Files.exists(MODE_FILE)) return;
+        if (!Files.exists(modeFile)) return;
 
         Properties modes = new Properties();
-        try (var is = Files.newInputStream(MODE_FILE)) {
+        try (var is = Files.newInputStream(modeFile)) {
             modes.load(is);
         } catch (IOException e) {
             log.warn("Failed to load persisted exchange modes: {}", e.getMessage());
@@ -589,8 +601,8 @@ public class ExchangeService {
         try {
             // Load existing modes
             Properties modes = new Properties();
-            if (Files.exists(MODE_FILE)) {
-                try (var is = Files.newInputStream(MODE_FILE)) {
+            if (Files.exists(modeFile)) {
+                try (var is = Files.newInputStream(modeFile)) {
                     modes.load(is);
                 }
             }
@@ -598,8 +610,8 @@ public class ExchangeService {
             modes.setProperty(exchange, mode);
 
             // Write back
-            Files.createDirectories(MODE_FILE.getParent());
-            try (var os = Files.newOutputStream(MODE_FILE)) {
+            Files.createDirectories(modeFile.getParent());
+            try (var os = Files.newOutputStream(modeFile)) {
                 modes.store(os, "Exchange modes - persisted across restarts");
             }
         } catch (IOException e) {

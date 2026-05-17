@@ -1,14 +1,14 @@
 package com.hft.engine.service;
 
 import com.hft.core.model.*;
+import com.hft.core.util.ListenerSet;
+import com.hft.core.util.PaddedVolatileLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
@@ -19,19 +19,24 @@ public class PositionManager {
     private static final Logger log = LoggerFactory.getLogger(PositionManager.class);
 
     private final Map<Symbol, Position> positions;
-    private final List<Consumer<Position>> positionListeners;
+    private final ListenerSet<Position> positionListeners;
+    private final ListenerSet.ExceptionSink logError =
+            (listener, cause) -> log.error("Error in position listener", cause);
 
-    // Aggregate P&L tracking (raw scaled units)
-    private volatile long totalRealizedPnl;
-    private volatile long totalUnrealizedPnl;
+    // Aggregate P&L tracking (raw scaled units). Padded to their own cache
+    // lines so writes from the Disruptor consumer (per-tick) do not invalidate
+    // reader caches (UI / risk-checker / Tomcat workers) that hit adjacent
+    // counters. See Phase 5 plan for the analysis.
+    private final PaddedVolatileLong totalRealizedPnl = new PaddedVolatileLong();
+    private final PaddedVolatileLong totalUnrealizedPnl = new PaddedVolatileLong();
 
-    // Incrementally maintained P&L in cents (scale 100) for O(1) risk checks
-    private volatile long cachedRealizedPnlCents;
-    private volatile long cachedUnrealizedPnlCents;
+    // Incrementally maintained P&L in cents (scale 100) for O(1) risk checks.
+    private final PaddedVolatileLong cachedRealizedPnlCents = new PaddedVolatileLong();
+    private final PaddedVolatileLong cachedUnrealizedPnlCents = new PaddedVolatileLong();
 
     public PositionManager() {
         this.positions = new ConcurrentHashMap<>();
-        this.positionListeners = new CopyOnWriteArrayList<>();
+        this.positionListeners = new ListenerSet<>();
     }
 
     /**
@@ -65,11 +70,11 @@ public class PositionManager {
 
         // Update aggregate P&L (raw units)
         long realizedDelta = newRealizedPnl - previousRealizedPnl;
-        totalRealizedPnl += realizedDelta;
+        totalRealizedPnl.addAndGet(realizedDelta);
 
         // Update incremental cents cache: convert delta from position's scale to cents
         int priceScale = position.getPriceScale();
-        cachedRealizedPnlCents += realizedDelta * 100 / priceScale;
+        cachedRealizedPnlCents.addAndGet(realizedDelta * 100 / priceScale);
 
         log.debug("Trade applied: {} {} {} @ {} -> Position: {} qty, realized P&L: {}",
                 trade.getSymbol(), trade.getSide(), trade.getQuantity(), trade.getPrice(),
@@ -90,11 +95,11 @@ public class PositionManager {
 
             // Update aggregate unrealized P&L (raw units)
             long unrealizedDelta = newUnrealized - previousUnrealized;
-            totalUnrealizedPnl += unrealizedDelta;
+            totalUnrealizedPnl.addAndGet(unrealizedDelta);
 
             // Update incremental cents cache
             int priceScale = position.getPriceScale();
-            cachedUnrealizedPnlCents += unrealizedDelta * 100 / priceScale;
+            cachedUnrealizedPnlCents.addAndGet(unrealizedDelta * 100 / priceScale);
 
             notifyListeners(position);
         }
@@ -154,7 +159,7 @@ public class PositionManager {
      * O(1) — uses incrementally maintained cache updated in applyTrade().
      */
     public long getTotalRealizedPnlCents() {
-        return cachedRealizedPnlCents;
+        return cachedRealizedPnlCents.get();
     }
 
     /**
@@ -162,7 +167,7 @@ public class PositionManager {
      * O(1) — uses incrementally maintained cache updated in updateMarketValue().
      */
     public long getTotalUnrealizedPnlCents() {
-        return cachedUnrealizedPnlCents;
+        return cachedUnrealizedPnlCents.get();
     }
 
     /**
@@ -170,7 +175,7 @@ public class PositionManager {
      * O(1) — uses incrementally maintained caches for hot-path risk checks.
      */
     public long getTotalPnlCents() {
-        return cachedRealizedPnlCents + cachedUnrealizedPnlCents;
+        return cachedRealizedPnlCents.get() + cachedUnrealizedPnlCents.get();
     }
 
     /**
@@ -184,8 +189,8 @@ public class PositionManager {
             realizedCents += position.getRealizedPnl() * 100 / position.getPriceScale();
             unrealizedCents += position.getUnrealizedPnl() * 100 / position.getPriceScale();
         }
-        cachedRealizedPnlCents = realizedCents;
-        cachedUnrealizedPnlCents = unrealizedCents;
+        cachedRealizedPnlCents.set(realizedCents);
+        cachedUnrealizedPnlCents.set(unrealizedCents);
     }
 
     /**
@@ -239,13 +244,7 @@ public class PositionManager {
     }
 
     private void notifyListeners(Position position) {
-        for (Consumer<Position> listener : positionListeners) {
-            try {
-                listener.accept(position);
-            } catch (Exception e) {
-                log.error("Error in position listener", e);
-            }
-        }
+        positionListeners.notify(position, logError);
     }
 
     /**
@@ -339,10 +338,10 @@ public class PositionManager {
      */
     public void clear() {
         positions.clear();
-        totalRealizedPnl = 0;
-        totalUnrealizedPnl = 0;
-        cachedRealizedPnlCents = 0;
-        cachedUnrealizedPnlCents = 0;
+        totalRealizedPnl.set(0);
+        totalUnrealizedPnl.set(0);
+        cachedRealizedPnlCents.set(0);
+        cachedUnrealizedPnlCents.set(0);
     }
 
     /**
