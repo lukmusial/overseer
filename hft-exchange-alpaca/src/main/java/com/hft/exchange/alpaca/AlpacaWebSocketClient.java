@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.hft.core.util.ListenerSet;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,13 +24,16 @@ public class AlpacaWebSocketClient {
     private final AlpacaConfig config;
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final List<Consumer<JsonNode>> quoteListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<JsonNode>> tradeListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<JsonNode>> barListeners = new CopyOnWriteArrayList<>();
+    private final ListenerSet<JsonNode> quoteListeners = new ListenerSet<>();
+    private final ListenerSet<JsonNode> tradeListeners = new ListenerSet<>();
+    private final ListenerSet<JsonNode> barListeners = new ListenerSet<>();
 
     // Raw string listeners for fast-path parsing (bypass Jackson tree entirely)
-    private final List<Consumer<String>> rawQuoteListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<String>> rawTradeListeners = new CopyOnWriteArrayList<>();
+    private final ListenerSet<String> rawQuoteListeners = new ListenerSet<>();
+    private final ListenerSet<String> rawTradeListeners = new ListenerSet<>();
+
+    private final ListenerSet.ExceptionSink logError =
+            (listener, cause) -> log.error("Error in websocket listener", cause);
     private final Set<String> subscribedQuotes = ConcurrentHashMap.newKeySet();
     private final Set<String> subscribedTrades = ConcurrentHashMap.newKeySet();
 
@@ -379,52 +383,22 @@ public class AlpacaWebSocketClient {
     }
 
     private void notifyQuoteListeners(JsonNode node) {
-        for (Consumer<JsonNode> listener : quoteListeners) {
-            try {
-                listener.accept(node);
-            } catch (Exception e) {
-                log.error("Error in quote listener", e);
-            }
-        }
+        quoteListeners.notify(node, logError);
     }
 
     private void notifyRawQuoteListeners(String text) {
-        for (Consumer<String> listener : rawQuoteListeners) {
-            try {
-                listener.accept(text);
-            } catch (Exception e) {
-                log.error("Error in raw quote listener", e);
-            }
-        }
+        rawQuoteListeners.notify(text, logError);
     }
 
     private void notifyTradeListeners(JsonNode node) {
-        for (Consumer<JsonNode> listener : tradeListeners) {
-            try {
-                listener.accept(node);
-            } catch (Exception e) {
-                log.error("Error in trade listener", e);
-            }
-        }
+        tradeListeners.notify(node, logError);
     }
 
     private void notifyRawTradeListeners(String text) {
-        for (Consumer<String> listener : rawTradeListeners) {
-            try {
-                listener.accept(text);
-            } catch (Exception e) {
-                log.error("Error in raw trade listener", e);
-            }
-        }
+        rawTradeListeners.notify(text, logError);
     }
 
     private void notifyBarListeners(JsonNode node) {
-        for (Consumer<JsonNode> listener : barListeners) {
-            try {
-                listener.accept(node);
-            } catch (Exception e) {
-                log.error("Error in bar listener", e);
-            }
-        }
+        barListeners.notify(node, logError);
     }
 }

@@ -18,10 +18,10 @@ import org.slf4j.LoggerFactory;
 
 import com.hft.core.model.ObjectPool;
 import com.hft.core.util.FastDecimalParser;
+import com.hft.core.util.ListenerSet;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -37,8 +37,8 @@ public class BinanceMarketDataPort implements MarketDataPort {
     private final BinanceHttpClient httpClient;
     private final BinanceWebSocketClient webSocketClient;
     private final Set<Symbol> subscribedSymbols = ConcurrentHashMap.newKeySet();
-    private final List<Consumer<Quote>> quoteListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<Trade>> tradeListeners = new CopyOnWriteArrayList<>();
+    private final ListenerSet<Quote> quoteListeners = new ListenerSet<>();
+    private final ListenerSet<Trade> tradeListeners = new ListenerSet<>();
 
     // Statistics
     private final AtomicLong quotesReceived = new AtomicLong();
@@ -100,6 +100,12 @@ public class BinanceMarketDataPort implements MarketDataPort {
                 .map(Symbol::getTicker)
                 .collect(Collectors.toSet());
 
+        // Pre-populate symbolCache so handleRawTickerMessage avoids a
+        // computeIfAbsent miss (allocation + map mutex) on the first tick per symbol.
+        for (Symbol s : symbols) {
+            symbolCache.putIfAbsent(s.getTicker(), s);
+        }
+
         return webSocketClient.subscribeTickers(tickers)
                 .thenRun(() -> subscribedSymbols.addAll(symbols));
     }
@@ -120,6 +126,11 @@ public class BinanceMarketDataPort implements MarketDataPort {
         Set<String> tickers = symbols.stream()
                 .map(Symbol::getTicker)
                 .collect(Collectors.toSet());
+
+        // Pre-populate symbolCache for the trade hot path too.
+        for (Symbol s : symbols) {
+            symbolCache.putIfAbsent(s.getTicker(), s);
+        }
 
         return webSocketClient.subscribeTrades(tickers)
                 .thenRun(() -> subscribedSymbols.addAll(symbols));
@@ -171,6 +182,9 @@ public class BinanceMarketDataPort implements MarketDataPort {
     public void addTradeListener(Consumer<Trade> listener) {
         tradeListeners.add(listener);
     }
+
+    private final ListenerSet.ExceptionSink logError =
+            (listener, cause) -> log.error("Error in market data listener", cause);
 
     @Override
     public void removeTradeListener(Consumer<Trade> listener) {
@@ -386,22 +400,10 @@ public class BinanceMarketDataPort implements MarketDataPort {
     }
 
     private void notifyQuoteListeners(Quote quote) {
-        for (Consumer<Quote> listener : quoteListeners) {
-            try {
-                listener.accept(quote);
-            } catch (Exception e) {
-                log.error("Error in quote listener", e);
-            }
-        }
+        quoteListeners.notify(quote, logError);
     }
 
     private void notifyTradeListeners(Trade trade) {
-        for (Consumer<Trade> listener : tradeListeners) {
-            try {
-                listener.accept(trade);
-            } catch (Exception e) {
-                log.error("Error in trade listener", e);
-            }
-        }
+        tradeListeners.notify(trade, logError);
     }
 }

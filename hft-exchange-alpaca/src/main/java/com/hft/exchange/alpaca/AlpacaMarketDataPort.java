@@ -22,7 +22,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import com.hft.core.util.ListenerSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -37,8 +37,10 @@ public class AlpacaMarketDataPort implements MarketDataPort {
     private final AlpacaHttpClient httpClient;
     private final AlpacaWebSocketClient webSocketClient;
     private final Set<Symbol> subscribedSymbols = ConcurrentHashMap.newKeySet();
-    private final List<Consumer<Quote>> quoteListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<Trade>> tradeListeners = new CopyOnWriteArrayList<>();
+    private final ListenerSet<Quote> quoteListeners = new ListenerSet<>();
+    private final ListenerSet<Trade> tradeListeners = new ListenerSet<>();
+    private final ListenerSet.ExceptionSink logError =
+            (listener, cause) -> log.error("Error in market data listener", cause);
 
     // Statistics
     private final AtomicLong quotesReceived = new AtomicLong();
@@ -400,23 +402,11 @@ public class AlpacaMarketDataPort implements MarketDataPort {
     }
 
     private void notifyQuoteListeners(Quote quote) {
-        for (Consumer<Quote> listener : quoteListeners) {
-            try {
-                listener.accept(quote);
-            } catch (Exception e) {
-                log.error("Error in quote listener", e);
-            }
-        }
+        quoteListeners.notify(quote, logError);
     }
 
     private void notifyTradeListeners(Trade trade) {
-        for (Consumer<Trade> listener : tradeListeners) {
-            try {
-                listener.accept(trade);
-            } catch (Exception e) {
-                log.error("Error in trade listener", e);
-            }
-        }
+        tradeListeners.notify(trade, logError);
     }
 
     // Response DTOs for REST API
