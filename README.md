@@ -166,3 +166,23 @@ hft-client/
 ## Disclaimer
 
 This is an **educational project**. It is not financial advice, and it is not designed or tested for live trading with real money. The strategies included are simplified implementations meant to illustrate concepts, not to generate profit. Use at your own risk.
+
+---
+
+## License
+
+Overseer is **dual-licensed**:
+
+- **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0) — free
+  to use, modify, and share for personal, academic, research, and other
+  non-commercial purposes. If you run a modified version as a network
+  service, AGPL-3.0 requires you to make the complete source code
+  available to its users.
+- **[Commercial license](COMMERCIAL-LICENSE.md)** — required for
+  commercial use that cannot or does not comply with AGPL-3.0 (e.g.,
+  closed-source products, proprietary SaaS, internal business use that
+  cannot release modifications). Commercial licenses are granted on a
+  case-by-case basis; see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)
+  for how to inquire.
+
+Copyright © 2026 Lukasz Musial.
